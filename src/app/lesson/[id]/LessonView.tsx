@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Download, X, Maximize2, ChevronRight, ChevronLeft, Image as ImageIcon } from "lucide-react";
-import { LEVELS, type Lesson, type LessonImage } from "@/lib/types";
-import { BackHeader, Loading, Empty } from "@/components/ui";
+import {
+  Download,
+  X,
+  Maximize2,
+  ChevronRight,
+  ChevronLeft,
+  Image as ImageIcon,
+  StickyNote,
+  BookOpen,
+  ArrowRight,
+} from "lucide-react";
+import Link from "next/link";
+import { LEVELS, NOTEBOOKS, type Lesson, type LessonImage } from "@/lib/types";
+import { Loading, Empty } from "@/components/ui";
 
 export function LessonView({ id }: { id: string }) {
   const [lesson, setLesson] = useState<Lesson | null>(null);
@@ -54,86 +65,158 @@ export function LessonView({ id }: { id: string }) {
   const fileName = (i: number) =>
     `درس-${lesson?.number ?? ""}-صورة-${i + 1}.jpg`;
 
+  const isDirectedWork = lesson?.type === "directed_work";
+
   return (
-    <div className="pb-10">
-      <BackHeader
-        href={lesson ? `/year/${lesson.level}` : "/"}
-        title={lesson ? `الدرس ${lesson.number}: ${lesson.title}` : "جاري التحميل..."}
-        subtitle={
-          lesson
-            ? `${LEVELS[lesson.level].label} • ${images.length} ${
-                images.length === 1 ? "صورة" : "صور"
-              }`
-            : undefined
-        }
-      />
+    <div className="pb-16 pt-3 space-y-4 fade-up">
+      {/* رأس الصفحة وزر الرجوع المخصص */}
+      <div className="flex items-start gap-3 bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs">
+        <Link
+          href={lesson ? `/year/${lesson.level}` : "/"}
+          className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition shrink-0 mt-0.5"
+          aria-label="الرجوع"
+        >
+          <ArrowRight className="w-5 h-5" />
+        </Link>
+        <div className="min-w-0 flex-1">
+          {lesson ? (
+            <div className="space-y-1">
+              {/* شارات التعريف بالكراس والمستوى */}
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold">
+                <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md">
+                  {LEVELS[lesson.level].label}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-md ${
+                    isDirectedWork
+                      ? "bg-sky-50 text-sky-800"
+                      : "bg-teal-50 text-teal-800"
+                  }`}
+                >
+                  {isDirectedWork ? "📗 كراس الأعمال الموجهة" : "📘 كراس الدروس"}
+                </span>
+              </div>
+
+              {/* العنوان الكامل للدرس دون أي اقتطاع */}
+              <h1 className="text-base font-black text-slate-900 leading-snug break-words pt-0.5">
+                {lesson.title}
+              </h1>
+
+              {/* تفاصيل الميدان والمقطع للكراس العادي */}
+              {!isDirectedWork && (
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-bold pt-0.5">
+                  {lesson.field && (
+                    <span className="flex items-center gap-1">
+                      <span>📐 الميدان:</span>
+                      <span className="text-slate-800 font-black">{lesson.field}</span>
+                    </span>
+                  )}
+                  {lesson.section && (
+                    <span className="flex items-center gap-1">
+                      <span>• 📑</span>
+                      <span className="text-slate-700">{lesson.section}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm font-bold text-slate-400">جاري تحميل بيانات الدرس...</div>
+          )}
+        </div>
+      </div>
 
       {loading ? (
         <Loading />
       ) : !lesson ? (
         <Empty text="الدرس غير موجود" />
-      ) : images.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200 mt-3 p-6">
-          <ImageIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="font-bold text-slate-700 text-sm">لا توجد صور لهذا الدرس حالياً</h3>
-          <p className="text-xs text-slate-400 mt-1">
-            سيقوم الأستاذ برفع صور السبورة والملخصات قريباً.
-          </p>
-        </div>
       ) : (
-        <div className="space-y-5 mt-3">
-          {images.map((img, i) => (
-            <figure
-              key={img.id}
-              className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden fade-up"
-            >
-              {/* شريط رقم الصورة */}
-              <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                <span className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                  <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-black">
-                    {i + 1}
-                  </span>
-                  <span>الصورة رقم {i + 1} من {images.length}</span>
+        <div className="space-y-4">
+          {/* صندوق ملاحظات وتوجيهات الأستاذ إن وجدت */}
+          {lesson.notes && (
+            <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 space-y-2 shadow-2xs">
+              <div className="flex items-center gap-2 text-amber-900 font-black text-xs">
+                <StickyNote className="w-4 h-4 text-amber-600" />
+                <span>ملاحظات وتوجيهات الأستاذ للتلاميذ:</span>
+              </div>
+              <p className="text-xs text-amber-950 font-medium whitespace-pre-line leading-relaxed pr-6">
+                {lesson.notes}
+              </p>
+            </div>
+          )}
+
+          {/* صور السبورة */}
+          {images.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200 p-6">
+              <ImageIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <h3 className="font-bold text-slate-700 text-sm">لا توجد صور لهذا الدرس حالياً</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                سيقوم الأستاذ برفع صور السبورة والملخصات قريباً.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
+                <span>صور السبورة المرفوعة ({images.length}):</span>
+                <span className="text-[11px] text-slate-400 font-normal">
+                  يمكنك الضغط على الصورة لتكبيرها بملء الشاشة
                 </span>
-                <span className="text-[11px] text-slate-400">اضغط على الصورة للتكبير</span>
               </div>
 
-              {/* معاينة الصورة */}
-              <button
-                onClick={() => setSelectedIndex(i)}
-                className="block w-full text-center bg-slate-900/5 relative group cursor-zoom-in"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={img.url}
-                  alt={`صورة السبورة رقم ${i + 1}`}
-                  loading="lazy"
-                  className="w-full h-auto max-h-[550px] object-contain mx-auto transition-transform group-hover:scale-[1.01]"
-                />
-              </button>
+              {images.map((img, i) => (
+                <figure
+                  key={img.id}
+                  className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden fade-up"
+                >
+                  {/* شريط رقم الصورة */}
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                    <span className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-black">
+                        {i + 1}
+                      </span>
+                      <span>الصورة رقم {i + 1} من {images.length}</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400">اضغط للتكبير</span>
+                  </div>
 
-              {/* أزرار الإجراءات السريعة */}
-              <div className="flex gap-2 p-3 border-t border-slate-100 bg-white">
-                <button
-                  onClick={() => setSelectedIndex(i)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition"
-                >
-                  <Maximize2 className="w-4 h-4 text-emerald-600" />
-                  <span>فتح مكبر بملء الشاشة</span>
-                </button>
-                <a
-                  href={img.downloadUrl || img.url}
-                  download={fileName(i)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold active:scale-95 transition shadow-sm"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>تحميل الصورة على الهاتف</span>
-                </a>
-              </div>
-            </figure>
-          ))}
+                  {/* معاينة الصورة */}
+                  <button
+                    onClick={() => setSelectedIndex(i)}
+                    className="block w-full text-center bg-slate-900/5 relative group cursor-zoom-in"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.url}
+                      alt={`صورة السبورة رقم ${i + 1}`}
+                      loading="lazy"
+                      className="w-full h-auto max-h-[550px] object-contain mx-auto transition-transform group-hover:scale-[1.01]"
+                    />
+                  </button>
+
+                  {/* أزرار الإجراءات السريعة */}
+                  <div className="flex gap-2 p-3 border-t border-slate-100 bg-white">
+                    <button
+                      onClick={() => setSelectedIndex(i)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition"
+                    >
+                      <Maximize2 className="w-4 h-4 text-emerald-600" />
+                      <span>تكبير بملء الشاشة</span>
+                    </button>
+                    <a
+                      href={img.downloadUrl || img.url}
+                      download={fileName(i)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold active:scale-95 transition shadow-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>تحميل الصورة على الهاتف</span>
+                    </a>
+                  </div>
+                </figure>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -159,64 +242,85 @@ export function LessonView({ id }: { id: string }) {
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold active:scale-95 transition"
               >
-                <Download className="w-3.5 h-3.5" /> تحميل الصورة
+                <Download className="w-3.5 h-3.5" />
+                <span>تحميل</span>
               </a>
             </div>
 
             <button
               onClick={() => setSelectedIndex(null)}
-              className="w-9 h-9 rounded-xl bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition"
+              className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition"
               aria-label="إغلاق"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
           </div>
 
-          {/* الصورة في الوسط مع أزرار التنقل */}
-          <div className="flex-1 relative overflow-auto flex items-center justify-center p-2">
-            {/* زر الصورة السابقة */}
+          {/* وسط الشاشة: الصورة مع أزرار التنقل يميناً ويساراً */}
+          <div className="flex-1 flex items-center justify-center relative p-2 min-h-0">
             {images.length > 1 && (
-              <button
-                disabled={selectedIndex === 0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  prevImage();
-                }}
-                className={`absolute right-2 md:right-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-sm transition ${
-                  selectedIndex === 0 ? "opacity-20 cursor-not-allowed" : "hover:bg-black/90 active:scale-95"
-                }`}
-                title="الصورة السابقة"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
+              <>
+                <button
+                  disabled={selectedIndex === 0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    prevImage();
+                  }}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm border border-white/20 z-10 transition ${
+                    selectedIndex === 0 ? "opacity-20 cursor-not-allowed" : "hover:bg-black/80"
+                  }`}
+                  aria-label="الصورة السابقة"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+
+                <button
+                  disabled={selectedIndex === images.length - 1}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    nextImage();
+                  }}
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm border border-white/20 z-10 transition ${
+                    selectedIndex === images.length - 1 ? "opacity-20 cursor-not-allowed" : "hover:bg-black/80"
+                  }`}
+                  aria-label="الصورة التالية"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+              </>
             )}
 
-            {/* الصورة نفسها */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={activeImage.url}
               alt=""
-              className="max-w-full max-h-full object-contain cursor-default"
+              className="max-h-full max-w-full object-contain pointer-events-auto"
               onClick={(e) => e.stopPropagation()}
             />
-
-            {/* زر الصورة التالية */}
-            {images.length > 1 && (
-              <button
-                disabled={selectedIndex === images.length - 1}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  nextImage();
-                }}
-                className={`absolute left-2 md:left-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-sm transition ${
-                  selectedIndex === images.length - 1 ? "opacity-20 cursor-not-allowed" : "hover:bg-black/90 active:scale-95"
-                }`}
-                title="الصورة التالية"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-            )}
           </div>
+
+          {/* شريط الصور المصغرة السفلي */}
+          {images.length > 1 && (
+            <div
+              className="p-3 bg-black/60 backdrop-blur-sm flex justify-center gap-2 overflow-x-auto z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {images.map((img, i) => (
+                <button
+                  key={img.id}
+                  onClick={() => setSelectedIndex(i)}
+                  className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition shrink-0 ${
+                    i === selectedIndex
+                      ? "border-emerald-500 scale-105"
+                      : "border-transparent opacity-50 hover:opacity-80"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

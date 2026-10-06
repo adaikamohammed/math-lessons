@@ -1,24 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLessonsData, saveLessonsData, deleteImageFile } from "@/lib/storage";
 import { verifyAdminSession } from "@/lib/auth";
-import { Lesson } from "@/lib/types";
+import { Lesson, NotebookType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// جلب الدروس (عام للتلاميذ والأستاذ)
+// جلب الدروس والأعمال الموجهة
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const levelParam = searchParams.get("level");
+  const typeParam = searchParams.get("type"); // "lessons" | "directed_work"
   const data = await getLessonsData();
 
   let lessons = data.lessons;
+
+  // فلترة حسب المستوى (1 أو 2 متوسط)
   if (levelParam) {
     const levelNum = Number(levelParam);
     lessons = lessons.filter((l) => l.level === levelNum);
   }
 
-  // ترتيب الدروس تصاعدياً حسب رقم الدرس
+  // فلترة حسب نوع الكراس (كراس الدروس أو كراس الأعمال الموجهة)
+  if (typeParam === "directed_work") {
+    lessons = lessons.filter((l) => l.type === "directed_work");
+  } else if (typeParam === "lessons") {
+    lessons = lessons.filter((l) => !l.type || l.type === "lessons");
+  }
+
+  // ترتيب الدروس تصاعدياً حسب رقم الدرس / الحصة
   lessons.sort((a, b) => a.number - b.number);
 
   return NextResponse.json(
@@ -33,7 +43,7 @@ export async function GET(req: NextRequest) {
   );
 }
 
-// إضافة درس جديد (للأستاذ فقط)
+// إضافة درس / حصة أعمال موجهة (للأستاذ فقط)
 export async function POST(req: NextRequest) {
   const isAuth = await verifyAdminSession();
   if (!isAuth) {
@@ -42,32 +52,40 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    let { level, number, title } = body;
+    let { level, type, field, section, number, title, notes } = body;
 
     if (!title || !level) {
-      return NextResponse.json({ error: "يرجى كتابة عنوان الدرس" }, { status: 400 });
+      return NextResponse.json({ error: "يرجى كتابة عنوان المورد / الحصة" }, { status: 400 });
     }
 
     title = String(title).trim();
+    const notebookType: NotebookType = type === "directed_work" ? "directed_work" : "lessons";
 
-    // إذا كتب الأستاذ "الدرس 1 : عنوان" ولم يدخل الرقم يدوياً، نستخرجه تلقائياً
-    const match = title.match(/^(?:الدرس\s*)?0*(\d+)\s*[:\-–]\s*(.+)$/i);
-    let lessonNum = Number(number);
-    if (!lessonNum && match) {
-      lessonNum = parseInt(match[1], 10);
+    // استخراج الرقم تلقائياً إذا كان مكتوباً في العنوان ولم يُدخل يدوياً
+    const match = title.match(/^(?:(?:الدرس|المورد|الحصة|سلسلة)\s*)?0*(\d+)\s*[:\-–]\s*(.+)$/i);
+    let itemNum = Number(number);
+    if (!itemNum && match) {
+      itemNum = parseInt(match[1], 10);
     }
 
     const data = await getLessonsData();
-    const existingForLevel = data.lessons.filter((l) => l.level === Number(level));
-    if (!lessonNum) {
-      lessonNum = existingForLevel.length ? Math.max(...existingForLevel.map((l) => l.number)) + 1 : 1;
+    const existingSame = data.lessons.filter(
+      (l) => l.level === Number(level) && (notebookType === "directed_work" ? l.type === "directed_work" : (!l.type || l.type === "lessons"))
+    );
+
+    if (!itemNum) {
+      itemNum = existingSame.length ? Math.max(...existingSame.map((l) => l.number)) + 1 : 1;
     }
 
     const newLesson: Lesson = {
       id: `lesson_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       level: Number(level) as 1 | 2,
-      number: lessonNum,
+      type: notebookType,
+      field: notebookType === "lessons" ? (field ? String(field).trim() : "أنشطة عددية") : undefined,
+      section: notebookType === "lessons" ? (section ? String(section).trim() : "المقطع 1 : الأعداد الطبيعية والأعداد العشرية") : undefined,
+      number: itemNum,
       title: title,
+      notes: notes ? String(notes).trim() : undefined,
       createdAt: new Date().toISOString(),
       images: [],
     };
@@ -82,7 +100,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// تعديل درس (للأستاذ فقط)
+// تعديل بيانات درس / حصة أعمال موجهة (للأستاذ فقط)
 export async function PUT(req: NextRequest) {
   const isAuth = await verifyAdminSession();
   if (!isAuth) {
@@ -91,20 +109,24 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, title, number } = body;
+    const { id, title, number, field, section, notes, type } = body;
 
     if (!id) {
-      return NextResponse.json({ error: "معرّف الدرس مطلوب" }, { status: 400 });
+      return NextResponse.json({ error: "معرّف العنصر مطلوب" }, { status: 400 });
     }
 
     const data = await getLessonsData();
     const lesson = data.lessons.find((l) => l.id === id);
     if (!lesson) {
-      return NextResponse.json({ error: "الدرس غير موجود" }, { status: 404 });
+      return NextResponse.json({ error: "العنصر غير موجود" }, { status: 404 });
     }
 
     if (title !== undefined) lesson.title = String(title).trim();
     if (number !== undefined) lesson.number = Number(number);
+    if (field !== undefined) lesson.field = field ? String(field).trim() : undefined;
+    if (section !== undefined) lesson.section = section ? String(section).trim() : undefined;
+    if (notes !== undefined) lesson.notes = notes ? String(notes).trim() : undefined;
+    if (type !== undefined) lesson.type = type === "directed_work" ? "directed_work" : "lessons";
 
     await saveLessonsData(data);
     return NextResponse.json({ success: true, lesson });
@@ -113,7 +135,7 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-// حذف درس وصوره (للأستاذ فقط)
+// حذف عنصر وصوره (للأستاذ فقط)
 export async function DELETE(req: NextRequest) {
   const isAuth = await verifyAdminSession();
   if (!isAuth) {
@@ -129,19 +151,19 @@ export async function DELETE(req: NextRequest) {
   }
 
   if (!id) {
-    return NextResponse.json({ error: "معرّف الدرس مطلوب" }, { status: 400 });
+    return NextResponse.json({ error: "معرّف العنصر مطلوب" }, { status: 400 });
   }
 
   try {
     const data = await getLessonsData();
     const index = data.lessons.findIndex((l) => l.id === id);
     if (index === -1) {
-      return NextResponse.json({ error: "الدرس غير موجود" }, { status: 404 });
+      return NextResponse.json({ error: "العنصر غير موجود" }, { status: 404 });
     }
 
     const [removed] = data.lessons.splice(index, 1);
 
-    // حذف صور الدرس من التخزين
+    // حذف الصور من التخزين
     if (removed.images && Array.isArray(removed.images)) {
       for (const img of removed.images) {
         if (img?.url) {
@@ -154,6 +176,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, deletedId: id });
   } catch (err: any) {
     console.error("DELETE lesson error:", err);
-    return NextResponse.json({ error: err?.message || "حدث خطأ أثناء حذف الدرس" }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "حدث خطأ أثناء حذف العنصر" }, { status: 500 });
   }
 }

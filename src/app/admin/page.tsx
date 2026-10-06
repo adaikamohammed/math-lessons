@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import imageCompression from "browser-image-compression";
 import Link from "next/link";
 import {
@@ -22,8 +22,18 @@ import {
   Megaphone,
   Globe,
   RefreshCw,
+  StickyNote,
+  Layers,
+  BookOpen,
 } from "lucide-react";
-import { LEVELS, type Lesson, type LessonImage } from "@/lib/types";
+import {
+  LEVELS,
+  NOTEBOOKS,
+  COMMON_FIELDS,
+  type Lesson,
+  type LessonImage,
+  type NotebookType,
+} from "@/lib/types";
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -117,15 +127,22 @@ function Login({ onLogin }: { onLogin: () => void }) {
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [level, setLevel] = useState<1 | 2>(1);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [notebookTab, setNotebookTab] = useState<NotebookType>("lessons");
+  const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // حقول إضافة عنصر جديد
+  const [field, setField] = useState("أنشطة عددية");
+  const [section, setSection] = useState("المقطع 1 : الأعداد الطبيعية والأعداد العشرية");
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
+  const [notes, setNotes] = useState("");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // حالات النوافذ المنبثقة (Modals)
+  // حالات النوافذ المنبثقة
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
 
@@ -134,7 +151,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       setLoading(true);
       const res = await fetch(`/api/lessons?level=${level}&_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
-      setLessons(data.lessons || []);
+      setAllLessons(data.lessons || []);
     } finally {
       setLoading(false);
     }
@@ -156,13 +173,31 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     onLogout();
   };
 
-  const nextNumber = lessons.length ? Math.max(...lessons.map((l) => l.number)) + 1 : 1;
+  // تصفية العناصر حسب نوع الكراس المختار
+  const currentItems = useMemo(() => {
+    return allLessons.filter((l) =>
+      notebookTab === "directed_work" ? l.type === "directed_work" : !l.type || l.type === "lessons"
+    );
+  }, [allLessons, notebookTab]);
 
-  // إضافة درس جديد
-  const addLesson = async (e: React.FormEvent) => {
+  // المقاطع المعرفية المسجلة مسبقاً في هذا المستوى للمساعدة في الاختيار
+  const knownSections = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of allLessons) {
+      if ((!l.type || l.type === "lessons") && l.section) {
+        set.add(l.section);
+      }
+    }
+    return Array.from(set);
+  }, [allLessons]);
+
+  const nextNumber = currentItems.length ? Math.max(...currentItems.map((l) => l.number)) + 1 : 1;
+
+  // إضافة مورد معرفي أو حصة أعمال موجهة
+  const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      showToast("error", "يرجى كتابة عنوان الدرس أولاً");
+      showToast("error", "يرجى كتابة العنوان أولاً");
       return;
     }
 
@@ -174,27 +209,64 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           level,
+          type: notebookTab,
+          field: notebookTab === "lessons" ? field.trim() : undefined,
+          section: notebookTab === "lessons" ? section.trim() : undefined,
           number: Number(number) || nextNumber,
           title: title.trim(),
+          notes: notes.trim() || undefined,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "فشل حفظ الدرس");
+      if (!res.ok) throw new Error(data.error || "فشل الحفظ");
 
       setTitle("");
       setNumber("");
-      showToast("success", `✓ تم إضافة "${data.lesson.title}" بنجاح! يمكنك الآن رفع صوره.`);
+      setNotes("");
+      showToast(
+        "success",
+        `✓ تم إضافة "${data.lesson.title}" إلى ${
+          notebookTab === "lessons" ? "كراس الدروس" : "كراس الأعمال الموجهة"
+        }!`
+      );
       await load();
       setOpenId(data.lesson.id);
     } catch (e: any) {
-      showToast("error", "خطأ: " + (e.message || "تعذر إضافة الدرس"));
+      showToast("error", "خطأ: " + (e.message || "تعذر الإضافة"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // تنظيم كراس الدروس في مجموعات حسب الميدان والمقطع
+  const groupedLessons = useMemo(() => {
+    if (notebookTab !== "lessons") return [];
+
+    const fieldMap = new Map<string, Map<string, Lesson[]>>();
+    for (const item of currentItems) {
+      const f = (item.field || "أنشطة عددية").trim();
+      const s = (item.section || "المقطع 1 : الأعداد الطبيعية والأعداد العشرية").trim();
+
+      if (!fieldMap.has(f)) fieldMap.set(f, new Map());
+      const sMap = fieldMap.get(f)!;
+      if (!sMap.has(s)) sMap.set(s, []);
+      sMap.get(s)!.push(item);
+    }
+
+    const groups: { field: string; sections: { section: string; items: Lesson[] }[] }[] = [];
+    for (const [f, sMap] of fieldMap.entries()) {
+      const secs: { section: string; items: Lesson[] }[] = [];
+      for (const [s, items] of sMap.entries()) {
+        items.sort((a, b) => a.number - b.number);
+        secs.push({ section: s, items });
+      }
+      groups.push({ field: f, sections: secs });
+    }
+    return groups;
+  }, [notebookTab, currentItems]);
+
   return (
-    <div className="pt-3 pb-12 space-y-4 fade-up">
+    <div className="pt-3 pb-16 space-y-4 fade-up">
       <style>{inputCss}</style>
 
       {/* شريط الإشعارات الطافي (Toast) */}
@@ -222,8 +294,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-base font-extrabold text-slate-800">لوحة إدارة الدروس</h1>
-            <p className="text-[11px] text-emerald-700 font-bold">الأستاذ محمد عدايكة — متوسطة باهي علي</p>
+            <h1 className="text-base font-extrabold text-slate-800">لوحة تحكم الأستاذ محمد عدايكة</h1>
+            <p className="text-[11px] text-emerald-700 font-bold">متوسطة المجاهد باهي علي — مادة الرياضيات</p>
           </div>
           <button
             onClick={handleLogout}
@@ -244,17 +316,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <span>عرض الإعلان والتوجيهات</span>
           </Link>
           <Link
-            href="/"
+            href={`/year/${level}`}
             target="_blank"
             className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition"
           >
             <Globe className="w-3.5 h-3.5 text-emerald-600" />
-            <span>معاينة الموقع للزوار</span>
+            <span>معاينة صفحة {LEVELS[level].short}</span>
           </Link>
         </div>
       </div>
 
-      {/* اختيار المستوى */}
+      {/* اختيار المستوى الدراسي (1 متوسط أو 2 متوسط) */}
       <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
         {([1, 2] as const).map((lv) => (
           <button
@@ -279,11 +351,44 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         ))}
       </div>
 
-      {/* نموذج إضافة درس */}
-      <form onSubmit={addLesson} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-800">
-            ➕ إضافة درس جديد لـ <span className="text-emerald-700 font-black">{LEVELS[level].short}</span>:
+      {/* اختيار الكراس المراد إدارته (كراس الدروس 192ص أو كراس الأعمال الموجهة 96ص) */}
+      <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
+        <button
+          onClick={() => {
+            setNotebookTab("lessons");
+            setOpenId(null);
+          }}
+          className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+            notebookTab === "lessons"
+              ? "bg-emerald-700 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <span>📘</span>
+          <span>كراس الدروس (192 ص)</span>
+        </button>
+        <button
+          onClick={() => {
+            setNotebookTab("directed_work");
+            setOpenId(null);
+          }}
+          className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+            notebookTab === "directed_work"
+              ? "bg-sky-700 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <span>📗</span>
+          <span>الأعمال الموجهة (96 ص)</span>
+        </button>
+      </div>
+
+      {/* نموذج إضافة مورد جديد أو حصة أعمال موجهة */}
+      <form onSubmit={addItem} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3.5">
+        <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+          <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+            <span>{notebookTab === "lessons" ? "➕ إضافة مورد معرفي جديد لـ" : "➕ إضافة حصة أعمال موجهة لـ"}</span>
+            <span className="text-emerald-700 font-extrabold">{LEVELS[level].short}</span>
           </span>
           <button
             type="button"
@@ -295,32 +400,149 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </button>
         </div>
 
-        <div className="space-y-2.5">
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-slate-600 shrink-0">رقم الدرس:</label>
-            <input
-              className="input w-24 text-center text-sm font-extrabold text-emerald-700 bg-emerald-50/40 border-emerald-200"
-              inputMode="numeric"
-              placeholder={String(nextNumber)}
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-            />
-            <span className="text-[11px] text-slate-400">
-              (تلقائياً: <span className="font-bold text-slate-600">{nextNumber}</span>)
-            </span>
-          </div>
+        {notebookTab === "lessons" ? (
+          /* حقول كراس الدروس */
+          <div className="space-y-3">
+            {/* 1. الميدان */}
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                📐 الميدان:
+              </label>
+              <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                {COMMON_FIELDS.map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setField(f)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shrink-0 ${
+                      field === f
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+              <input
+                className="input text-xs font-semibold"
+                placeholder="أو اكتب ميدان جديد (مثلاً: أنشطة عددية)"
+                value={field}
+                onChange={(e) => setField(e.target.value)}
+                required
+              />
+            </div>
 
-          <div>
-            <label className="text-xs font-bold text-slate-600 block mb-1">عنوان الدرس:</label>
-            <input
-              className="input text-sm font-semibold"
-              placeholder="مثال: قراءة وكتابة عدد طبيعي"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
+            {/* 2. المقطع المعرفي */}
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                📑 المقطع المعرفي:
+              </label>
+              {knownSections.length > 0 && (
+                <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                  {knownSections.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSection(s)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition shrink-0 ${
+                        section === s
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <input
+                className="input text-xs font-semibold"
+                placeholder="مثال: المقطع 1 : الأعداد الطبيعية والأعداد العشرية"
+                value={section}
+                onChange={(e) => setSection(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* 3. رقم المورد وعنوانه */}
+            <div className="grid grid-cols-4 gap-2">
+              <div className="col-span-1">
+                <label className="text-xs font-bold text-slate-600 block mb-1">رقم المورد:</label>
+                <input
+                  className="input text-center text-sm font-extrabold text-emerald-700 bg-emerald-50/40 border-emerald-200"
+                  inputMode="numeric"
+                  placeholder={String(nextNumber)}
+                  value={number}
+                  onChange={(e) => setNumber(e.target.value)}
+                />
+              </div>
+              <div className="col-span-3">
+                <label className="text-xs font-bold text-slate-600 block mb-1">عنوان المورد المعرفي:</label>
+                <input
+                  className="input text-xs font-semibold"
+                  placeholder="مثال: قراءة وكتابة عدد طبيعي"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* 4. ملاحظات وتوجيهات الأستاذ */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
+                <StickyNote className="w-3.5 h-3.5 text-amber-600" />
+                <span>ملاحظات وتوجيهات الأستاذ لهذا الدرس (اختياري):</span>
+              </label>
+              <textarea
+                className="input text-xs min-h-[65px] resize-y"
+                placeholder="مثال: واجب منزلي: حل تمرين 5 ص 18 على كراس المحاولات، تنبيه: إحضار المنقلة والكوس..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
           </div>
-        </div>
+        ) : (
+          /* حقول كراس الأعمال الموجهة */
+          <div className="space-y-3">
+            <div className="grid grid-cols-4 gap-2">
+              <div className="col-span-1">
+                <label className="text-xs font-bold text-slate-600 block mb-1">رقم الحصة:</label>
+                <input
+                  className="input text-center text-sm font-extrabold text-sky-700 bg-sky-50/40 border-sky-200"
+                  inputMode="numeric"
+                  placeholder={String(nextNumber)}
+                  value={number}
+                  onChange={(e) => setNumber(e.target.value)}
+                />
+              </div>
+              <div className="col-span-3">
+                <label className="text-xs font-bold text-slate-600 block mb-1">عنوان الحصة / السلسلة:</label>
+                <input
+                  className="input text-xs font-semibold"
+                  placeholder="مثال: سلسلة تمارين 01 : الحساب على الأعداد الطبيعية"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
+                <StickyNote className="w-3.5 h-3.5 text-amber-600" />
+                <span>ملاحظات وتوجيهات الأستاذ للتلاميذ (اختياري):</span>
+              </label>
+              <textarea
+                className="input text-xs min-h-[65px] resize-y"
+                placeholder="مثال: إحضار كراس الأعمال الموجهة 96 صفحة، حل التمارين الفردية فقط..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
 
         <button disabled={isSubmitting} className="btn-primary w-full py-3 text-sm">
           {isSubmitting ? (
@@ -331,41 +553,88 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           ) : (
             <>
               <Plus className="w-4 h-4" />
-              <span>إضافة الدرس والبدء برفع الصور</span>
+              <span>
+                {notebookTab === "lessons"
+                  ? "إضافة المورد والبدء برفع الصور"
+                  : "إضافة حصة الأعمال الموجهة والبدء برفع الصور"}
+              </span>
             </>
           )}
         </button>
       </form>
 
-      {/* قائمة الدروس */}
-      <div className="space-y-2.5">
+      {/* قائمة الدروس والأعمال الموجهة المنظمة */}
+      <div className="space-y-3">
         <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
-          <span>دروس {LEVELS[level].label}:</span>
-          <span className="text-[11px] text-slate-400 font-normal">عدد الدروس: {lessons.length}</span>
+          <span>
+            {notebookTab === "lessons"
+              ? `محتويات كراس الدروس (${currentItems.length} موارد):`
+              : `حصص الأعمال الموجهة (${currentItems.length} حصص):`}
+          </span>
+          <span className="text-[11px] text-slate-400 font-normal">{LEVELS[level].short}</span>
         </div>
 
         {loading ? (
           <div className="text-center py-10 text-slate-400 text-xs bg-white rounded-2xl border border-slate-100">
             <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-emerald-600" />
-            جاري جلب الدروس...
+            جاري جلب القائمة...
           </div>
-        ) : lessons.length === 0 ? (
+        ) : currentItems.length === 0 ? (
           <div className="text-center text-xs text-slate-400 py-10 bg-white rounded-2xl border border-dashed border-slate-200 px-4">
-            لا توجد دروس بعد لـ {LEVELS[level].short}. اكتب عنوان الدرس أعلاه واضغط على زر الإضافة!
+            لا توجد عناصر مضافة بعد في هذا الكراس. أضف عنصراً جديداً أعلاه!
+          </div>
+        ) : notebookTab === "lessons" ? (
+          /* عرض كراس الدروس مقسماً بالميدان والمقطع */
+          <div className="space-y-4">
+            {groupedLessons.map((grp) => (
+              <div key={grp.field} className="space-y-2.5">
+                <div className="bg-emerald-800 text-white px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5">
+                  <span>📐 الميدان:</span>
+                  <span>{grp.field}</span>
+                </div>
+
+                {grp.sections.map((sec) => (
+                  <div key={sec.section} className="space-y-2 pr-2 border-r-2 border-emerald-200">
+                    <div className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5 pt-1">
+                      <span>📑</span>
+                      <span>{sec.section}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {sec.items.map((item) => (
+                        <LessonCard
+                          key={item.id}
+                          lesson={item}
+                          open={openId === item.id}
+                          onToggle={() => setOpenId(openId === item.id ? null : item.id)}
+                          onChanged={load}
+                          onEdit={() => setEditingLesson(item)}
+                          onDelete={() => setDeletingLesson(item)}
+                          showToast={showToast}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         ) : (
-          lessons.map((l) => (
-            <LessonCard
-              key={l.id}
-              lesson={l}
-              open={openId === l.id}
-              onToggle={() => setOpenId(openId === l.id ? null : l.id)}
-              onChanged={load}
-              onEdit={() => setEditingLesson(l)}
-              onDelete={() => setDeletingLesson(l)}
-              showToast={showToast}
-            />
-          ))
+          /* عرض كراس الأعمال الموجهة */
+          <div className="space-y-2.5">
+            {currentItems.map((item) => (
+              <LessonCard
+                key={item.id}
+                lesson={item}
+                open={openId === item.id}
+                onToggle={() => setOpenId(openId === item.id ? null : item.id)}
+                onChanged={load}
+                onEdit={() => setEditingLesson(item)}
+                onDelete={() => setDeletingLesson(item)}
+                showToast={showToast}
+              />
+            ))}
+          </div>
         )}
       </div>
 
@@ -373,10 +642,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       {editingLesson && (
         <EditLessonModal
           lesson={editingLesson}
+          knownSections={knownSections}
           onClose={() => setEditingLesson(null)}
           onSuccess={async () => {
             setEditingLesson(null);
-            showToast("success", "✓ تم تحديث الدرس بنجاح!");
+            showToast("success", "✓ تم تحديث العنصر بنجاح!");
             await load();
           }}
         />
@@ -389,7 +659,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           onClose={() => setDeletingLesson(null)}
           onSuccess={async () => {
             setDeletingLesson(null);
-            showToast("success", "✓ تم حذف الدرس وكافة صوره بنجاح!");
+            showToast("success", "✓ تم الحذف بنجاح!");
             await load();
           }}
         />
@@ -398,7 +668,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-/* ---------------- 3. بطاقة درس واحد مع إدارة صوره ---------------- */
+/* ---------------- 3. بطاقة درس / حصة مع إدارة الصور ---------------- */
 function LessonCard({
   lesson,
   open,
@@ -421,7 +691,8 @@ function LessonCard({
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
   const [isDeletingImg, setIsDeletingImg] = useState(false);
 
-  // رفع الصور وضغطها
+  const isDirectedWork = lesson.type === "directed_work";
+
   const uploadFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     const list = Array.from(files);
@@ -459,7 +730,6 @@ function LessonCard({
     onChanged();
   };
 
-  // حذف صورة سبورة واحدة
   const confirmDeleteImage = async () => {
     if (!deletingImageId) return;
     setIsDeletingImg(true);
@@ -482,7 +752,6 @@ function LessonCard({
     }
   };
 
-  // تحريك ترتيب الصور
   const moveImage = async (index: number, direction: "prev" | "next") => {
     const images = [...lesson.images];
     const targetIndex = direction === "prev" ? index - 1 : index + 1;
@@ -511,48 +780,73 @@ function LessonCard({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-2xs overflow-hidden transition">
-      {/* رأس بطاقة الدرس */}
-      <div className="p-3 flex items-center justify-between gap-2">
-        <button onClick={onToggle} className="flex-1 flex items-center gap-2.5 text-right min-w-0">
-          <span className="w-8 h-8 shrink-0 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-xs">
+      {/* رأس بطاقة العنصر */}
+      <div className="p-3 flex items-start justify-between gap-2">
+        <button onClick={onToggle} className="flex-1 flex items-start gap-2.5 text-right min-w-0">
+          <span
+            className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-xs mt-0.5 ${
+              isDirectedWork
+                ? "bg-sky-50 text-sky-700"
+                : "bg-emerald-50 text-emerald-700"
+            }`}
+          >
             {lesson.number}
           </span>
           <div className="flex-1 min-w-0">
-            <div className="font-bold text-xs text-slate-800 truncate">{lesson.title}</div>
-            <div className="text-[10px] text-slate-400">
-              الدرس {lesson.number} • {lesson.images?.length || 0} صور
+            {/* العنوان بالكامل بدون أي اقتطاع */}
+            <div className="font-bold text-xs text-slate-900 leading-snug break-words">
+              {lesson.title}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-slate-400">
+              <span>{isDirectedWork ? "حصة" : "مورد"} {lesson.number}</span>
+              <span>•</span>
+              <span className="font-bold text-slate-500">{lesson.images?.length || 0} صور</span>
+              {lesson.notes && (
+                <>
+                  <span>•</span>
+                  <span className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.2 rounded">📌 ملاحظة</span>
+                </>
+              )}
             </div>
           </div>
           <ChevronDown
-            className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
+            className={`w-4 h-4 text-slate-400 transition-transform shrink-0 mt-1 ${open ? "rotate-180" : ""}`}
           />
         </button>
 
-        {/* أزرار الإجراءات السريعة على كل درس */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* زر تعديل الدرس */}
+        {/* أزرار الإجراءات السريعة */}
+        <div className="flex items-center gap-1 shrink-0 mt-0.5">
           <button
             onClick={onEdit}
             className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition"
-            title="تعديل رقم وعنوان الدرس"
+            title="تعديل البيانات"
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
-
-          {/* زر حذف الدرس */}
           <button
             onClick={onDelete}
             className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
-            title="حذف الدرس كاملاً"
+            title="حذف العنصر كاملاً"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* قسم رفع وإدارة صور الدرس عند الفتح */}
+      {/* قسم رفع وإدارة صور السبورة عند الفتح */}
       {open && (
         <div className="border-t border-slate-100 p-3.5 space-y-3.5 bg-slate-50/50">
+          {/* عرض الملاحظة إن وجدت */}
+          {lesson.notes && (
+            <div className="bg-amber-50/80 p-2.5 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+              <span className="font-black text-[11px] flex items-center gap-1">
+                <StickyNote className="w-3.5 h-3.5 text-amber-600" /> ملاحظة الأستاذ:
+              </span>
+              <p className="whitespace-pre-line leading-relaxed">{lesson.notes}</p>
+            </div>
+          )}
+
           <div className="flex items-center justify-between text-xs font-bold text-slate-700">
             <span>صور السبورة لهذا الدرس ({lesson.images?.length || 0}):</span>
             <span className="text-[11px] text-slate-400 font-normal">مرتبة بالتسلسل</span>
@@ -649,7 +943,7 @@ function LessonCard({
             ) : (
               <>
                 <Upload className="w-4 h-4" />
-                <span>📷 رفع صور جديدة للدرس (يمكن اختيار صورة أو عدة صور معاً)</span>
+                <span>📷 رفع صور جديدة (يمكن اختيار صورة أو عدة صور معاً)</span>
               </>
             )}
             <input
@@ -678,7 +972,7 @@ function LessonCard({
               onClick={onDelete}
               className="flex items-center gap-1 text-red-600 hover:text-red-700 font-bold"
             >
-              <Trash2 className="w-3.5 h-3.5" /> حذف الدرس كاملاً
+              <Trash2 className="w-3.5 h-3.5" /> حذف العنصر كاملاً
             </button>
           </div>
         </div>
@@ -694,7 +988,7 @@ function LessonCard({
             <div>
               <h3 className="font-extrabold text-sm text-slate-800">تأكيد حذف صورة السبورة</h3>
               <p className="text-xs text-slate-500 mt-1">
-                هل أنت متأكد من حذف هذه الصورة من الدرس "{lesson.title}"؟
+                هل أنت متأكد من حذف هذه الصورة من "{lesson.title}"؟
               </p>
             </div>
             <div className="flex gap-2 pt-1">
@@ -741,25 +1035,31 @@ function LessonCard({
   );
 }
 
-/* ---------------- 4. نافذة تعديل الدرس (Modal) ---------------- */
+/* ---------------- 4. نافذة تعديل البيانات (Modal) ---------------- */
 function EditLessonModal({
   lesson,
+  knownSections,
   onClose,
   onSuccess,
 }: {
   lesson: Lesson;
+  knownSections: string[];
   onClose: () => void;
   onSuccess: () => void;
 }) {
   const [num, setNum] = useState(String(lesson.number));
   const [title, setTitle] = useState(lesson.title);
+  const [field, setField] = useState(lesson.field || "أنشطة عددية");
+  const [section, setSection] = useState(lesson.section || "المقطع 1 : الأعداد الطبيعية والأعداد العشرية");
+  const [notes, setNotes] = useState(lesson.notes || "");
+  const [type, setType] = useState<NotebookType>(lesson.type || "lessons");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      setErr("عنوان الدرس مطلوب");
+      setErr("العنوان مطلوب");
       return;
     }
 
@@ -772,8 +1072,12 @@ function EditLessonModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: lesson.id,
+          type,
           title: title.trim(),
           number: Number(num) || lesson.number,
+          field: type === "lessons" ? field.trim() : undefined,
+          section: type === "lessons" ? section.trim() : undefined,
+          notes: notes.trim() || undefined,
         }),
       });
 
@@ -782,24 +1086,24 @@ function EditLessonModal({
 
       onSuccess();
     } catch (e: any) {
-      setErr(e.message || "حدث خطأ أثناء تعديل الدرس");
+      setErr(e.message || "حدث خطأ أثناء التعديل");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <form
         onSubmit={submit}
-        className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 fade-up"
+        className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-3.5 shadow-xl border border-slate-100 fade-up my-auto max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
               <Pencil className="w-4 h-4" />
             </div>
-            <h3 className="font-extrabold text-sm text-slate-800">تعديل بيانات الدرس</h3>
+            <h3 className="font-extrabold text-sm text-slate-800">تعديل بيانات العنصر</h3>
           </div>
           <button
             type="button"
@@ -817,9 +1121,62 @@ function EditLessonModal({
           </div>
         )}
 
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-bold text-slate-600 block mb-1">رقم الدرس:</label>
+        {/* نوع الكراس */}
+        <div>
+          <label className="text-xs font-bold text-slate-600 block mb-1">الكراس التابع له:</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setType("lessons")}
+              className={`py-2 text-xs font-bold rounded-xl border transition ${
+                type === "lessons"
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-400"
+                  : "bg-slate-50 text-slate-600 border-slate-200"
+              }`}
+            >
+              📘 كراس الدروس
+            </button>
+            <button
+              type="button"
+              onClick={() => setType("directed_work")}
+              className={`py-2 text-xs font-bold rounded-xl border transition ${
+                type === "directed_work"
+                  ? "bg-sky-50 text-sky-800 border-sky-400"
+                  : "bg-slate-50 text-slate-600 border-slate-200"
+              }`}
+            >
+              📗 الأعمال الموجهة
+            </button>
+          </div>
+        </div>
+
+        {type === "lessons" && (
+          <>
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">الميدان:</label>
+              <input
+                className="input text-xs font-semibold"
+                value={field}
+                onChange={(e) => setField(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">المقطع المعرفي:</label>
+              <input
+                className="input text-xs font-semibold"
+                value={section}
+                onChange={(e) => setSection(e.target.value)}
+                required
+              />
+            </div>
+          </>
+        )}
+
+        <div className="grid grid-cols-4 gap-2">
+          <div className="col-span-1">
+            <label className="text-xs font-bold text-slate-600 block mb-1">الرقم:</label>
             <input
               className="input text-center text-sm font-extrabold text-emerald-700 bg-emerald-50/40"
               inputMode="numeric"
@@ -828,11 +1185,10 @@ function EditLessonModal({
               required
             />
           </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-600 block mb-1">عنوان الدرس:</label>
+          <div className="col-span-3">
+            <label className="text-xs font-bold text-slate-600 block mb-1">العنوان:</label>
             <input
-              className="input text-sm font-semibold"
+              className="input text-xs font-semibold"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
@@ -840,7 +1196,19 @@ function EditLessonModal({
           </div>
         </div>
 
-        <div className="flex gap-2 pt-2">
+        <div>
+          <label className="text-xs font-bold text-slate-600 block mb-1">
+            ملاحظات وتوجيهات الأستاذ:
+          </label>
+          <textarea
+            className="input text-xs min-h-[60px]"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="اكتب ملاحظة إن أردت..."
+          />
+        </div>
+
+        <div className="flex gap-2 pt-1">
           <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التعديل"}
           </button>
@@ -858,7 +1226,7 @@ function EditLessonModal({
   );
 }
 
-/* ---------------- 5. نافذة تأكيد حذف الدرس (Modal) ---------------- */
+/* ---------------- 5. نافذة تأكيد الحذف (Modal) ---------------- */
 function DeleteLessonModal({
   lesson,
   onClose,
@@ -879,10 +1247,10 @@ function DeleteLessonModal({
         method: "DELETE",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "فشل حذف الدرس");
+      if (!res.ok) throw new Error(data.error || "فشل الحذف");
       onSuccess();
     } catch (e: any) {
-      setErr(e.message || "حدث خطأ أثناء محاولة حذف الدرس");
+      setErr(e.message || "حدث خطأ أثناء محاولة الحذف");
     } finally {
       setBusy(false);
     }
@@ -896,12 +1264,12 @@ function DeleteLessonModal({
         </div>
 
         <div>
-          <h3 className="font-extrabold text-sm text-slate-900">تأكيد حذف الدرس نهائياً</h3>
-          <p className="text-xs font-bold text-slate-700 mt-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-            {lesson.title} (الدرس رقم {lesson.number})
+          <h3 className="font-extrabold text-sm text-slate-900">تأكيد الحذف نهائياً</h3>
+          <p className="text-xs font-bold text-slate-700 mt-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-snug break-words">
+            {lesson.title}
           </p>
           <p className="text-[11px] text-red-600 mt-2">
-            ⚠️ تنبيه: سيتم حذف هذا الدرس وجميع صور السبورة التابعة له ({lesson.images?.length || 0} صورة) بشكل دائم ولا يمكن استرجاعها.
+            ⚠️ تنبيه: سيتم حذف هذا العنصر وجميع صور السبورة التابعة له ({lesson.images?.length || 0} صورة) بشكل دائم.
           </p>
         </div>
 
@@ -917,7 +1285,7 @@ function DeleteLessonModal({
             onClick={submitDelete}
             className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
           >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الدرس الآن"}
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الآن"}
           </button>
           <button
             disabled={busy}
