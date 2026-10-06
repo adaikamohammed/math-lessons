@@ -86,12 +86,16 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const isAuth = await verifyAdminSession();
   if (!isAuth) {
-    return NextResponse.json({ error: "غير مصرح لك" }, { status: 401 });
+    return NextResponse.json({ error: "غير مصرح لك - يرجى تسجيل الدخول" }, { status: 401 });
   }
 
   try {
     const body = await req.json();
     const { id, title, number } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "معرّف الدرس مطلوب" }, { status: 400 });
+    }
 
     const data = await getLessonsData();
     const lesson = data.lessons.find((l) => l.id === id);
@@ -99,13 +103,13 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "الدرس غير موجود" }, { status: 404 });
     }
 
-    if (title) lesson.title = title.trim();
+    if (title !== undefined) lesson.title = String(title).trim();
     if (number !== undefined) lesson.number = Number(number);
 
     await saveLessonsData(data);
-    return NextResponse.json({ lesson });
-  } catch {
-    return NextResponse.json({ error: "فشل التعديل" }, { status: 500 });
+    return NextResponse.json({ success: true, lesson });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || "فشل التعديل" }, { status: 500 });
   }
 }
 
@@ -113,28 +117,43 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const isAuth = await verifyAdminSession();
   if (!isAuth) {
-    return NextResponse.json({ error: "غير مصرح لك" }, { status: 401 });
+    return NextResponse.json({ error: "غير مصرح لك - يرجى تسجيل الدخول" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
+  let id = new URL(req.url).searchParams.get("id");
+  if (!id) {
+    try {
+      const body = await req.json();
+      id = body?.id;
+    } catch {}
+  }
+
   if (!id) {
     return NextResponse.json({ error: "معرّف الدرس مطلوب" }, { status: 400 });
   }
 
-  const data = await getLessonsData();
-  const index = data.lessons.findIndex((l) => l.id === id);
-  if (index === -1) {
-    return NextResponse.json({ error: "الدرس غير موجود" }, { status: 404 });
+  try {
+    const data = await getLessonsData();
+    const index = data.lessons.findIndex((l) => l.id === id);
+    if (index === -1) {
+      return NextResponse.json({ error: "الدرس غير موجود" }, { status: 404 });
+    }
+
+    const [removed] = data.lessons.splice(index, 1);
+
+    // حذف صور الدرس من التخزين
+    if (removed.images && Array.isArray(removed.images)) {
+      for (const img of removed.images) {
+        if (img?.url) {
+          await deleteImageFile(img.url);
+        }
+      }
+    }
+
+    await saveLessonsData(data);
+    return NextResponse.json({ success: true, deletedId: id });
+  } catch (err: any) {
+    console.error("DELETE lesson error:", err);
+    return NextResponse.json({ error: err?.message || "حدث خطأ أثناء حذف الدرس" }, { status: 500 });
   }
-
-  const [removed] = data.lessons.splice(index, 1);
-
-  // حذف صور الدرس من التخزين
-  for (const img of removed.images) {
-    await deleteImageFile(img.url);
-  }
-
-  await saveLessonsData(data);
-  return NextResponse.json({ success: true });
 }
