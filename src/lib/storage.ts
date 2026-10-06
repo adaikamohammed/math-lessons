@@ -7,7 +7,13 @@ const LOCAL_DATA_DIR = path.join(process.cwd(), "data");
 const LOCAL_DATA_FILE = path.join(LOCAL_DATA_DIR, "lessons.json");
 const LOCAL_UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
 
-export const isVercelBlobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+export function getBlobToken(): string | undefined {
+  return process.env.BLOB_READ_WRITE_TOKEN;
+}
+
+export function isVercelBlobConfigured(): boolean {
+  return Boolean(getBlobToken());
+}
 
 // Ensure local folders exist
 async function ensureLocalDirs() {
@@ -17,9 +23,11 @@ async function ensureLocalDirs() {
 
 // ----------------- قراءة بيانات الدروس -----------------
 export async function getLessonsData(): Promise<LessonsData> {
-  if (isVercelBlobConfigured) {
+  const token = getBlobToken();
+
+  if (token) {
     try {
-      const { blobs } = await list({ prefix: "lessons-db.json" });
+      const { blobs } = await list({ prefix: "lessons-db.json", token });
       const found = blobs.find((b) => b.pathname === "lessons-db.json");
       if (found) {
         // Fetch fresh content without cache
@@ -47,12 +55,15 @@ export async function getLessonsData(): Promise<LessonsData> {
 
 // ----------------- حفظ بيانات الدروس -----------------
 export async function saveLessonsData(data: LessonsData): Promise<void> {
-  if (isVercelBlobConfigured) {
+  const token = getBlobToken();
+
+  if (token) {
     await put("lessons-db.json", JSON.stringify(data, null, 2), {
       access: "public",
       addRandomSuffix: false,
       allowOverwrite: true,
       cacheControlMaxAge: 60,
+      token,
     });
     return;
   }
@@ -71,11 +82,13 @@ export async function uploadImageFile(
 ): Promise<{ url: string; downloadUrl: string }> {
   const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
   const uniqueName = `${Date.now()}-${safeName}`;
+  const token = getBlobToken();
 
-  if (isVercelBlobConfigured) {
+  if (token) {
     const blobPath = `lessons/${level}/${lessonId}/${uniqueName}`;
     const blob = await put(blobPath, file, {
       access: "public",
+      token,
     });
     return {
       url: blob.url,
@@ -101,9 +114,11 @@ export async function uploadImageFile(
 
 // ----------------- حذف صورة -----------------
 export async function deleteImageFile(url: string): Promise<void> {
-  if (isVercelBlobConfigured && url.startsWith("http")) {
+  const token = getBlobToken();
+
+  if (token && url.startsWith("http")) {
     try {
-      await del(url);
+      await del(url, { token });
     } catch (e) {
       console.error("Error deleting blob:", e);
     }
