@@ -69,7 +69,7 @@ export async function saveLessonsData(data: LessonsData): Promise<void> {
       access: "public",
       addRandomSuffix: false,
       allowOverwrite: true,
-      cacheControlMaxAge: 60,
+      cacheControlMaxAge: 0,
       token,
     });
     return;

@@ -23,16 +23,13 @@ import {
   Globe,
   RefreshCw,
   StickyNote,
-  Layers,
   BookOpen,
   Users,
   UserPlus,
   Clock,
-  Search,
 } from "lucide-react";
 import {
   LEVELS,
-  NOTEBOOKS,
   COMMON_FIELDS,
   type Lesson,
   type LessonImage,
@@ -131,9 +128,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
 
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
 function Dashboard({ onLogout }: { onLogout: () => void }) {
-  // التبويب الرئيسي للوحة: إدارة الدروس أو استدعاءات الأولياء
   const [mainTab, setMainTab] = useState<"lessons" | "summons">("lessons");
-
   const [level, setLevel] = useState<1 | 2>(1);
   const [notebookTab, setNotebookTab] = useState<NotebookType>("lessons");
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
@@ -151,7 +146,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [studentName, setStudentName] = useState("");
   const [className, setClassName] = useState("1م3");
   const [summonsNotes, setSummonsNotes] = useState("");
-  const [isUrgent, setIsUrgent] = useState(false);
+  const [isExtraSunday, setIsExtraSunday] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -163,7 +158,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [editingSummons, setEditingSummons] = useState<ParentSummons | null>(null);
   const [deletingSummons, setDeletingSummons] = useState<ParentSummons | null>(null);
 
-  // جلب الدروس
   const loadLessons = useCallback(async () => {
     try {
       setLoading(true);
@@ -175,7 +169,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, [level]);
 
-  // جلب استدعاءات الأولياء
   const loadSummons = useCallback(async () => {
     try {
       const res = await fetch(`/api/summons?_t=${Date.now()}`, { cache: "no-store" });
@@ -195,7 +188,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     setToastMsg({ type, text });
     setTimeout(() => {
       setToastMsg((cur) => (cur?.text === text ? null : cur));
-    }, 4500);
+    }, 4000);
   };
 
   const handleLogout = async () => {
@@ -221,7 +214,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const nextNumber = currentItems.length ? Math.max(...currentItems.map((l) => l.number)) + 1 : 1;
 
-  // إضافة درس / حصة أعمال موجهة
+  // 1. إضافة مورد معرفي أو حصة أعمال موجهة مع تحديث فوري مباشر للواجهة
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
@@ -251,14 +244,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       setTitle("");
       setNumber("");
       setNotes("");
+
+      // تحديث فوري للواجهة بدون الحاجة لانتظار أو تحديث المتصفح
+      setAllLessons((prev) => [...prev, data.lesson]);
+      setOpenId(data.lesson.id);
+
       showToast(
         "success",
-        `✓ تم إضافة "${data.lesson.title}" إلى ${
+        `✓ تم إضافة "${data.lesson.title}" مباشرة إلى ${
           notebookTab === "lessons" ? "كراس الدروس" : "كراس الأعمال الموجهة"
         }!`
       );
-      await loadLessons();
-      setOpenId(data.lesson.id);
     } catch (e: any) {
       showToast("error", "خطأ: " + (e.message || "تعذر الإضافة"));
     } finally {
@@ -266,7 +262,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  // إضافة استدعاء ولي أمر
+  // 2. إضافة استدعاء ولي أمر مع تحديث فوري مباشر للواجهة
   const addSummons = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim() || !className.trim()) {
@@ -283,7 +279,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           studentName: studentName.trim(),
           className: className.trim(),
           notes: summonsNotes.trim() || undefined,
-          isUrgent,
+          isUrgent: isExtraSunday,
         }),
       });
       const data = await res.json();
@@ -291,9 +287,12 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
       setStudentName("");
       setSummonsNotes("");
-      setIsUrgent(false);
-      showToast("success", `✓ تم تسجيل استدعاء ولي التلميذ "${data.summons.studentName}" بنجاح!`);
-      await loadSummons();
+      setIsExtraSunday(false);
+
+      // تحديث فوري مباشر
+      setSummonsList((prev) => [data.summons, ...prev]);
+
+      showToast("success", `✓ تم إضافة التلميذ "${data.summons.studentName}" فورياً إلى جدول الاستقبال!`);
     } catch (e: any) {
       showToast("error", "خطأ: " + (e.message || "تعذر تسجيل الاستدعاء"));
     } finally {
@@ -301,7 +300,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  // تنظيم كراس الدروس في مجموعات حسب الميدان والمقطع
+  // تجميع كراس الدروس حسب الميدان والمقطع
   const groupedLessons = useMemo(() => {
     if (notebookTab !== "lessons") return [];
 
@@ -332,7 +331,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     <div className="pt-3 pb-16 space-y-4 fade-up">
       <style>{inputCss}</style>
 
-      {/* شريط الإشعارات الطافي (Toast) */}
+      {/* شريط الإشعارات الطافي */}
       {toastMsg && (
         <div
           className={`fixed top-4 left-4 right-4 z-50 max-w-md mx-auto p-3.5 rounded-2xl shadow-lg flex items-center gap-2.5 text-xs font-bold transition-all border ${
@@ -354,7 +353,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       )}
 
       {/* الشريط العلوي */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-base font-extrabold text-slate-800">لوحة تحكم الأستاذ محمد عدايكة</h1>
@@ -371,6 +370,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         {/* أزرار سريعة للمعاينة */}
         <div className="flex items-center gap-2 pt-1 border-t border-slate-100 text-xs font-bold">
           <Link
+            href="/"
+            target="_blank"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
+          >
+            <Globe className="w-3.5 h-3.5 text-emerald-600" />
+            <span>الموقع الرئيسي</span>
+          </Link>
+          <Link
             href="/parents"
             target="_blank"
             className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200/70 hover:bg-rose-100 transition text-[11px]"
@@ -386,14 +393,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <Megaphone className="w-3.5 h-3.5 text-amber-600" />
             <span>الإعلان والتوجيهات</span>
           </Link>
-          <Link
-            href="/"
-            target="_blank"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
-          >
-            <Globe className="w-3.5 h-3.5 text-emerald-600" />
-            <span>الموقع للزوار</span>
-          </Link>
         </div>
       </div>
 
@@ -408,7 +407,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           }`}
         >
           <BookOpen className="w-4 h-4" />
-          <span>إدارة الدروس والكراريس</span>
+          <span>الدروس والكراريس</span>
         </button>
 
         <button
@@ -424,12 +423,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </button>
       </div>
 
-      {/* ======================================================== */}
-      {/* ================ تبويب 1: إدارة الدروس والكراريس ================ */}
-      {/* ======================================================== */}
+      {/* ==================== 1. تبويب الدروس والكراريس ==================== */}
       {mainTab === "lessons" ? (
         <div className="space-y-4">
-          {/* اختيار المستوى الدراسي (1 متوسط أو 2 متوسط) */}
+          {/* اختيار المستوى */}
           <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
             {([1, 2] as const).map((lv) => (
               <button
@@ -454,7 +451,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             ))}
           </div>
 
-          {/* اختيار الكراس (كراس الدروس 192ص أو كراس الأعمال الموجهة 96ص) */}
+          {/* اختيار الكراس */}
           <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
             <button
               onClick={() => {
@@ -486,18 +483,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </button>
           </div>
 
-          {/* نموذج إضافة مورد جديد أو حصة أعمال موجهة */}
+          {/* نموذج إضافة مورد أو حصة */}
           <form onSubmit={addItem} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3.5">
             <div className="flex items-center justify-between pb-1 border-b border-slate-100">
               <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                <span>{notebookTab === "lessons" ? "➕ إضافة مورد معرفي جديد لـ" : "➕ إضافة حصة أعمال موجهة لـ"}</span>
+                <span>{notebookTab === "lessons" ? "➕ إضافة مورد جديد لـ" : "➕ إضافة حصة أعمال موجهة لـ"}</span>
                 <span className="text-emerald-700 font-extrabold">{LEVELS[level].short}</span>
               </span>
               <button
                 type="button"
                 onClick={loadLessons}
                 className="text-[11px] text-slate-400 hover:text-emerald-600 flex items-center gap-1"
-                title="تحديث القائمة"
+                title="تحديث"
               >
                 <RefreshCw className="w-3 h-3" /> تحديث
               </button>
@@ -505,7 +502,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
             {notebookTab === "lessons" ? (
               <div className="space-y-3">
-                {/* 1. الميدان */}
+                {/* الميدان */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">📐 الميدان:</label>
                   <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
@@ -526,14 +523,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                   <input
                     className="input text-xs font-semibold"
-                    placeholder="أو اكتب ميدان جديد (مثلاً: أنشطة عددية)"
+                    placeholder="مثال: أنشطة عددية"
                     value={field}
                     onChange={(e) => setField(e.target.value)}
                     required
                   />
                 </div>
 
-                {/* 2. المقطع المعرفي */}
+                {/* المقطع المعرفي */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">📑 المقطع المعرفي:</label>
                   {knownSections.length > 0 && (
@@ -563,7 +560,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   />
                 </div>
 
-                {/* 3. رقم المورد وعنوانه */}
+                {/* رقم المورد وعنوانه */}
                 <div className="grid grid-cols-4 gap-2">
                   <div className="col-span-1">
                     <label className="text-xs font-bold text-slate-600 block mb-1">رقم المورد:</label>
@@ -587,15 +584,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 </div>
 
-                {/* 4. ملاحظات وتوجيهات الأستاذ */}
+                {/* ملاحظات الأستاذ */}
                 <div>
                   <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
                     <StickyNote className="w-3.5 h-3.5 text-amber-600" />
                     <span>ملاحظات وتوجيهات الأستاذ لهذا الدرس (اختياري):</span>
                   </label>
                   <textarea
-                    className="input text-xs min-h-[65px] resize-y"
-                    placeholder="مثال: واجب منزلي: حل تمرين 5 ص 18 على كراس المحاولات..."
+                    className="input text-xs min-h-[60px] resize-y"
+                    placeholder="مثال: حل تمرين 5 ص 18 على كراس المحاولات..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                   />
@@ -619,7 +616,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     <label className="text-xs font-bold text-slate-600 block mb-1">عنوان الحصة / السلسلة:</label>
                     <input
                       className="input text-xs font-semibold"
-                      placeholder="مثال: سلسلة تمارين 01 : الحساب على الأعداد الطبيعية"
+                      placeholder="مثال: سلسلة تمارين 01 : العمليات على الأعداد الطبيعية"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       required
@@ -633,7 +630,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     <span>ملاحظات وتوجيهات الأستاذ للتلاميذ (اختياري):</span>
                   </label>
                   <textarea
-                    className="input text-xs min-h-[65px] resize-y"
+                    className="input text-xs min-h-[60px] resize-y"
                     placeholder="مثال: إحضار كراس الأعمال الموجهة 96 صفحة، حل التمارين الفردية فقط..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -704,7 +701,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                               lesson={item}
                               open={openId === item.id}
                               onToggle={() => setOpenId(openId === item.id ? null : item.id)}
-                              onChanged={loadLessons}
+                              onLessonUpdated={(updated) => {
+                                setAllLessons((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+                              }}
                               onEdit={() => setEditingLesson(item)}
                               onDelete={() => setDeletingLesson(item)}
                               showToast={showToast}
@@ -724,7 +723,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     lesson={item}
                     open={openId === item.id}
                     onToggle={() => setOpenId(openId === item.id ? null : item.id)}
-                    onChanged={loadLessons}
+                    onLessonUpdated={(updated) => {
+                      setAllLessons((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+                    }}
                     onEdit={() => setEditingLesson(item)}
                     onDelete={() => setDeletingLesson(item)}
                     showToast={showToast}
@@ -735,11 +736,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
       ) : (
-        /* ======================================================== */
-        /* ================ تبويب 2: إدارة استدعاءات الأولياء ================ */
-        /* ======================================================== */
+        /* ==================== 2. تبويب استدعاءات الأولياء ==================== */
         <div className="space-y-4">
-          {/* نموذج إضافة استدعاء جديد */}
+          {/* نموذج إضافة استدعاء */}
           <form
             onSubmit={addSummons}
             className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3.5"
@@ -747,13 +746,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <div className="flex items-center justify-between pb-1 border-b border-slate-100">
               <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                 <UserPlus className="w-4 h-4 text-rose-600" />
-                <span>إضافة استدعاء ولي تلميذ إلى جدول الاستقبال</span>
+                <span>إضافة تلميذ إلى جدول استدعاء الأولياء</span>
               </span>
               <button
                 type="button"
                 onClick={loadSummons}
                 className="text-[11px] text-slate-400 hover:text-rose-600 flex items-center gap-1"
-                title="تحديث القائمة"
+                title="تحديث"
               >
                 <RefreshCw className="w-3 h-3" /> تحديث
               </button>
@@ -783,7 +782,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               </div>
 
-              {/* أزرار سريعة للأفواج الشائعة */}
+              {/* أزرار سريعة للأفواج */}
               <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-[11px]">
                 {["1م1", "1م2", "1م3", "1م4", "2م1", "2م2", "2م3", "2م4"].map((cls) => (
                   <button
@@ -804,28 +803,30 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1 flex items-center gap-1">
                   <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                  <span>ملاحظة وتوجيه الأستاذ لولي الأمر (سبب الاستدعاء):</span>
+                  <span>ملاحظة وسبب الاستدعاء لولي الأمر:</span>
                 </label>
                 <textarea
-                  className="input text-xs min-h-[65px] resize-y"
-                  placeholder="مثال: إهمال الكراس والواجبات المنزلية، كراس الدروس ناقص عدة دروس، يرجى الحضور لمناقشة المستوى..."
+                  className="input text-xs min-h-[60px] resize-y"
+                  placeholder="مثال: إهمال الكراس والواجبات، كراس الدروس ناقص عدة دروس..."
                   value={summonsNotes}
                   onChange={(e) => setSummonsNotes(e.target.value)}
                 />
               </div>
 
-              {/* خيار الحالة المستعجلة */}
-              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-50/60 border border-rose-100 cursor-pointer">
+              {/* خيار التوقيت الإضافي ليوم الأحد */}
+              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-sky-50/70 border border-sky-200 cursor-pointer">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500"
-                  checked={isUrgent}
-                  onChange={(e) => setIsUrgent(e.target.checked)}
+                  className="w-4 h-4 text-sky-600 rounded border-slate-300 focus:ring-sky-500"
+                  checked={isExtraSunday}
+                  onChange={(e) => setIsExtraSunday(e.target.checked)}
                 />
                 <div className="text-xs">
-                  <span className="font-black text-rose-900 block">حالة مستعجلة (موعد الأحد صباحاً)</span>
-                  <span className="text-[10px] text-rose-700">
-                    يمكن للولي الحضور استثنائياً يوم الأحد من 08:00 إلى 09:00 صباحاً
+                  <span className="font-black text-sky-950 block">
+                    توقيت إضافي: الأحد صباحاً (08:00 إلى 09:00)
+                  </span>
+                  <span className="text-[10px] text-sky-800">
+                    مبادرة من الأستاذ لعدم الانتظار لأسبوع كامل (وليس ساعة استقبال رسمية)
                   </span>
                 </div>
               </label>
@@ -843,14 +844,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               ) : (
                 <>
                   <UserPlus className="w-4 h-4" />
-                  <span>تسجيل استدعاء الولي في القائمة</span>
+                  <span>تسجيل استدعاء الولي فورياً</span>
                 </>
               )}
             </button>
           </form>
 
           {/* قائمة الاستدعاءات الحالية */}
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
               <span>التلاميذ المسجلين لاستقبال أوليائهم:</span>
               <span className="text-[11px] bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-full font-extrabold border border-rose-200">
@@ -860,30 +861,30 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
             {summonsList.length === 0 ? (
               <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 p-4">
-                لا توجد استدعاءات مسجلة حالياً. استخدم النموذج أعلاه لإضافة تلميذ.
+                لا توجد استدعاءات مسجلة حالياً.
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {summonsList.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs space-y-2"
+                    className="bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs space-y-1.5"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-extrabold text-xs text-slate-900">{item.studentName}</span>
+                          <span className="font-black text-xs text-slate-900">{item.studentName}</span>
                           <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-800">
                             فوج {item.className}
                           </span>
                           {item.isUrgent && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800">
-                              ⚡ مستعجل (الأحد)
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-sky-50 text-sky-800 border border-sky-200">
+                              توقيت إضافي (الأحد 08:00 - 09:00)
                             </span>
                           )}
                         </div>
                         {item.notes && (
-                          <p className="text-xs text-slate-600 mt-1 whitespace-pre-line bg-slate-50 p-2 rounded-lg">
+                          <p className="text-xs text-slate-600 mt-1 whitespace-pre-line bg-slate-50 p-2 rounded-lg font-medium">
                             {item.notes}
                           </p>
                         )}
@@ -914,55 +915,59 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       )}
 
-      {/* نافذة تعديل الدرس (Edit Lesson Modal) */}
+      {/* نافذة تعديل الدرس */}
       {editingLesson && (
         <EditLessonModal
           lesson={editingLesson}
           knownSections={knownSections}
           onClose={() => setEditingLesson(null)}
-          onSuccess={async () => {
+          onSuccess={(updated) => {
             setEditingLesson(null);
+            // تحديث فوري مباشر للحالة
+            setAllLessons((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
             showToast("success", "✓ تم تحديث العنصر بنجاح!");
-            await loadLessons();
           }}
         />
       )}
 
-      {/* نافذة تأكيد حذف الدرس (Delete Lesson Modal) */}
+      {/* نافذة تأكيد حذف الدرس */}
       {deletingLesson && (
         <DeleteLessonModal
           lesson={deletingLesson}
           onClose={() => setDeletingLesson(null)}
-          onSuccess={async () => {
+          onSuccess={(deletedId) => {
             setDeletingLesson(null);
+            // تحديث فوري مباشر للحالة
+            setAllLessons((prev) => prev.filter((l) => l.id !== deletedId));
             showToast("success", "✓ تم الحذف بنجاح!");
-            await loadLessons();
           }}
         />
       )}
 
-      {/* نافذة تعديل استدعاء الولي (Edit Summons Modal) */}
+      {/* نافذة تعديل استدعاء الولي */}
       {editingSummons && (
         <EditSummonsModal
           summons={editingSummons}
           onClose={() => setEditingSummons(null)}
-          onSuccess={async () => {
+          onSuccess={(updated) => {
             setEditingSummons(null);
-            showToast("success", "✓ تم تحديث استدعاء الولي بنجاح!");
-            await loadSummons();
+            // تحديث فوري مباشر للحالة
+            setSummonsList((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+            showToast("success", "✓ تم تحديث الاستدعاء بنجاح!");
           }}
         />
       )}
 
-      {/* نافذة تأكيد حذف استدعاء الولي (Delete Summons Modal) */}
+      {/* نافذة تأكيد حذف استدعاء الولي */}
       {deletingSummons && (
         <DeleteSummonsModal
           summons={deletingSummons}
           onClose={() => setDeletingSummons(null)}
-          onSuccess={async () => {
+          onSuccess={(deletedId) => {
             setDeletingSummons(null);
+            // تحديث فوري مباشر للحالة
+            setSummonsList((prev) => prev.filter((s) => s.id !== deletedId));
             showToast("success", "✓ تم حذف الاستدعاء من القائمة بنجاح!");
-            await loadSummons();
           }}
         />
       )}
@@ -975,7 +980,7 @@ function LessonCard({
   lesson,
   open,
   onToggle,
-  onChanged,
+  onLessonUpdated,
   onEdit,
   onDelete,
   showToast,
@@ -983,7 +988,7 @@ function LessonCard({
   lesson: Lesson;
   open: boolean;
   onToggle: () => void;
-  onChanged: () => void;
+  onLessonUpdated: (updated: Lesson) => void;
   onEdit: () => void;
   onDelete: () => void;
   showToast: (type: "success" | "error", text: string) => void;
@@ -1029,7 +1034,11 @@ function LessonCard({
 
     setUploading("");
     showToast("success", `✓ تم رفع الصور بنجاح إلى "${lesson.title}"`);
-    onChanged();
+
+    // جلب الدرس المحدث وتحديث الحالة محلياً مباشرة
+    const res = await fetch(`/api/lessons/${lesson.id}?_t=${Date.now()}`, { cache: "no-store" });
+    const data = await res.json();
+    if (data.lesson) onLessonUpdated(data.lesson);
   };
 
   const confirmDeleteImage = async () => {
@@ -1041,8 +1050,13 @@ function LessonCard({
       });
       if (res.ok) {
         showToast("success", "✓ تم حذف الصورة بنجاح");
+        // تحديث محلي مباشر
+        const updated = {
+          ...lesson,
+          images: lesson.images.filter((img) => img.id !== deletingImageId),
+        };
+        onLessonUpdated(updated);
         setDeletingImageId(null);
-        onChanged();
       } else {
         const data = await res.json();
         showToast("error", data.error || "تعذر حذف الصورة");
@@ -1063,6 +1077,9 @@ function LessonCard({
     images[index] = images[targetIndex];
     images[targetIndex] = temp;
 
+    // تحديث محلي فوري
+    onLessonUpdated({ ...lesson, images });
+
     try {
       const res = await fetch("/api/images", {
         method: "PUT",
@@ -1072,8 +1089,8 @@ function LessonCard({
           imageIds: images.map((img) => img.id),
         }),
       });
-      if (res.ok) {
-        onChanged();
+      if (!res.ok) {
+        showToast("error", "فشل حفظ ترتيب الصور في الخادم");
       }
     } catch {
       showToast("error", "فشل تغيير ترتيب الصور");
@@ -1140,7 +1157,7 @@ function LessonCard({
               <span className="font-black text-[11px] flex items-center gap-1">
                 <StickyNote className="w-3.5 h-3.5 text-amber-600" /> ملاحظة الأستاذ:
               </span>
-              <p className="whitespace-pre-line leading-relaxed">{lesson.notes}</p>
+              <p className="whitespace-pre-line leading-relaxed font-medium">{lesson.notes}</p>
             </div>
           )}
 
@@ -1335,7 +1352,7 @@ function EditLessonModal({
   lesson: Lesson;
   knownSections: string[];
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (updated: Lesson) => void;
 }) {
   const [num, setNum] = useState(String(lesson.number));
   const [title, setTitle] = useState(lesson.title);
@@ -1374,7 +1391,7 @@ function EditLessonModal({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "فشل التعديل");
 
-      onSuccess();
+      onSuccess(data.lesson);
     } catch (e: any) {
       setErr(e.message || "حدث خطأ أثناء التعديل");
     } finally {
@@ -1523,7 +1540,7 @@ function DeleteLessonModal({
 }: {
   lesson: Lesson;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (deletedId: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -1537,7 +1554,7 @@ function DeleteLessonModal({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "فشل الحذف");
-      onSuccess();
+      onSuccess(lesson.id);
     } catch (e: any) {
       setErr(e.message || "حدث خطأ أثناء محاولة الحذف");
     } finally {
@@ -1597,12 +1614,12 @@ function EditSummonsModal({
 }: {
   summons: ParentSummons;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (updated: ParentSummons) => void;
 }) {
   const [studentName, setStudentName] = useState(summons.studentName);
   const [className, setClassName] = useState(summons.className);
   const [notes, setNotes] = useState(summons.notes || "");
-  const [isUrgent, setIsUrgent] = useState(Boolean(summons.isUrgent));
+  const [isExtraSunday, setIsExtraSunday] = useState(Boolean(summons.isUrgent));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -1625,14 +1642,14 @@ function EditSummonsModal({
           studentName: studentName.trim(),
           className: className.trim(),
           notes: notes.trim() || undefined,
-          isUrgent,
+          isUrgent: isExtraSunday,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "فشل التعديل");
 
-      onSuccess();
+      onSuccess(data.summons);
     } catch (e: any) {
       setErr(e.message || "حدث خطأ أثناء تعديل الاستدعاء");
     } finally {
@@ -1694,22 +1711,22 @@ function EditSummonsModal({
           <div>
             <label className="text-xs font-bold text-slate-700 block mb-1">ملاحظة الأستاذ لولي الأمر:</label>
             <textarea
-              className="input text-xs min-h-[65px]"
+              className="input text-xs min-h-[60px]"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="اكتب ملاحظة أو سبب الاستدعاء..."
             />
           </div>
 
-          <label className="flex items-center gap-2 p-2 rounded-xl bg-rose-50/60 border border-rose-100 cursor-pointer">
+          <label className="flex items-center gap-2 p-2 rounded-xl bg-sky-50/70 border border-sky-200 cursor-pointer">
             <input
               type="checkbox"
-              className="w-4 h-4 text-rose-600 rounded border-slate-300"
-              checked={isUrgent}
-              onChange={(e) => setIsUrgent(e.target.checked)}
+              className="w-4 h-4 text-sky-600 rounded border-slate-300"
+              checked={isExtraSunday}
+              onChange={(e) => setIsExtraSunday(e.target.checked)}
             />
-            <span className="text-xs font-bold text-rose-900">
-              حالة مستعجلة (موعد الأحد صباحاً 08:00 إلى 09:00)
+            <span className="text-xs font-bold text-sky-950">
+              توقيت إضافي: الأحد صباحاً (08:00 إلى 09:00)
             </span>
           </label>
         </div>
@@ -1740,7 +1757,7 @@ function DeleteSummonsModal({
 }: {
   summons: ParentSummons;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (deletedId: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -1754,7 +1771,7 @@ function DeleteSummonsModal({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "فشل الحذف");
-      onSuccess();
+      onSuccess(summons.id);
     } catch (e: any) {
       setErr(e.message || "حدث خطأ أثناء محاولة الحذف");
     } finally {
