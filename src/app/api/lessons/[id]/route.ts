@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLessonsData } from "@/lib/storage";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -13,5 +16,12 @@ export async function GET(
     return NextResponse.json({ error: "الدرس غير موجود" }, { status: 404 });
   }
 
-  return NextResponse.json({ lesson });
+  return NextResponse.json(
+    { lesson },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+      },
+    }
+  );
 }

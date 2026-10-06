@@ -11,7 +11,7 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/lessons?level=${level}`)
+    fetch(`/api/lessons?level=${level}&_t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data.lessons) {

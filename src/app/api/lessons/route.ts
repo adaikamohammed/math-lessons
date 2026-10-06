@@ -3,6 +3,9 @@ import { getLessonsData, saveLessonsData, deleteImageFile } from "@/lib/storage"
 import { verifyAdminSession } from "@/lib/auth";
 import { Lesson } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // جلب الدروس (عام للتلاميذ والأستاذ)
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -18,7 +21,16 @@ export async function GET(req: NextRequest) {
   // ترتيب الدروس تصاعدياً حسب رقم الدرس
   lessons.sort((a, b) => a.number - b.number);
 
-  return NextResponse.json({ lessons });
+  return NextResponse.json(
+    { lessons },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    }
+  );
 }
 
 // إضافة درس جديد (للأستاذ فقط)

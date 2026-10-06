@@ -126,7 +126,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/lessons?level=${level}`);
+      const res = await fetch(`/api/lessons?level=${level}&_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       setLessons(data.lessons || []);
     } finally {

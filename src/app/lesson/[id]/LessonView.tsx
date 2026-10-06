@@ -11,7 +11,7 @@ export function LessonView({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/lessons/${id}`)
+    fetch(`/api/lessons/${id}?_t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data.lesson) {
