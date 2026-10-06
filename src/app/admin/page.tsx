@@ -25,6 +25,10 @@ import {
   StickyNote,
   Layers,
   BookOpen,
+  Users,
+  UserPlus,
+  Clock,
+  Search,
 } from "lucide-react";
 import {
   LEVELS,
@@ -33,6 +37,7 @@ import {
   type Lesson,
   type LessonImage,
   type NotebookType,
+  type ParentSummons,
 } from "@/lib/types";
 
 export default function AdminPage() {
@@ -126,17 +131,27 @@ function Login({ onLogin }: { onLogin: () => void }) {
 
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
 function Dashboard({ onLogout }: { onLogout: () => void }) {
+  // التبويب الرئيسي للوحة: إدارة الدروس أو استدعاءات الأولياء
+  const [mainTab, setMainTab] = useState<"lessons" | "summons">("lessons");
+
   const [level, setLevel] = useState<1 | 2>(1);
   const [notebookTab, setNotebookTab] = useState<NotebookType>("lessons");
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
+  const [summonsList, setSummonsList] = useState<ParentSummons[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // حقول إضافة عنصر جديد
+  // حقول إضافة درس
   const [field, setField] = useState("أنشطة عددية");
   const [section, setSection] = useState("المقطع 1 : الأعداد الطبيعية والأعداد العشرية");
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
   const [notes, setNotes] = useState("");
+
+  // حقول إضافة استدعاء ولي أمر
+  const [studentName, setStudentName] = useState("");
+  const [className, setClassName] = useState("1م3");
+  const [summonsNotes, setSummonsNotes] = useState("");
+  const [isUrgent, setIsUrgent] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -145,8 +160,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   // حالات النوافذ المنبثقة
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
+  const [editingSummons, setEditingSummons] = useState<ParentSummons | null>(null);
+  const [deletingSummons, setDeletingSummons] = useState<ParentSummons | null>(null);
 
-  const load = useCallback(async () => {
+  // جلب الدروس
+  const loadLessons = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch(`/api/lessons?level=${level}&_t=${Date.now()}`, { cache: "no-store" });
@@ -157,9 +175,21 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, [level]);
 
+  // جلب استدعاءات الأولياء
+  const loadSummons = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/summons?_t=${Date.now()}`, { cache: "no-store" });
+      const data = await res.json();
+      setSummonsList(data.summons || []);
+    } catch {
+      setSummonsList([]);
+    }
+  }, []);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    loadLessons();
+    loadSummons();
+  }, [loadLessons, loadSummons]);
 
   const showToast = (type: "success" | "error", text: string) => {
     setToastMsg({ type, text });
@@ -173,14 +203,12 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     onLogout();
   };
 
-  // تصفية العناصر حسب نوع الكراس المختار
   const currentItems = useMemo(() => {
     return allLessons.filter((l) =>
       notebookTab === "directed_work" ? l.type === "directed_work" : !l.type || l.type === "lessons"
     );
   }, [allLessons, notebookTab]);
 
-  // المقاطع المعرفية المسجلة مسبقاً في هذا المستوى للمساعدة في الاختيار
   const knownSections = useMemo(() => {
     const set = new Set<string>();
     for (const l of allLessons) {
@@ -193,7 +221,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const nextNumber = currentItems.length ? Math.max(...currentItems.map((l) => l.number)) + 1 : 1;
 
-  // إضافة مورد معرفي أو حصة أعمال موجهة
+  // إضافة درس / حصة أعمال موجهة
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
@@ -229,10 +257,45 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           notebookTab === "lessons" ? "كراس الدروس" : "كراس الأعمال الموجهة"
         }!`
       );
-      await load();
+      await loadLessons();
       setOpenId(data.lesson.id);
     } catch (e: any) {
       showToast("error", "خطأ: " + (e.message || "تعذر الإضافة"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // إضافة استدعاء ولي أمر
+  const addSummons = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentName.trim() || !className.trim()) {
+      showToast("error", "يرجى كتابة اسم التلميذ والفوج");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/summons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentName: studentName.trim(),
+          className: className.trim(),
+          notes: summonsNotes.trim() || undefined,
+          isUrgent,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل التسجيل");
+
+      setStudentName("");
+      setSummonsNotes("");
+      setIsUrgent(false);
+      showToast("success", `✓ تم تسجيل استدعاء ولي التلميذ "${data.summons.studentName}" بنجاح!`);
+      await loadSummons();
+    } catch (e: any) {
+      showToast("error", "خطأ: " + (e.message || "تعذر تسجيل الاستدعاء"));
     } finally {
       setIsSubmitting(false);
     }
@@ -305,338 +368,551 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </button>
         </div>
 
-        {/* أزرار سريعة للأستاذ */}
+        {/* أزرار سريعة للمعاينة */}
         <div className="flex items-center gap-2 pt-1 border-t border-slate-100 text-xs font-bold">
+          <Link
+            href="/parents"
+            target="_blank"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200/70 hover:bg-rose-100 transition text-[11px]"
+          >
+            <Users className="w-3.5 h-3.5 text-rose-600" />
+            <span>صفحة الأولياء</span>
+          </Link>
           <Link
             href="/announcement"
             target="_blank"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-50 text-amber-800 border border-amber-200/70 hover:bg-amber-100 transition"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200/70 hover:bg-amber-100 transition text-[11px]"
           >
             <Megaphone className="w-3.5 h-3.5 text-amber-600" />
-            <span>عرض الإعلان والتوجيهات</span>
+            <span>الإعلان والتوجيهات</span>
           </Link>
           <Link
-            href={`/year/${level}`}
+            href="/"
             target="_blank"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
           >
             <Globe className="w-3.5 h-3.5 text-emerald-600" />
-            <span>معاينة صفحة {LEVELS[level].short}</span>
+            <span>الموقع للزوار</span>
           </Link>
         </div>
       </div>
 
-      {/* اختيار المستوى الدراسي (1 متوسط أو 2 متوسط) */}
+      {/* التبويب الرئيسي: إدارة الدروس أو استدعاءات الأولياء */}
       <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
-        {([1, 2] as const).map((lv) => (
-          <button
-            key={lv}
-            onClick={() => {
-              setLevel(lv);
-              setOpenId(null);
-            }}
-            className={`py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
-              level === lv ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <span>{LEVELS[lv].label}</span>
-            <span
-              className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold ${
-                level === lv ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+        <button
+          onClick={() => setMainTab("lessons")}
+          className={`py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 ${
+            mainTab === "lessons"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>إدارة الدروس والكراريس</span>
+        </button>
+
+        <button
+          onClick={() => setMainTab("summons")}
+          className={`py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 ${
+            mainTab === "summons"
+              ? "bg-rose-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>استدعاءات الأولياء ({summonsList.length})</span>
+        </button>
+      </div>
+
+      {/* ======================================================== */}
+      {/* ================ تبويب 1: إدارة الدروس والكراريس ================ */}
+      {/* ======================================================== */}
+      {mainTab === "lessons" ? (
+        <div className="space-y-4">
+          {/* اختيار المستوى الدراسي (1 متوسط أو 2 متوسط) */}
+          <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
+            {([1, 2] as const).map((lv) => (
+              <button
+                key={lv}
+                onClick={() => {
+                  setLevel(lv);
+                  setOpenId(null);
+                }}
+                className={`py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+                  level === lv ? "bg-slate-800 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <span>{LEVELS[lv].label}</span>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold ${
+                    level === lv ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {LEVELS[lv].short}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* اختيار الكراس (كراس الدروس 192ص أو كراس الأعمال الموجهة 96ص) */}
+          <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
+            <button
+              onClick={() => {
+                setNotebookTab("lessons");
+                setOpenId(null);
+              }}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                notebookTab === "lessons"
+                  ? "bg-emerald-700 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-50"
               }`}
             >
-              {LEVELS[lv].short}
-            </span>
-          </button>
-        ))}
-      </div>
+              <span>📘</span>
+              <span>كراس الدروس (192 ص)</span>
+            </button>
+            <button
+              onClick={() => {
+                setNotebookTab("directed_work");
+                setOpenId(null);
+              }}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                notebookTab === "directed_work"
+                  ? "bg-sky-700 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <span>📗</span>
+              <span>الأعمال الموجهة (96 ص)</span>
+            </button>
+          </div>
 
-      {/* اختيار الكراس المراد إدارته (كراس الدروس 192ص أو كراس الأعمال الموجهة 96ص) */}
-      <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
-        <button
-          onClick={() => {
-            setNotebookTab("lessons");
-            setOpenId(null);
-          }}
-          className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-            notebookTab === "lessons"
-              ? "bg-emerald-700 text-white shadow-sm"
-              : "text-slate-600 hover:bg-slate-50"
-          }`}
-        >
-          <span>📘</span>
-          <span>كراس الدروس (192 ص)</span>
-        </button>
-        <button
-          onClick={() => {
-            setNotebookTab("directed_work");
-            setOpenId(null);
-          }}
-          className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-            notebookTab === "directed_work"
-              ? "bg-sky-700 text-white shadow-sm"
-              : "text-slate-600 hover:bg-slate-50"
-          }`}
-        >
-          <span>📗</span>
-          <span>الأعمال الموجهة (96 ص)</span>
-        </button>
-      </div>
+          {/* نموذج إضافة مورد جديد أو حصة أعمال موجهة */}
+          <form onSubmit={addItem} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+              <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                <span>{notebookTab === "lessons" ? "➕ إضافة مورد معرفي جديد لـ" : "➕ إضافة حصة أعمال موجهة لـ"}</span>
+                <span className="text-emerald-700 font-extrabold">{LEVELS[level].short}</span>
+              </span>
+              <button
+                type="button"
+                onClick={loadLessons}
+                className="text-[11px] text-slate-400 hover:text-emerald-600 flex items-center gap-1"
+                title="تحديث القائمة"
+              >
+                <RefreshCw className="w-3 h-3" /> تحديث
+              </button>
+            </div>
 
-      {/* نموذج إضافة مورد جديد أو حصة أعمال موجهة */}
-      <form onSubmit={addItem} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3.5">
-        <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-          <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-            <span>{notebookTab === "lessons" ? "➕ إضافة مورد معرفي جديد لـ" : "➕ إضافة حصة أعمال موجهة لـ"}</span>
-            <span className="text-emerald-700 font-extrabold">{LEVELS[level].short}</span>
-          </span>
-          <button
-            type="button"
-            onClick={load}
-            className="text-[11px] text-slate-400 hover:text-emerald-600 flex items-center gap-1"
-            title="تحديث القائمة"
-          >
-            <RefreshCw className="w-3 h-3" /> تحديث
-          </button>
-        </div>
+            {notebookTab === "lessons" ? (
+              <div className="space-y-3">
+                {/* 1. الميدان */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">📐 الميدان:</label>
+                  <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                    {COMMON_FIELDS.map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setField(f)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shrink-0 ${
+                          field === f
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                            : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    className="input text-xs font-semibold"
+                    placeholder="أو اكتب ميدان جديد (مثلاً: أنشطة عددية)"
+                    value={field}
+                    onChange={(e) => setField(e.target.value)}
+                    required
+                  />
+                </div>
 
-        {notebookTab === "lessons" ? (
-          /* حقول كراس الدروس */
+                {/* 2. المقطع المعرفي */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">📑 المقطع المعرفي:</label>
+                  {knownSections.length > 0 && (
+                    <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                      {knownSections.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setSection(s)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition shrink-0 ${
+                            section === s
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                              : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    className="input text-xs font-semibold"
+                    placeholder="مثال: المقطع 1 : الأعداد الطبيعية والأعداد العشرية"
+                    value={section}
+                    onChange={(e) => setSection(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* 3. رقم المورد وعنوانه */}
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="col-span-1">
+                    <label className="text-xs font-bold text-slate-600 block mb-1">رقم المورد:</label>
+                    <input
+                      className="input text-center text-sm font-extrabold text-emerald-700 bg-emerald-50/40 border-emerald-200"
+                      inputMode="numeric"
+                      placeholder={String(nextNumber)}
+                      value={number}
+                      onChange={(e) => setNumber(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <label className="text-xs font-bold text-slate-600 block mb-1">عنوان المورد المعرفي:</label>
+                    <input
+                      className="input text-xs font-semibold"
+                      placeholder="مثال: قراءة وكتابة عدد طبيعي"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* 4. ملاحظات وتوجيهات الأستاذ */}
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
+                    <StickyNote className="w-3.5 h-3.5 text-amber-600" />
+                    <span>ملاحظات وتوجيهات الأستاذ لهذا الدرس (اختياري):</span>
+                  </label>
+                  <textarea
+                    className="input text-xs min-h-[65px] resize-y"
+                    placeholder="مثال: واجب منزلي: حل تمرين 5 ص 18 على كراس المحاولات..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
+              /* حقول كراس الأعمال الموجهة */
+              <div className="space-y-3">
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="col-span-1">
+                    <label className="text-xs font-bold text-slate-600 block mb-1">رقم الحصة:</label>
+                    <input
+                      className="input text-center text-sm font-extrabold text-sky-700 bg-sky-50/40 border-sky-200"
+                      inputMode="numeric"
+                      placeholder={String(nextNumber)}
+                      value={number}
+                      onChange={(e) => setNumber(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <label className="text-xs font-bold text-slate-600 block mb-1">عنوان الحصة / السلسلة:</label>
+                    <input
+                      className="input text-xs font-semibold"
+                      placeholder="مثال: سلسلة تمارين 01 : الحساب على الأعداد الطبيعية"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
+                    <StickyNote className="w-3.5 h-3.5 text-amber-600" />
+                    <span>ملاحظات وتوجيهات الأستاذ للتلاميذ (اختياري):</span>
+                  </label>
+                  <textarea
+                    className="input text-xs min-h-[65px] resize-y"
+                    placeholder="مثال: إحضار كراس الأعمال الموجهة 96 صفحة، حل التمارين الفردية فقط..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <button disabled={isSubmitting} className="btn-primary w-full py-3 text-sm">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>جاري الحفظ...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  <span>
+                    {notebookTab === "lessons"
+                      ? "إضافة المورد والبدء برفع الصور"
+                      : "إضافة حصة الأعمال الموجهة والبدء برفع الصور"}
+                  </span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* قائمة الدروس والأعمال الموجهة */}
           <div className="space-y-3">
-            {/* 1. الميدان */}
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                📐 الميدان:
-              </label>
-              <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                {COMMON_FIELDS.map((f) => (
+            <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
+              <span>
+                {notebookTab === "lessons"
+                  ? `محتويات كراس الدروس (${currentItems.length} موارد):`
+                  : `حصص الأعمال الموجهة (${currentItems.length} حصص):`}
+              </span>
+              <span className="text-[11px] text-slate-400 font-normal">{LEVELS[level].short}</span>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-10 text-slate-400 text-xs bg-white rounded-2xl border border-slate-100">
+                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-emerald-600" />
+                جاري جلب القائمة...
+              </div>
+            ) : currentItems.length === 0 ? (
+              <div className="text-center text-xs text-slate-400 py-10 bg-white rounded-2xl border border-dashed border-slate-200 px-4">
+                لا توجد عناصر مضافة بعد في هذا الكراس. أضف عنصراً جديداً أعلاه!
+              </div>
+            ) : notebookTab === "lessons" ? (
+              <div className="space-y-4">
+                {groupedLessons.map((grp) => (
+                  <div key={grp.field} className="space-y-2.5">
+                    <div className="bg-emerald-800 text-white px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5">
+                      <span>📐 الميدان:</span>
+                      <span>{grp.field}</span>
+                    </div>
+
+                    {grp.sections.map((sec) => (
+                      <div key={sec.section} className="space-y-2 pr-2 border-r-2 border-emerald-200">
+                        <div className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5 pt-1">
+                          <span>📑</span>
+                          <span>{sec.section}</span>
+                        </div>
+
+                        <div className="space-y-2">
+                          {sec.items.map((item) => (
+                            <LessonCard
+                              key={item.id}
+                              lesson={item}
+                              open={openId === item.id}
+                              onToggle={() => setOpenId(openId === item.id ? null : item.id)}
+                              onChanged={loadLessons}
+                              onEdit={() => setEditingLesson(item)}
+                              onDelete={() => setDeletingLesson(item)}
+                              showToast={showToast}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {currentItems.map((item) => (
+                  <LessonCard
+                    key={item.id}
+                    lesson={item}
+                    open={openId === item.id}
+                    onToggle={() => setOpenId(openId === item.id ? null : item.id)}
+                    onChanged={loadLessons}
+                    onEdit={() => setEditingLesson(item)}
+                    onDelete={() => setDeletingLesson(item)}
+                    showToast={showToast}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* ======================================================== */
+        /* ================ تبويب 2: إدارة استدعاءات الأولياء ================ */
+        /* ======================================================== */
+        <div className="space-y-4">
+          {/* نموذج إضافة استدعاء جديد */}
+          <form
+            onSubmit={addSummons}
+            className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3.5"
+          >
+            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+              <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                <UserPlus className="w-4 h-4 text-rose-600" />
+                <span>إضافة استدعاء ولي تلميذ إلى جدول الاستقبال</span>
+              </span>
+              <button
+                type="button"
+                onClick={loadSummons}
+                className="text-[11px] text-slate-400 hover:text-rose-600 flex items-center gap-1"
+                title="تحديث القائمة"
+              >
+                <RefreshCw className="w-3 h-3" /> تحديث
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+                  <input
+                    className="input text-xs font-bold"
+                    placeholder="مثال: محمد بلقاسم"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="text-xs font-bold text-slate-700 block mb-1">الفوج:</label>
+                  <input
+                    className="input text-xs text-center font-black text-rose-700 bg-rose-50/40 border-rose-200"
+                    placeholder="مثال: 1م3"
+                    value={className}
+                    onChange={(e) => setClassName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* أزرار سريعة للأفواج الشائعة */}
+              <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-[11px]">
+                {["1م1", "1م2", "1م3", "1م4", "2م1", "2م2", "2م3", "2م4"].map((cls) => (
                   <button
-                    key={f}
+                    key={cls}
                     type="button"
-                    onClick={() => setField(f)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shrink-0 ${
-                      field === f
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                    onClick={() => setClassName(cls)}
+                    className={`px-2 py-0.5 rounded-lg border font-bold transition shrink-0 ${
+                      className === cls
+                        ? "bg-rose-50 text-rose-800 border-rose-300"
                         : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                     }`}
                   >
-                    {f}
+                    {cls}
                   </button>
                 ))}
               </div>
-              <input
-                className="input text-xs font-semibold"
-                placeholder="أو اكتب ميدان جديد (مثلاً: أنشطة عددية)"
-                value={field}
-                onChange={(e) => setField(e.target.value)}
-                required
-              />
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1 flex items-center gap-1">
+                  <StickyNote className="w-3.5 h-3.5 text-amber-600" />
+                  <span>ملاحظة وتوجيه الأستاذ لولي الأمر (سبب الاستدعاء):</span>
+                </label>
+                <textarea
+                  className="input text-xs min-h-[65px] resize-y"
+                  placeholder="مثال: إهمال الكراس والواجبات المنزلية، كراس الدروس ناقص عدة دروس، يرجى الحضور لمناقشة المستوى..."
+                  value={summonsNotes}
+                  onChange={(e) => setSummonsNotes(e.target.value)}
+                />
+              </div>
+
+              {/* خيار الحالة المستعجلة */}
+              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-50/60 border border-rose-100 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500"
+                  checked={isUrgent}
+                  onChange={(e) => setIsUrgent(e.target.checked)}
+                />
+                <div className="text-xs">
+                  <span className="font-black text-rose-900 block">حالة مستعجلة (موعد الأحد صباحاً)</span>
+                  <span className="text-[10px] text-rose-700">
+                    يمكن للولي الحضور استثنائياً يوم الأحد من 08:00 إلى 09:00 صباحاً
+                  </span>
+                </div>
+              </label>
             </div>
 
-            {/* 2. المقطع المعرفي */}
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                📑 المقطع المعرفي:
-              </label>
-              {knownSections.length > 0 && (
-                <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                  {knownSections.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setSection(s)}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition shrink-0 ${
-                        section === s
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+            <button
+              disabled={isSubmitting}
+              className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>جاري التسجيل...</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4" />
+                  <span>تسجيل استدعاء الولي في القائمة</span>
+                </>
               )}
-              <input
-                className="input text-xs font-semibold"
-                placeholder="مثال: المقطع 1 : الأعداد الطبيعية والأعداد العشرية"
-                value={section}
-                onChange={(e) => setSection(e.target.value)}
-                required
-              />
-            </div>
+            </button>
+          </form>
 
-            {/* 3. رقم المورد وعنوانه */}
-            <div className="grid grid-cols-4 gap-2">
-              <div className="col-span-1">
-                <label className="text-xs font-bold text-slate-600 block mb-1">رقم المورد:</label>
-                <input
-                  className="input text-center text-sm font-extrabold text-emerald-700 bg-emerald-50/40 border-emerald-200"
-                  inputMode="numeric"
-                  placeholder={String(nextNumber)}
-                  value={number}
-                  onChange={(e) => setNumber(e.target.value)}
-                />
-              </div>
-              <div className="col-span-3">
-                <label className="text-xs font-bold text-slate-600 block mb-1">عنوان المورد المعرفي:</label>
-                <input
-                  className="input text-xs font-semibold"
-                  placeholder="مثال: قراءة وكتابة عدد طبيعي"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* 4. ملاحظات وتوجيهات الأستاذ */}
-            <div>
-              <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
-                <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                <span>ملاحظات وتوجيهات الأستاذ لهذا الدرس (اختياري):</span>
-              </label>
-              <textarea
-                className="input text-xs min-h-[65px] resize-y"
-                placeholder="مثال: واجب منزلي: حل تمرين 5 ص 18 على كراس المحاولات، تنبيه: إحضار المنقلة والكوس..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-          </div>
-        ) : (
-          /* حقول كراس الأعمال الموجهة */
+          {/* قائمة الاستدعاءات الحالية */}
           <div className="space-y-3">
-            <div className="grid grid-cols-4 gap-2">
-              <div className="col-span-1">
-                <label className="text-xs font-bold text-slate-600 block mb-1">رقم الحصة:</label>
-                <input
-                  className="input text-center text-sm font-extrabold text-sky-700 bg-sky-50/40 border-sky-200"
-                  inputMode="numeric"
-                  placeholder={String(nextNumber)}
-                  value={number}
-                  onChange={(e) => setNumber(e.target.value)}
-                />
-              </div>
-              <div className="col-span-3">
-                <label className="text-xs font-bold text-slate-600 block mb-1">عنوان الحصة / السلسلة:</label>
-                <input
-                  className="input text-xs font-semibold"
-                  placeholder="مثال: سلسلة تمارين 01 : الحساب على الأعداد الطبيعية"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
-                <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                <span>ملاحظات وتوجيهات الأستاذ للتلاميذ (اختياري):</span>
-              </label>
-              <textarea
-                className="input text-xs min-h-[65px] resize-y"
-                placeholder="مثال: إحضار كراس الأعمال الموجهة 96 صفحة، حل التمارين الفردية فقط..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        <button disabled={isSubmitting} className="btn-primary w-full py-3 text-sm">
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>جاري الحفظ...</span>
-            </>
-          ) : (
-            <>
-              <Plus className="w-4 h-4" />
-              <span>
-                {notebookTab === "lessons"
-                  ? "إضافة المورد والبدء برفع الصور"
-                  : "إضافة حصة الأعمال الموجهة والبدء برفع الصور"}
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+              <span>التلاميذ المسجلين لاستقبال أوليائهم:</span>
+              <span className="text-[11px] bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-full font-extrabold border border-rose-200">
+                {summonsList.length} تلميذ
               </span>
-            </>
-          )}
-        </button>
-      </form>
+            </div>
 
-      {/* قائمة الدروس والأعمال الموجهة المنظمة */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
-          <span>
-            {notebookTab === "lessons"
-              ? `محتويات كراس الدروس (${currentItems.length} موارد):`
-              : `حصص الأعمال الموجهة (${currentItems.length} حصص):`}
-          </span>
-          <span className="text-[11px] text-slate-400 font-normal">{LEVELS[level].short}</span>
-        </div>
+            {summonsList.length === 0 ? (
+              <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 p-4">
+                لا توجد استدعاءات مسجلة حالياً. استخدم النموذج أعلاه لإضافة تلميذ.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {summonsList.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-xs text-slate-900">{item.studentName}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-800">
+                            فوج {item.className}
+                          </span>
+                          {item.isUrgent && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800">
+                              ⚡ مستعجل (الأحد)
+                            </span>
+                          )}
+                        </div>
+                        {item.notes && (
+                          <p className="text-xs text-slate-600 mt-1 whitespace-pre-line bg-slate-50 p-2 rounded-lg">
+                            {item.notes}
+                          </p>
+                        )}
+                      </div>
 
-        {loading ? (
-          <div className="text-center py-10 text-slate-400 text-xs bg-white rounded-2xl border border-slate-100">
-            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-emerald-600" />
-            جاري جلب القائمة...
-          </div>
-        ) : currentItems.length === 0 ? (
-          <div className="text-center text-xs text-slate-400 py-10 bg-white rounded-2xl border border-dashed border-slate-200 px-4">
-            لا توجد عناصر مضافة بعد في هذا الكراس. أضف عنصراً جديداً أعلاه!
-          </div>
-        ) : notebookTab === "lessons" ? (
-          /* عرض كراس الدروس مقسماً بالميدان والمقطع */
-          <div className="space-y-4">
-            {groupedLessons.map((grp) => (
-              <div key={grp.field} className="space-y-2.5">
-                <div className="bg-emerald-800 text-white px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5">
-                  <span>📐 الميدان:</span>
-                  <span>{grp.field}</span>
-                </div>
-
-                {grp.sections.map((sec) => (
-                  <div key={sec.section} className="space-y-2 pr-2 border-r-2 border-emerald-200">
-                    <div className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5 pt-1">
-                      <span>📑</span>
-                      <span>{sec.section}</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      {sec.items.map((item) => (
-                        <LessonCard
-                          key={item.id}
-                          lesson={item}
-                          open={openId === item.id}
-                          onToggle={() => setOpenId(openId === item.id ? null : item.id)}
-                          onChanged={load}
-                          onEdit={() => setEditingLesson(item)}
-                          onDelete={() => setDeletingLesson(item)}
-                          showToast={showToast}
-                        />
-                      ))}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => setEditingSummons(item)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-700 hover:bg-rose-50 transition"
+                          title="تعديل الاستدعاء"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingSummons(item)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                          title="حذف الاستدعاء"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-            ))}
+            )}
           </div>
-        ) : (
-          /* عرض كراس الأعمال الموجهة */
-          <div className="space-y-2.5">
-            {currentItems.map((item) => (
-              <LessonCard
-                key={item.id}
-                lesson={item}
-                open={openId === item.id}
-                onToggle={() => setOpenId(openId === item.id ? null : item.id)}
-                onChanged={load}
-                onEdit={() => setEditingLesson(item)}
-                onDelete={() => setDeletingLesson(item)}
-                showToast={showToast}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* نافذة تعديل الدرس (Edit Lesson Modal) */}
       {editingLesson && (
@@ -647,7 +923,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           onSuccess={async () => {
             setEditingLesson(null);
             showToast("success", "✓ تم تحديث العنصر بنجاح!");
-            await load();
+            await loadLessons();
           }}
         />
       )}
@@ -660,7 +936,33 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           onSuccess={async () => {
             setDeletingLesson(null);
             showToast("success", "✓ تم الحذف بنجاح!");
-            await load();
+            await loadLessons();
+          }}
+        />
+      )}
+
+      {/* نافذة تعديل استدعاء الولي (Edit Summons Modal) */}
+      {editingSummons && (
+        <EditSummonsModal
+          summons={editingSummons}
+          onClose={() => setEditingSummons(null)}
+          onSuccess={async () => {
+            setEditingSummons(null);
+            showToast("success", "✓ تم تحديث استدعاء الولي بنجاح!");
+            await loadSummons();
+          }}
+        />
+      )}
+
+      {/* نافذة تأكيد حذف استدعاء الولي (Delete Summons Modal) */}
+      {deletingSummons && (
+        <DeleteSummonsModal
+          summons={deletingSummons}
+          onClose={() => setDeletingSummons(null)}
+          onSuccess={async () => {
+            setDeletingSummons(null);
+            showToast("success", "✓ تم حذف الاستدعاء من القائمة بنجاح!");
+            await loadSummons();
           }}
         />
       )}
@@ -668,7 +970,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-/* ---------------- 3. بطاقة درس / حصة مع إدارة الصور ---------------- */
+/* ---------------- 3. بطاقة درس / حصة ---------------- */
 function LessonCard({
   lesson,
   open,
@@ -780,7 +1082,6 @@ function LessonCard({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-2xs overflow-hidden transition">
-      {/* رأس بطاقة العنصر */}
       <div className="p-3 flex items-start justify-between gap-2">
         <button onClick={onToggle} className="flex-1 flex items-start gap-2.5 text-right min-w-0">
           <span
@@ -793,7 +1094,6 @@ function LessonCard({
             {lesson.number}
           </span>
           <div className="flex-1 min-w-0">
-            {/* العنوان بالكامل بدون أي اقتطاع */}
             <div className="font-bold text-xs text-slate-900 leading-snug break-words">
               {lesson.title}
             </div>
@@ -815,7 +1115,6 @@ function LessonCard({
           />
         </button>
 
-        {/* أزرار الإجراءات السريعة */}
         <div className="flex items-center gap-1 shrink-0 mt-0.5">
           <button
             onClick={onEdit}
@@ -834,10 +1133,8 @@ function LessonCard({
         </div>
       </div>
 
-      {/* قسم رفع وإدارة صور السبورة عند الفتح */}
       {open && (
         <div className="border-t border-slate-100 p-3.5 space-y-3.5 bg-slate-50/50">
-          {/* عرض الملاحظة إن وجدت */}
           {lesson.notes && (
             <div className="bg-amber-50/80 p-2.5 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
               <span className="font-black text-[11px] flex items-center gap-1">
@@ -852,7 +1149,6 @@ function LessonCard({
             <span className="text-[11px] text-slate-400 font-normal">مرتبة بالتسلسل</span>
           </div>
 
-          {/* قائمة الصور الحالية */}
           {lesson.images && lesson.images.length > 0 ? (
             <div className="space-y-2">
               {lesson.images.map((img, idx) => (
@@ -884,7 +1180,6 @@ function LessonCard({
                     </button>
                   </div>
 
-                  {/* أزرار الترتيب (تقديم / تأخير) */}
                   <div className="flex items-center gap-1">
                     <button
                       disabled={idx === 0}
@@ -912,7 +1207,6 @@ function LessonCard({
                     </button>
                   </div>
 
-                  {/* زر حذف الصورة */}
                   <button
                     onClick={() => setDeletingImageId(img.id)}
                     className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
@@ -929,7 +1223,6 @@ function LessonCard({
             </div>
           )}
 
-          {/* زر رفع صور جديدة */}
           <label
             className={`btn-primary w-full py-3 text-xs cursor-pointer shadow-sm ${
               uploading ? "opacity-70 pointer-events-none" : ""
@@ -958,7 +1251,6 @@ function LessonCard({
             />
           </label>
 
-          {/* شريط الإجراءات في أسفل البطاقة */}
           <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60">
             <a
               href={`/lesson/${lesson.id}`}
@@ -978,7 +1270,6 @@ function LessonCard({
         </div>
       )}
 
-      {/* نافذة تأكيد حذف صورة السبورة */}
       {deletingImageId && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
@@ -1011,7 +1302,6 @@ function LessonCard({
         </div>
       )}
 
-      {/* نافذة معاينة الصورة بملء الشاشة */}
       {previewImg && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-3"
@@ -1035,7 +1325,7 @@ function LessonCard({
   );
 }
 
-/* ---------------- 4. نافذة تعديل البيانات (Modal) ---------------- */
+/* ---------------- 4. نافذة تعديل الدرس ---------------- */
 function EditLessonModal({
   lesson,
   knownSections,
@@ -1121,7 +1411,6 @@ function EditLessonModal({
           </div>
         )}
 
-        {/* نوع الكراس */}
         <div>
           <label className="text-xs font-bold text-slate-600 block mb-1">الكراس التابع له:</label>
           <div className="grid grid-cols-2 gap-2">
@@ -1226,7 +1515,7 @@ function EditLessonModal({
   );
 }
 
-/* ---------------- 5. نافذة تأكيد الحذف (Modal) ---------------- */
+/* ---------------- 5. نافذة تأكيد حذف الدرس ---------------- */
 function DeleteLessonModal({
   lesson,
   onClose,
@@ -1293,6 +1582,223 @@ function DeleteLessonModal({
             className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
           >
             إلغاء وتراجع
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- 6. نافذة تعديل استدعاء الولي ---------------- */
+function EditSummonsModal({
+  summons,
+  onClose,
+  onSuccess,
+}: {
+  summons: ParentSummons;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [studentName, setStudentName] = useState(summons.studentName);
+  const [className, setClassName] = useState(summons.className);
+  const [notes, setNotes] = useState(summons.notes || "");
+  const [isUrgent, setIsUrgent] = useState(Boolean(summons.isUrgent));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentName.trim() || !className.trim()) {
+      setErr("اسم التلميذ والفوج مطلوبان");
+      return;
+    }
+
+    setBusy(true);
+    setErr("");
+
+    try {
+      const res = await fetch("/api/summons", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: summons.id,
+          studentName: studentName.trim(),
+          className: className.trim(),
+          notes: notes.trim() || undefined,
+          isUrgent,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل التعديل");
+
+      onSuccess();
+    } catch (e: any) {
+      setErr(e.message || "حدث خطأ أثناء تعديل الاستدعاء");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <form
+        onSubmit={submit}
+        className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-3.5 shadow-xl border border-slate-100 fade-up"
+      >
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center">
+              <Pencil className="w-4 h-4" />
+            </div>
+            <h3 className="font-extrabold text-sm text-slate-800">تعديل استدعاء ولي التلميذ</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {err && (
+          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{err}</span>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+              <input
+                className="input text-xs font-bold"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="col-span-1">
+              <label className="text-xs font-bold text-slate-700 block mb-1">الفوج:</label>
+              <input
+                className="input text-xs text-center font-black text-rose-700 bg-rose-50/40 border-rose-200"
+                value={className}
+                onChange={(e) => setClassName(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">ملاحظة الأستاذ لولي الأمر:</label>
+            <textarea
+              className="input text-xs min-h-[65px]"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="اكتب ملاحظة أو سبب الاستدعاء..."
+            />
+          </div>
+
+          <label className="flex items-center gap-2 p-2 rounded-xl bg-rose-50/60 border border-rose-100 cursor-pointer">
+            <input
+              type="checkbox"
+              className="w-4 h-4 text-rose-600 rounded border-slate-300"
+              checked={isUrgent}
+              onChange={(e) => setIsUrgent(e.target.checked)}
+            />
+            <span className="text-xs font-bold text-rose-900">
+              حالة مستعجلة (موعد الأحد صباحاً 08:00 إلى 09:00)
+            </span>
+          </label>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs bg-rose-600 hover:bg-rose-700">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التعديل"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+          >
+            إلغاء
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* ---------------- 7. نافذة تأكيد حذف استدعاء الولي ---------------- */
+function DeleteSummonsModal({
+  summons,
+  onClose,
+  onSuccess,
+}: {
+  summons: ParentSummons;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submitDelete = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch(`/api/summons?id=${encodeURIComponent(summons.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل الحذف");
+      onSuccess();
+    } catch (e: any) {
+      setErr(e.message || "حدث خطأ أثناء محاولة الحذف");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
+        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+          <Trash2 className="w-6 h-6" />
+        </div>
+
+        <div>
+          <h3 className="font-extrabold text-sm text-slate-900">حذف استدعاء الولي من القائمة</h3>
+          <p className="text-xs font-bold text-slate-700 mt-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            التلميذ: {summons.studentName} (فوج {summons.className})
+          </p>
+          <p className="text-[11px] text-slate-500 mt-2">
+            هل حضر ولي الأمر أو تم حل الإشكال وترغب في إزالة اسمه من جدول الاستدعاء؟
+          </p>
+        </div>
+
+        {err && (
+          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold">
+            {err}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button
+            disabled={busy}
+            onClick={submitDelete}
+            className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الآن"}
+          </button>
+          <button
+            disabled={busy}
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+          >
+            إلغاء
           </button>
         </div>
       </div>

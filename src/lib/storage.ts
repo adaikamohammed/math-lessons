@@ -34,22 +34,29 @@ export async function getLessonsData(): Promise<LessonsData> {
         const res = await fetch(targetUrl, { cache: "no-store" });
         if (res.ok) {
           const json = await res.json();
-          return json as LessonsData;
+          return {
+            lessons: Array.isArray(json.lessons) ? json.lessons : [],
+            summons: Array.isArray(json.summons) ? json.summons : [],
+          };
         }
       }
     } catch (e) {
       console.error("Error reading from Vercel Blob:", e);
     }
-    return { lessons: [] };
+    return { lessons: [], summons: [] };
   }
 
   // Local fallback
   try {
     await ensureLocalDirs();
     const data = await fs.readFile(LOCAL_DATA_FILE, "utf-8");
-    return JSON.parse(data) as LessonsData;
+    const json = JSON.parse(data);
+    return {
+      lessons: Array.isArray(json.lessons) ? json.lessons : [],
+      summons: Array.isArray(json.summons) ? json.summons : [],
+    };
   } catch {
-    return { lessons: [] };
+    return { lessons: [], summons: [] };
   }
 }
 

@@ -1,11 +1,20 @@
 import Link from "next/link";
-import { ChevronLeft, Sparkles, BookOpen, Calendar, Clock, Megaphone } from "lucide-react";
+import {
+  ChevronLeft,
+  Sparkles,
+  BookOpen,
+  Calendar,
+  Clock,
+  Megaphone,
+  Users,
+  AlertCircle,
+} from "lucide-react";
 
 const years = [
   {
     level: 1,
     title: "السنة الأولى متوسط",
-    subtitle: "دروس وملخصات السبورة",
+    subtitle: "كراس الدروس وكراس الأعمال الموجهة",
     tag: "1م",
     gradient: "from-emerald-600 to-teal-600",
     shadow: "shadow-emerald-600/15",
@@ -13,7 +22,7 @@ const years = [
   {
     level: 2,
     title: "السنة الثانية متوسط",
-    subtitle: "دروس وملخصات السبورة",
+    subtitle: "كراس الدروس وكراس الأعمال الموجهة",
     tag: "2م",
     gradient: "from-sky-600 to-indigo-600",
     shadow: "shadow-sky-600/15",
@@ -22,7 +31,7 @@ const years = [
 
 export default function Home() {
   return (
-    <div className="pt-6 pb-12 fade-up space-y-5">
+    <div className="pt-6 pb-14 fade-up space-y-4">
       {/* رأس الصفحة والهوية */}
       <div className="text-center">
         <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center text-3xl font-extrabold shadow-lg shadow-emerald-600/20">
@@ -36,7 +45,49 @@ export default function Home() {
         </p>
       </div>
 
-      {/* بطاقة الإعلان الهام والتوجيهات (بارزة جداً للأولياء والتلاميذ) */}
+      {/* بطاقة استدعاء الأولياء وساعة الاستقبال (جديد وبارز جداً) */}
+      <Link
+        href="/parents"
+        className="block bg-gradient-to-br from-rose-600 via-rose-700 to-red-800 rounded-3xl p-5 text-white shadow-md shadow-rose-700/20 active:scale-[0.98] transition group relative overflow-hidden"
+      >
+        <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-x-10 -translate-y-10 pointer-events-none"></div>
+
+        <div className="relative z-10 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur text-[11px] font-black border border-white/20">
+              <Users className="w-3.5 h-3.5" /> استدعاء الأولياء ومواعيد الاستقبال
+            </span>
+            <span className="text-[10px] bg-white text-rose-900 font-black px-2.5 py-0.5 rounded-lg shadow-2xs">
+              هام للأولياء
+            </span>
+          </div>
+
+          <div>
+            <h2 className="text-base font-black text-white leading-snug">
+              قائمة التلاميذ المعنيين بمقابلة أوليائهم
+            </h2>
+            <p className="text-xs text-rose-100 mt-1 leading-relaxed">
+              « أود استقبالكم الآن لمتابعة مستوى أبنائكم ومعالجة النقائص، وليس بعد الإعلان عن نتائج الفصل الأول! »
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-white border-t border-white/20">
+            <div className="flex items-center gap-2 text-[11px] text-rose-100">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3 text-rose-200" /> الأربعاء (10:00 - 11:00)
+              </span>
+              <span>•</span>
+              <span className="text-amber-200">الأحد مستعجل (08:00 - 09:00)</span>
+            </div>
+            <span className="inline-flex items-center gap-1 text-white font-black group-hover:translate-x-1 transition-transform">
+              <span>عرض القائمة</span>
+              <ChevronLeft className="w-4 h-4" />
+            </span>
+          </div>
+        </div>
+      </Link>
+
+      {/* بطاقة الإعلان الهام والتوجيهات */}
       <Link
         href="/announcement"
         className="block bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 rounded-3xl p-5 text-white shadow-md shadow-amber-600/20 active:scale-[0.98] transition group relative overflow-hidden"
@@ -48,14 +99,14 @@ export default function Home() {
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur text-[11px] font-black border border-white/20">
               <Megaphone className="w-3.5 h-3.5 animate-pulse" /> إعلان هام وتوجيهات العام
             </span>
-            <span className="text-[11px] bg-white text-amber-900 font-extrabold px-2.5 py-0.5 rounded-lg shadow-2xs">
-              جديد
+            <span className="text-[10px] bg-white text-amber-900 font-extrabold px-2.5 py-0.5 rounded-lg shadow-2xs">
+              دروس الدعم
             </span>
           </div>
 
           <div>
             <h2 className="text-base font-black text-white leading-snug">
-              حصص الدعم المدرسي، تنظيم الكراريس واستقبال الأولياء
+              حصص الدعم المدرسي، تنظيم الكراريس وميثاق التقويم
             </h2>
             <p className="text-xs text-amber-100 mt-1 line-clamp-2 leading-relaxed">
               انطلاق دروس الدعم بأكاديمية ستار سكول (1م و 2م)، شروط الكراريس والـ 5 نقاط في التقويم، وميثاق العدل في التنقيط.

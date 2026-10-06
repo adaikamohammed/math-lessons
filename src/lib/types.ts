@@ -21,8 +21,18 @@ export type Lesson = {
   images: LessonImage[];
 };
 
+export type ParentSummons = {
+  id: string;
+  studentName: string; // اسم التلميذ
+  className: string; // الفوج : مثلاً "1م3"
+  notes?: string; // ملاحظة الأستاذ لولي الأمر وسبب الاستدعاء
+  isUrgent?: boolean; // هل الحالة مستعجلة (لحضور الأحد صباحاً)
+  createdAt: string;
+};
+
 export type LessonsData = {
   lessons: Lesson[];
+  summons?: ParentSummons[];
 };
 
 export const LEVELS = {
@@ -52,3 +62,12 @@ export const COMMON_FIELDS = [
   "أنشطة هندسية",
   "تنظيم معطيات",
 ] as const;
+
+export const RECEPTION_INFO = {
+  officialDay: "الأربعاء",
+  officialTime: "من 10:00 إلى 11:00 صباحاً",
+  urgentDay: "الأحد",
+  urgentTime: "من 08:00 إلى 09:00 صباحاً",
+  location: "متوسطة المجاهد باهي علي",
+  motto: "أود استقبالكم الآن لمتابعة مستوى أبنائكم ومعالجة النقائص، وليس بعد الإعلان عن نتائج الفصل الأول!",
+} as const;
