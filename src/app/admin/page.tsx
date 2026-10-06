@@ -198,7 +198,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const loadHonors = useCallback(async () => {
     try {
-      const res = await fetch(`/api/honors?_t=${Date.now()}`, { cache: "no-store" });
+      const res = await fetch(`/api/honors?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
       const data = await res.json();
       setHonorsList(data.honors || []);
     } catch {
@@ -1138,7 +1141,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 الكل ({honorsList.length})
               </button>
               {HONOR_CLASSES.map((cls) => {
-                const count = honorsList.filter((h) => h.className === cls).length;
+                const count = honorsList.filter(
+                  (h) => (h.className || "").replace(/\s+/g, "") === cls.replace(/\s+/g, "")
+                ).length;
                 return (
                   <button
                     key={cls}
@@ -1168,7 +1173,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 {honorsList
                   .filter(
                     (h) =>
-                      selectedHonorFilter === "all" || h.className === selectedHonorFilter
+                      selectedHonorFilter === "all" ||
+                      (h.className || "").replace(/\s+/g, "") ===
+                        selectedHonorFilter.replace(/\s+/g, "")
                   )
                   .map((item) => (
                     <div

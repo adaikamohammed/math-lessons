@@ -28,7 +28,10 @@ export default function HonorRollPage() {
 
   const fetchHonors = async () => {
     try {
-      const res = await fetch(`/api/honors?t=${Date.now()}`, { cache: "no-store" });
+      const res = await fetch(`/api/honors?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
       const data = await res.json();
       setHonors(Array.isArray(data.honors) ? data.honors : []);
     } catch (e) {
@@ -38,9 +41,13 @@ export default function HonorRollPage() {
     }
   };
 
+  const normalizeClass = (c?: string) => (c ? c.replace(/\s+/g, "").trim() : "");
+
   // تصفية حسب القسم والبحث
   const filteredHonors = honors.filter((item) => {
-    const matchesClass = selectedClass === "all" || item.className === selectedClass;
+    const matchesClass =
+      selectedClass === "all" ||
+      normalizeClass(item.className) === normalizeClass(selectedClass);
     const matchesSearch =
       !search.trim() ||
       item.studentName.toLowerCase().includes(search.toLowerCase()) ||
@@ -52,7 +59,7 @@ export default function HonorRollPage() {
   // حساب عدد المتميزين في كل قسم
   const getClassCount = (cls: string) => {
     if (cls === "all") return honors.length;
-    return honors.filter((h) => h.className === cls).length;
+    return honors.filter((h) => normalizeClass(h.className) === normalizeClass(cls)).length;
   };
 
   return (

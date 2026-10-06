@@ -1,4 +1,4 @@
-import { put, del, list } from "@vercel/blob";
+import { put, del, list, get } from "@vercel/blob";
 import fs from "fs/promises";
 import path from "path";
 import { Lesson, LessonsData } from "./types";
@@ -30,8 +30,32 @@ export async function getLessonsData(): Promise<LessonsData> {
       const listResult = await list({ prefix: "lessons-db.json", token });
       const found = listResult.blobs.find((b) => b.pathname === "lessons-db.json");
       if (found) {
+        // نستخدم get المباشر مع token للحصول على أحدث نسخة وتجاوز كاش الـ CDN كلياً
+        try {
+          const blobRes = await get(found.url, { token, access: "public" });
+          if (blobRes && blobRes.statusCode === 200 && blobRes.stream) {
+            const chunks: Uint8Array[] = [];
+            // @ts-ignore
+            for await (const chunk of blobRes.stream) {
+              chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+            }
+            const text = Buffer.concat(chunks).toString("utf-8");
+            const json = JSON.parse(text);
+            return {
+              lessons: Array.isArray(json.lessons) ? json.lessons : [],
+              summons: Array.isArray(json.summons) ? json.summons : [],
+              honors: Array.isArray(json.honors) ? json.honors : [],
+            };
+          }
+        } catch (getErr) {
+          console.warn("Direct blob.get error, falling back to fetch:", getErr);
+        }
+
         const targetUrl = `${found.url}?t=${Date.now()}`;
-        const res = await fetch(targetUrl, { cache: "no-store" });
+        const res = await fetch(targetUrl, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+        });
         if (res.ok) {
           const json = await res.json();
           return {
