@@ -21,16 +21,55 @@ async function ensureLocalDirs() {
   await fs.mkdir(LOCAL_UPLOADS_DIR, { recursive: true });
 }
 
+// Mutex lock to serialize writes and prevent concurrent race conditions
+let writeQueue: Promise<any> = Promise.resolve();
+
 // ----------------- قراءة بيانات الدروس -----------------
 export async function getLessonsData(): Promise<LessonsData> {
   const token = getBlobToken();
 
   if (token) {
     try {
+      // 1. أولاً: فحص النسخ ذات المعرف الفريد الزمني (db/v-)
+      // كل نسخة ذات اسم فريد تضمن تخطي كاش الـ Edge CDN بنسبة 100% لأن رابطها لم يسبق طلبه
+      const versionList = await list({ prefix: "db/v-", token });
+      if (versionList.blobs && versionList.blobs.length > 0) {
+        // ترتيب تنازلي حسب تاريخ الرفع للحصول على أحدث نسخة فوراً
+        const sorted = versionList.blobs.sort(
+          (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
+        const latest = sorted[0];
+
+        try {
+          const res = await fetch(latest.url, {
+            cache: "no-store",
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              Pragma: "no-cache",
+            },
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const result: LessonsData = {
+              lessons: Array.isArray(json.lessons) ? json.lessons : [],
+              summons: Array.isArray(json.summons) ? json.summons : [],
+              honors: Array.isArray(json.honors) ? json.honors : [],
+            };
+            // حفظ نسخة محلية احتياطية
+            ensureLocalDirs()
+              .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
+              .catch(() => {});
+            return result;
+          }
+        } catch (fetchErr) {
+          console.warn("Error fetching versioned blob, trying fallback:", fetchErr);
+        }
+      }
+
+      // 2. ثانياً: في حال عدم العثور على db/v-، نلجأ إلى lessons-db.json كنسخة احتياطية
       const listResult = await list({ prefix: "lessons-db.json", token });
       const found = listResult.blobs.find((b) => b.pathname === "lessons-db.json");
       if (found) {
-        // نستخدم get المباشر مع token للحصول على أحدث نسخة وتجاوز كاش الـ CDN كلياً
         try {
           const blobRes = await get(found.url, { token, access: "public" });
           if (blobRes && blobRes.statusCode === 200 && blobRes.stream) {
@@ -48,27 +87,12 @@ export async function getLessonsData(): Promise<LessonsData> {
             };
           }
         } catch (getErr) {
-          console.warn("Direct blob.get error, falling back to fetch:", getErr);
-        }
-
-        const targetUrl = `${found.url}?t=${Date.now()}`;
-        const res = await fetch(targetUrl, {
-          cache: "no-store",
-          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
-        });
-        if (res.ok) {
-          const json = await res.json();
-          return {
-            lessons: Array.isArray(json.lessons) ? json.lessons : [],
-            summons: Array.isArray(json.summons) ? json.summons : [],
-            honors: Array.isArray(json.honors) ? json.honors : [],
-          };
+          console.warn("Direct blob.get error on lessons-db.json:", getErr);
         }
       }
     } catch (e) {
       console.error("Error reading from Vercel Blob:", e);
     }
-    return { lessons: [], summons: [], honors: [] };
   }
 
   // Local fallback
@@ -87,23 +111,64 @@ export async function getLessonsData(): Promise<LessonsData> {
 }
 
 // ----------------- حفظ بيانات الدروس -----------------
-export async function saveLessonsData(data: LessonsData): Promise<void> {
+async function executeSave(data: LessonsData): Promise<void> {
   const token = getBlobToken();
 
   if (token) {
-    await put("lessons-db.json", JSON.stringify(data, null, 2), {
+    const payload = JSON.stringify(data, null, 2);
+    const ts = Date.now();
+    const versionPath = `db/v-${ts}.json`;
+
+    // 1. كتابة النسخة الفريدة (db/v-) التي تضمن عدم الكاش إطلاقاً
+    await put(versionPath, payload, {
       access: "public",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      cacheControlMaxAge: 0,
       token,
     });
+
+    // 2. تحديث lessons-db.json أيضاً للتوافق الاحتياطي
+    try {
+      await put("lessons-db.json", payload, {
+        access: "public",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        token,
+      });
+    } catch (legacyErr) {
+      console.warn("Could not overwrite lessons-db.json fallback:", legacyErr);
+    }
+
+    // 3. تنظيف النسخ القديمة جداً في الخلفية (الاحتفاظ بآخر 5 نسخ للأمان)
+    list({ prefix: "db/v-", token })
+      .then(async (res) => {
+        if (res.blobs && res.blobs.length > 5) {
+          const sorted = res.blobs.sort(
+            (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+          );
+          const toDelete = sorted.slice(5);
+          for (const b of toDelete) {
+            await del(b.url, { token }).catch(() => {});
+          }
+        }
+      })
+      .catch(() => {});
+
+    // 4. حفظ نسخة محلية أيضاً
+    ensureLocalDirs()
+      .then(() => fs.writeFile(LOCAL_DATA_FILE, payload, "utf-8"))
+      .catch(() => {});
+
     return;
   }
 
   // Local fallback
   await ensureLocalDirs();
   await fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+}
+
+export function saveLessonsData(data: LessonsData): Promise<void> {
+  const next = writeQueue.then(() => executeSave(data));
+  writeQueue = next.catch(() => {});
+  return next;
 }
 
 // ----------------- رفع صورة -----------------
