@@ -22,43 +22,34 @@ async function ensureLocalDirs() {
 }
 
 // ----------------- قراءة بيانات الدروس -----------------
-export async function getLessonsData(): Promise<LessonsData & { _debug?: any }> {
+export async function getLessonsData(): Promise<LessonsData> {
   const token = getBlobToken();
 
   if (token) {
-    const debug: any = { tokenSet: true };
     try {
       const listResult = await list({ prefix: "lessons-db.json", token });
-      debug.blobsFound = listResult.blobs.length;
       const found = listResult.blobs.find((b) => b.pathname === "lessons-db.json");
-      debug.found = Boolean(found);
       if (found) {
-        debug.url = found.url;
         const targetUrl = `${found.url}?t=${Date.now()}`;
         const res = await fetch(targetUrl, { cache: "no-store" });
-        debug.fetchStatus = res.status;
-        const text = await res.text();
-        debug.textLength = text.length;
-        debug.textPreview = text.substring(0, 80);
         if (res.ok) {
-          const json = JSON.parse(text);
-          return { ...json, _debug: debug };
+          const json = await res.json();
+          return json as LessonsData;
         }
       }
-    } catch (e: any) {
-      debug.error = e.message;
+    } catch (e) {
       console.error("Error reading from Vercel Blob:", e);
     }
-    return { lessons: [], _debug: debug };
+    return { lessons: [] };
   }
 
   // Local fallback
   try {
     await ensureLocalDirs();
     const data = await fs.readFile(LOCAL_DATA_FILE, "utf-8");
-    return { ...(JSON.parse(data) as LessonsData), _debug: { local: true } };
-  } catch (e: any) {
-    return { lessons: [], _debug: { local: true, err: e.message } };
+    return JSON.parse(data) as LessonsData;
+  } catch {
+    return { lessons: [] };
   }
 }
 

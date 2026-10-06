@@ -22,13 +22,7 @@ export async function GET(req: NextRequest) {
   lessons.sort((a, b) => a.number - b.number);
 
   return NextResponse.json(
-    {
-      lessons,
-      _debug: {
-        hasToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-        storageDebug: data._debug,
-      },
-    },
+    { lessons },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
