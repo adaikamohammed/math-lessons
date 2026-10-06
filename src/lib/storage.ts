@@ -51,6 +51,7 @@ export async function saveLessonsData(data: LessonsData): Promise<void> {
     await put("lessons-db.json", JSON.stringify(data, null, 2), {
       access: "public",
       addRandomSuffix: false,
+      allowOverwrite: true,
     });
     return;
   }

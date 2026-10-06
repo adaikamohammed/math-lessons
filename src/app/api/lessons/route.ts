@@ -25,23 +25,37 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const isAuth = await verifyAdminSession();
   if (!isAuth) {
-    return NextResponse.json({ error: "غير مصرح لك" }, { status: 401 });
+    return NextResponse.json({ error: "غير مصرح لك - يرجى تسجيل الدخول" }, { status: 401 });
   }
 
   try {
     const body = await req.json();
-    const { level, number, title } = body;
+    let { level, number, title } = body;
 
     if (!title || !level) {
-      return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
+      return NextResponse.json({ error: "يرجى كتابة عنوان الدرس" }, { status: 400 });
+    }
+
+    title = String(title).trim();
+
+    // إذا كتب الأستاذ "الدرس 1 : عنوان" ولم يدخل الرقم يدوياً، نستخرجه تلقائياً
+    const match = title.match(/^(?:الدرس\s*)?0*(\d+)\s*[:\-–]\s*(.+)$/i);
+    let lessonNum = Number(number);
+    if (!lessonNum && match) {
+      lessonNum = parseInt(match[1], 10);
     }
 
     const data = await getLessonsData();
+    const existingForLevel = data.lessons.filter((l) => l.level === Number(level));
+    if (!lessonNum) {
+      lessonNum = existingForLevel.length ? Math.max(...existingForLevel.map((l) => l.number)) + 1 : 1;
+    }
+
     const newLesson: Lesson = {
       id: `lesson_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       level: Number(level) as 1 | 2,
-      number: Number(number) || data.lessons.filter((l) => l.level === Number(level)).length + 1,
-      title: title.trim(),
+      number: lessonNum,
+      title: title,
       createdAt: new Date().toISOString(),
       images: [],
     };
@@ -50,8 +64,9 @@ export async function POST(req: NextRequest) {
     await saveLessonsData(data);
 
     return NextResponse.json({ lesson: newLesson });
-  } catch (err) {
-    return NextResponse.json({ error: "حدث خطأ أثناء الحفظ" }, { status: 500 });
+  } catch (err: any) {
+    console.error("POST /api/lessons error:", err);
+    return NextResponse.json({ error: err?.message || "حدث خطأ أثناء الحفظ" }, { status: 500 });
   }
 }
 
