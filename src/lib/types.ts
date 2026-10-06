@@ -30,9 +30,22 @@ export type ParentSummons = {
   createdAt: string;
 };
 
+export type HonorStudent = {
+  id: string;
+  studentName: string; // اسم التلميذ
+  className: string; // القسم : "1 م 1" ، "1 م 2" ، "1 م 3" ، "2 م 3"
+  notes?: string; // ملاحظة غير ضرورية (تميز في الفرض، كراس منظم، مواظبة...)
+  badge?: string; // لقب تشجيعي اختياري (مثلاً: نجم الرياضيات ⭐، كراس نموذجي 📖)
+  createdAt: string;
+};
+
+export const HONOR_CLASSES = ["1 م 1", "1 م 2", "1 م 3", "2 م 3"] as const;
+export type HonorClass = (typeof HONOR_CLASSES)[number];
+
 export type LessonsData = {
   lessons: Lesson[];
   summons?: ParentSummons[];
+  honors?: HonorStudent[];
 };
 
 export const LEVELS = {

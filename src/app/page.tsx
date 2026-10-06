@@ -6,6 +6,7 @@ import {
   Megaphone,
   Users,
   BookOpen,
+  Trophy,
 } from "lucide-react";
 
 const years = [
@@ -77,7 +78,29 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 2. قسم المتابعة والإعلانات (متوافق مع ألوان وتصميم الموقع وبنص مختصر) */}
+      {/* 2. لوحة الشرف (تحفيزية وتنافسية شريفة للتلاميذ والأولياء) */}
+      <div className="pt-1">
+        <Link
+          href="/honor"
+          className="flex items-center gap-3.5 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-emerald-500/10 rounded-2xl p-3.5 border border-amber-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs active:scale-[0.98] transition group"
+        >
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/20 group-hover:scale-105 transition-transform">
+            <Trophy className="w-5 h-5 text-amber-100" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-xs text-slate-900">لوحة الشرف | نجوم الرياضيات</span>
+              <span className="text-[10px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.2 rounded">تميز 🏆</span>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 font-medium">
+              أفضل التلاميذ انضباطاً وإتقاناً في أقسامنا (1م1، 1م2، 1م3، 2م3)
+            </p>
+          </div>
+          <ChevronLeft className="w-4 h-4 text-amber-600 group-hover:text-amber-800 transition shrink-0" />
+        </Link>
+      </div>
+
+      {/* 3. قسم المتابعة والإعلانات (متوافق مع ألوان وتصميم الموقع وبنص مختصر) */}
       <div className="pt-2 space-y-2">
         <div className="text-xs font-bold text-slate-600 px-1">توجيهات واستقبال الأولياء:</div>
 

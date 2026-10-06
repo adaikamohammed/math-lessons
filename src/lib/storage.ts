@@ -37,13 +37,14 @@ export async function getLessonsData(): Promise<LessonsData> {
           return {
             lessons: Array.isArray(json.lessons) ? json.lessons : [],
             summons: Array.isArray(json.summons) ? json.summons : [],
+            honors: Array.isArray(json.honors) ? json.honors : [],
           };
         }
       }
     } catch (e) {
       console.error("Error reading from Vercel Blob:", e);
     }
-    return { lessons: [], summons: [] };
+    return { lessons: [], summons: [], honors: [] };
   }
 
   // Local fallback
@@ -54,9 +55,10 @@ export async function getLessonsData(): Promise<LessonsData> {
     return {
       lessons: Array.isArray(json.lessons) ? json.lessons : [],
       summons: Array.isArray(json.summons) ? json.summons : [],
+      honors: Array.isArray(json.honors) ? json.honors : [],
     };
   } catch {
-    return { lessons: [], summons: [] };
+    return { lessons: [], summons: [], honors: [] };
   }
 }
 

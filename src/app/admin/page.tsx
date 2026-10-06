@@ -27,14 +27,21 @@ import {
   Users,
   UserPlus,
   Clock,
+  Trophy,
+  Award,
+  Sparkles,
+  Star,
+  GraduationCap,
 } from "lucide-react";
 import {
   LEVELS,
   COMMON_FIELDS,
+  HONOR_CLASSES,
   type Lesson,
   type LessonImage,
   type NotebookType,
   type ParentSummons,
+  type HonorStudent,
 } from "@/lib/types";
 
 export default function AdminPage() {
@@ -128,11 +135,12 @@ function Login({ onLogin }: { onLogin: () => void }) {
 
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
 function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [mainTab, setMainTab] = useState<"lessons" | "summons">("lessons");
+  const [mainTab, setMainTab] = useState<"lessons" | "summons" | "honors">("lessons");
   const [level, setLevel] = useState<1 | 2>(1);
   const [notebookTab, setNotebookTab] = useState<NotebookType>("lessons");
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [summonsList, setSummonsList] = useState<ParentSummons[]>([]);
+  const [honorsList, setHonorsList] = useState<HonorStudent[]>([]);
   const [loading, setLoading] = useState(true);
 
   // حقول إضافة درس
@@ -148,6 +156,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [summonsNotes, setSummonsNotes] = useState("");
   const [isExtraSunday, setIsExtraSunday] = useState(false);
 
+  // حقول إضافة تلميذ في لوحة الشرف
+  const [honorStudentName, setHonorStudentName] = useState("");
+  const [honorClass, setHonorClass] = useState<string>("1 م 1");
+  const [honorNotes, setHonorNotes] = useState("");
+  const [honorBadge, setHonorBadge] = useState("");
+  const [selectedHonorFilter, setSelectedHonorFilter] = useState<string>("all");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -157,6 +172,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
   const [editingSummons, setEditingSummons] = useState<ParentSummons | null>(null);
   const [deletingSummons, setDeletingSummons] = useState<ParentSummons | null>(null);
+  const [editingHonor, setEditingHonor] = useState<HonorStudent | null>(null);
+  const [deletingHonor, setDeletingHonor] = useState<HonorStudent | null>(null);
 
   const loadLessons = useCallback(async () => {
     try {
@@ -179,10 +196,21 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, []);
 
+  const loadHonors = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/honors?_t=${Date.now()}`, { cache: "no-store" });
+      const data = await res.json();
+      setHonorsList(data.honors || []);
+    } catch {
+      setHonorsList([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadLessons();
     loadSummons();
-  }, [loadLessons, loadSummons]);
+    loadHonors();
+  }, [loadLessons, loadSummons, loadHonors]);
 
   const showToast = (type: "success" | "error", text: string) => {
     setToastMsg({ type, text });
@@ -300,6 +328,44 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
+  // 3. إضافة تلميذ إلى لوحة الشرف مع تحديث فوري مباشر للواجهة
+  const addHonor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!honorStudentName.trim() || !honorClass.trim()) {
+      showToast("error", "يرجى كتابة اسم التلميذ واختيار القسم");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/honors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentName: honorStudentName.trim(),
+          className: honorClass.trim(),
+          notes: honorNotes.trim() || undefined,
+          badge: honorBadge.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل تسجيل التلميذ");
+
+      setHonorStudentName("");
+      setHonorNotes("");
+      setHonorBadge("");
+
+      // تحديث فوري مباشر
+      setHonorsList((prev) => [data.honor, ...prev]);
+
+      showToast("success", `✓ تم إضافة التلميذ "${data.honor.studentName}" فورياً إلى لوحة الشرف! 🏆`);
+    } catch (e: any) {
+      showToast("error", "خطأ: " + (e.message || "تعذر تسجيل التلميذ"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // تجميع كراس الدروس حسب الميدان والمقطع
   const groupedLessons = useMemo(() => {
     if (notebookTab !== "lessons") return [];
@@ -368,19 +434,27 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         {/* أزرار سريعة للمعاينة */}
-        <div className="flex items-center gap-2 pt-1 border-t border-slate-100 text-xs font-bold">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-100 text-xs font-bold">
           <Link
             href="/"
             target="_blank"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
+            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
           >
             <Globe className="w-3.5 h-3.5 text-emerald-600" />
             <span>الموقع الرئيسي</span>
           </Link>
           <Link
+            href="/honor"
+            target="_blank"
+            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-amber-50 text-amber-900 border border-amber-200/70 hover:bg-amber-100 transition text-[11px]"
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-600" />
+            <span>لوحة الشرف</span>
+          </Link>
+          <Link
             href="/parents"
             target="_blank"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200/70 hover:bg-rose-100 transition text-[11px]"
+            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-rose-50 text-rose-800 border border-rose-200/70 hover:bg-rose-100 transition text-[11px]"
           >
             <Users className="w-3.5 h-3.5 text-rose-600" />
             <span>صفحة الأولياء</span>
@@ -388,38 +462,50 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           <Link
             href="/announcement"
             target="_blank"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200/70 hover:bg-amber-100 transition text-[11px]"
+            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
           >
-            <Megaphone className="w-3.5 h-3.5 text-amber-600" />
+            <Megaphone className="w-3.5 h-3.5 text-emerald-600" />
             <span>الإعلان والتوجيهات</span>
           </Link>
         </div>
       </div>
 
-      {/* التبويب الرئيسي: إدارة الدروس أو استدعاءات الأولياء */}
-      <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
+      {/* التبويب الرئيسي: إدارة الدروس أو استدعاءات الأولياء أو لوحة الشرف */}
+      <div className="grid grid-cols-3 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
         <button
           onClick={() => setMainTab("lessons")}
-          className={`py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 ${
+          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
             mainTab === "lessons"
               ? "bg-emerald-600 text-white shadow-sm"
               : "text-slate-600 hover:bg-slate-50"
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          <span>الدروس والكراريس</span>
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>الدروس</span>
         </button>
 
         <button
           onClick={() => setMainTab("summons")}
-          className={`py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 ${
+          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
             mainTab === "summons"
               ? "bg-rose-600 text-white shadow-sm"
               : "text-slate-600 hover:bg-slate-50"
           }`}
         >
-          <Users className="w-4 h-4" />
-          <span>استدعاءات الأولياء ({summonsList.length})</span>
+          <Users className="w-3.5 h-3.5" />
+          <span>الاستدعاء ({summonsList.length})</span>
+        </button>
+
+        <button
+          onClick={() => setMainTab("honors")}
+          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+            mainTab === "honors"
+              ? "bg-amber-500 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <Trophy className="w-3.5 h-3.5" />
+          <span>لوحة الشرف ({honorsList.length})</span>
         </button>
       </div>
 
@@ -735,7 +821,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             )}
           </div>
         </div>
-      ) : (
+      ) : mainTab === "summons" ? (
         /* ==================== 2. تبويب استدعاءات الأولياء ==================== */
         <div className="space-y-4">
           {/* نموذج إضافة استدعاء */}
@@ -913,6 +999,230 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             )}
           </div>
         </div>
+      ) : (
+        /* ==================== 3. تبويب لوحة الشرف ==================== */
+        <div className="space-y-4">
+          {/* نموذج إضافة تلميذ إلى لوحة الشرف */}
+          <form
+            onSubmit={addHonor}
+            className="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-sm space-y-3.5"
+          >
+            <div className="flex items-center justify-between pb-1 border-b border-amber-100">
+              <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                <Trophy className="w-4 h-4 text-amber-500" />
+                <span>إضافة تلميذ إلى لوحة الشرف (نجوم الرياضيات)</span>
+              </span>
+              <span className="text-[10px] bg-amber-50 text-amber-800 font-extrabold px-2 py-0.5 rounded-full border border-amber-200">
+                أقسام الأستاذ
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="sm:col-span-2">
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  اسم ولقب التلميذ: <span className="text-amber-600">*</span>
+                </label>
+                <input
+                  className="input text-xs"
+                  placeholder="مثال: يونس بلحاج..."
+                  value={honorStudentName}
+                  onChange={(e) => setHonorStudentName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  القسم: <span className="text-amber-600">*</span>
+                </label>
+                <select
+                  className="input text-xs font-black text-amber-900 bg-amber-50/40 border-amber-200"
+                  value={honorClass}
+                  onChange={(e) => setHonorClass(e.target.value)}
+                  required
+                >
+                  {HONOR_CLASSES.map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls} {cls.startsWith("1") ? "(الأولى متوسط)" : "(الثانية متوسط)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* وسام أو لقب تشجيعي اختياري */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">
+                وسام أو لقب تشجيعي (اختياري):
+              </label>
+              <input
+                className="input text-xs"
+                placeholder="مثال: ⭐ نجم الرياضيات أو اختر من الأوسمة السريعة أدناه..."
+                value={honorBadge}
+                onChange={(e) => setHonorBadge(e.target.value)}
+              />
+              {/* أوسمة جاهزة سريعة بنقرة واحدة */}
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {[
+                  "⭐ نجم الرياضيات",
+                  "📖 كراس نموذجي (5/5)",
+                  "🎖️ فارس الإتقان",
+                  "🌟 تميز وانضباط",
+                  "✍️ إتقان الواجبات",
+                  "🧠 عبقري الحساب",
+                ].map((bg) => (
+                  <button
+                    key={bg}
+                    type="button"
+                    onClick={() => setHonorBadge(bg)}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/70 hover:bg-amber-100 transition active:scale-95"
+                  >
+                    {bg}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ملاحظة تشجيعية اختيارية */}
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                ملاحظة الأستاذ التشجيعية (غير ضرورية واختيارية):
+              </label>
+              <textarea
+                className="input text-xs min-h-[60px]"
+                value={honorNotes}
+                onChange={(e) => setHonorNotes(e.target.value)}
+                placeholder="مثال: تميز كبير في الفرض وحل جميع الواجبات المنزلية بدقة وكراس متقن..."
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="btn-primary w-full py-2.5 text-xs bg-amber-500 hover:bg-amber-600 shadow-sm shadow-amber-500/20"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>جاري الإضافة...</span>
+                </>
+              ) : (
+                <>
+                  <Trophy className="w-4 h-4" />
+                  <span>إضافة التلميذ فورياً إلى لوحة الشرف 🏆</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* قائمة التلاميذ المكرمين مع فلتر الأقسام */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+              <span>قائمة نجوم الرياضيات في لوحة الشرف:</span>
+              <span className="text-[11px] bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full font-extrabold border border-amber-200">
+                {honorsList.length} متميز
+              </span>
+            </div>
+
+            {/* فلتر الأقسام الأربعة */}
+            <div className="grid grid-cols-5 gap-1 bg-white p-1 rounded-xl border border-slate-100 text-center">
+              <button
+                type="button"
+                onClick={() => setSelectedHonorFilter("all")}
+                className={`py-1.5 rounded-lg text-xs font-bold transition ${
+                  selectedHonorFilter === "all"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                الكل ({honorsList.length})
+              </button>
+              {HONOR_CLASSES.map((cls) => {
+                const count = honorsList.filter((h) => h.className === cls).length;
+                return (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setSelectedHonorFilter(cls)}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition ${
+                      selectedHonorFilter === cls
+                        ? "bg-amber-500 text-white"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {cls} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* عرض بطاقات التلاميذ */}
+            {honorsList.length === 0 ? (
+              <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-amber-200 text-xs text-slate-400 p-4 space-y-1">
+                <div className="text-amber-500 text-lg">⭐</div>
+                <div>لا يوجد تلاميذ مضافين في لوحة الشرف حالياً.</div>
+                <div className="text-[11px] text-slate-400">أضف أفضل تلاميذك وسيتألقون مباشرة أمام زملائهم وأوليائهم!</div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {honorsList
+                  .filter(
+                    (h) =>
+                      selectedHonorFilter === "all" || h.className === selectedHonorFilter
+                  )
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      className="bg-white p-3 rounded-2xl border border-amber-200/60 shadow-2xs space-y-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-black">
+                              ⭐
+                            </span>
+                            <span className="font-black text-xs text-slate-900">
+                              {item.studentName}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200/50">
+                              قسم {item.className}
+                            </span>
+                            {item.badge && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                          {item.notes && (
+                            <p className="text-xs text-slate-600 mt-1 whitespace-pre-line bg-amber-50/40 p-2 rounded-lg font-medium border border-amber-100/50">
+                              💬 {item.notes}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => setEditingHonor(item)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-amber-700 hover:bg-amber-50 transition"
+                            title="تعديل بيانات التلميذ"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingHonor(item)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                            title="حذف من لوحة الشرف"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* نافذة تعديل الدرس */}
@@ -968,6 +1278,34 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             // تحديث فوري مباشر للحالة
             setSummonsList((prev) => prev.filter((s) => s.id !== deletedId));
             showToast("success", "✓ تم حذف الاستدعاء من القائمة بنجاح!");
+          }}
+        />
+      )}
+
+      {/* نافذة تعديل تلميذ في لوحة الشرف */}
+      {editingHonor && (
+        <EditHonorModal
+          honor={editingHonor}
+          onClose={() => setEditingHonor(null)}
+          onSuccess={(updated) => {
+            setEditingHonor(null);
+            // تحديث فوري مباشر للحالة
+            setHonorsList((prev) => prev.map((h) => (h.id === updated.id ? updated : h)));
+            showToast("success", "✓ تم تحديث بيانات التلميذ بنجاح! 🏆");
+          }}
+        />
+      )}
+
+      {/* نافذة تأكيد حذف تلميذ من لوحة الشرف */}
+      {deletingHonor && (
+        <DeleteHonorModal
+          honor={deletingHonor}
+          onClose={() => setDeletingHonor(null)}
+          onSuccess={(deletedId) => {
+            setDeletingHonor(null);
+            // تحديث فوري مباشر للحالة
+            setHonorsList((prev) => prev.filter((h) => h.id !== deletedId));
+            showToast("success", "✓ تم حذف التلميذ من لوحة الشرف!");
           }}
         />
       )}
@@ -1807,6 +2145,227 @@ function DeleteSummonsModal({
             disabled={busy}
             onClick={submitDelete}
             className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الآن"}
+          </button>
+          <button
+            disabled={busy}
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+          >
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- 8. نافذة تعديل تلميذ في لوحة الشرف ---------------- */
+function EditHonorModal({
+  honor,
+  onClose,
+  onSuccess,
+}: {
+  honor: HonorStudent;
+  onClose: () => void;
+  onSuccess: (updated: HonorStudent) => void;
+}) {
+  const [studentName, setStudentName] = useState(honor.studentName);
+  const [className, setClassName] = useState(honor.className);
+  const [notes, setNotes] = useState(honor.notes || "");
+  const [badge, setBadge] = useState(honor.badge || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentName.trim() || !className.trim()) {
+      setErr("اسم التلميذ والقسم مطلوبان");
+      return;
+    }
+
+    setBusy(true);
+    setErr("");
+
+    try {
+      const res = await fetch("/api/honors", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: honor.id,
+          studentName: studentName.trim(),
+          className: className.trim(),
+          notes: notes.trim() || undefined,
+          badge: badge.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل التعديل");
+
+      onSuccess(data.honor);
+    } catch (e: any) {
+      setErr(e.message || "حدث خطأ أثناء محاولة التعديل");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <form
+        onSubmit={submit}
+        className="bg-white rounded-3xl p-5 max-w-md w-full space-y-4 shadow-xl border border-slate-100 text-right fade-up"
+      >
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
+              🏆
+            </div>
+            <h3 className="font-extrabold text-sm text-slate-800">تعديل بيانات التلميذ في لوحة الشرف</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {err && (
+          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold">{err}</div>
+        )}
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+              <input
+                className="input text-xs"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="col-span-1">
+              <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
+              <select
+                className="input text-xs font-black text-amber-900 bg-amber-50/40 border-amber-200"
+                value={className}
+                onChange={(e) => setClassName(e.target.value)}
+                required
+              >
+                {HONOR_CLASSES.map((cls) => (
+                  <option key={cls} value={cls}>
+                    {cls}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">وسام / لقب تشجيعي:</label>
+            <input
+              className="input text-xs"
+              value={badge}
+              onChange={(e) => setBadge(e.target.value)}
+              placeholder="مثال: ⭐ نجم الرياضيات"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">
+              ملاحظة تشجيعية (اختيارية):
+            </label>
+            <textarea
+              className="input text-xs min-h-[60px]"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="اكتب ملاحظة إن أردت..."
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs bg-amber-500 hover:bg-amber-600">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التعديل"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+          >
+            إلغاء
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* ---------------- 9. نافذة تأكيد حذف تلميذ من لوحة الشرف ---------------- */
+function DeleteHonorModal({
+  honor,
+  onClose,
+  onSuccess,
+}: {
+  honor: HonorStudent;
+  onClose: () => void;
+  onSuccess: (deletedId: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submitDelete = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch(`/api/honors?id=${encodeURIComponent(honor.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل الحذف");
+      onSuccess(honor.id);
+    } catch (e: any) {
+      setErr(e.message || "حدث خطأ أثناء محاولة الحذف");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
+        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto text-xl">
+          ⭐
+        </div>
+
+        <div>
+          <h3 className="font-extrabold text-sm text-slate-900">إزالة تلميذ من لوحة الشرف</h3>
+          <p className="text-xs font-bold text-slate-700 mt-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            التلميذ: {honor.studentName} (قسم {honor.className})
+          </p>
+          <p className="text-[11px] text-slate-500 mt-2">
+            هل أنت متأكد من حذف هذا التلميذ من لوحة الشرف؟
+          </p>
+        </div>
+
+        {err && (
+          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold">
+            {err}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button
+            disabled={busy}
+            onClick={submitDelete}
+            className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الآن"}
           </button>
