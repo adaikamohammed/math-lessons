@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       lessons,
       _debug: {
         hasToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-        totalRawLessons: data.lessons.length,
+        storageDebug: data._debug,
       },
     },
     {
