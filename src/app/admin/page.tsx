@@ -169,13 +169,37 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [selectedHonorFilter, setSelectedHonorFilter] = useState<string>("all");
 
   // حقول إضافة عقوبة أو خصم (تلميذ أو مجموعة تلاميذ)
-  const [penaltyStudentNames, setPenaltyStudentNames] = useState("");
+  const [penaltyStudents, setPenaltyStudents] = useState<string[]>([]);
+  const [currentStudentName, setCurrentStudentName] = useState("");
   const [penaltyClass, setPenaltyClass] = useState<string>("1 م 1");
   const [penaltyDeduction, setPenaltyDeduction] = useState("ناقص 3 في التقويم المستمر (-3)");
   const [penaltyReason, setPenaltyReason] = useState("");
   const [penaltyDate, setPenaltyDate] = useState("");
+  const [penaltyTiming, setPenaltyTiming] = useState("");
   const [penaltyNotes, setPenaltyNotes] = useState("");
   const [selectedPenaltyFilter, setSelectedPenaltyFilter] = useState<string>("all");
+
+  // دوال مساعدة لإضافة وحذف التلاميذ من القائمة دفعة واحدة
+  const handleAddStudent = () => {
+    if (!currentStudentName.trim()) return;
+    const parts = currentStudentName
+      .split(/[\n,،]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
+    setPenaltyStudents((prev) => {
+      const next = [...prev];
+      for (const p of parts) {
+        if (!next.includes(p)) next.push(p);
+      }
+      return next;
+    });
+    setCurrentStudentName("");
+  };
+
+  const handleRemoveStudent = (nameToRemove: string) => {
+    setPenaltyStudents((prev) => prev.filter((n) => n !== nameToRemove));
+  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -399,12 +423,38 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  // 4. إضافة عقوبة أو خصم لتلميذ أو مجموعة تلاميذ مع تحديث فوري مباشر
+  // 4. إضافة عقوبة أو خصم لتلميذ أو مجموعة تلاميذ مع توقيت موحد وحفظ دفعة واحدة
   const addPenalty = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!penaltyStudentNames.trim() || !penaltyClass.trim() || !penaltyReason.trim()) {
-      showToast("error", "يرجى كتابة اسم التلميذ، القسم، وسبب العقوبة");
+
+    // نجمع التلاميذ الموجودين في القائمة المحددة + أي اسم مكتوب في حقل الإدخال الحالي
+    let finalStudents = [...penaltyStudents];
+    if (currentStudentName.trim()) {
+      const extraParts = currentStudentName
+        .split(/[\n,،]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const p of extraParts) {
+        if (!finalStudents.includes(p)) finalStudents.push(p);
+      }
+    }
+
+    if (finalStudents.length === 0) {
+      showToast("error", "يرجى إضافة تلميذ واحد على الأقل للعقوبة");
       return;
+    }
+
+    if (!penaltyClass.trim() || !penaltyDeduction.trim() || !penaltyReason.trim()) {
+      showToast("error", "يرجى ملء القسم، ومقدار الخصم، وسبب العقوبة");
+      return;
+    }
+
+    // تجهيز التاريخ والتوقيت الموحد
+    let finalDateTime = penaltyDate.trim();
+    if (penaltyTiming.trim()) {
+      finalDateTime = finalDateTime
+        ? `${finalDateTime} (${penaltyTiming.trim()})`
+        : penaltyTiming.trim();
     }
 
     setIsSubmitting(true);
@@ -413,21 +463,23 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentNames: penaltyStudentNames.trim(),
+          studentNames: finalStudents,
           className: penaltyClass.trim(),
           deduction: penaltyDeduction.trim(),
           reason: penaltyReason.trim(),
-          date: penaltyDate.trim() || undefined,
+          date: finalDateTime || undefined,
           notes: penaltyNotes.trim() || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "فشل تسجيل العقوبة");
 
-      setPenaltyStudentNames("");
+      // تفريغ قائمة التلاميذ وحقل الإدخال لعملية جديدة
+      setPenaltyStudents([]);
+      setCurrentStudentName("");
       setPenaltyReason("");
       setPenaltyNotes("");
-      setPenaltyDate("");
+      setPenaltyTiming("");
 
       // تحديث فوري مباشر
       const newItems = Array.isArray(data.penalties) ? data.penalties : [data.penalty];
@@ -435,7 +487,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
       showToast(
         "success",
-        `✓ تم تسجيل الخصم والعقوبة بنجاح لـ (${newItems.length}) تلميذ باللون الأحمر! ⚠️`
+        `✓ تم حفظ العقوبة بنجاح لـ (${newItems.length}) تلاميذ دفعة واحدة بنفس التوقيت! ⚠️`
       );
     } catch (e: any) {
       showToast("error", "خطأ: " + (e.message || "تعذر تسجيل العقوبة"));
@@ -1343,46 +1395,110 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               </span>
             </div>
 
-            <div className="space-y-3">
-              {/* القسم المعني */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    القسم المعني: <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    className="input text-xs font-black text-red-950 bg-red-50/40 border-red-200"
-                    value={penaltyClass}
-                    onChange={(e) => setPenaltyClass(e.target.value)}
-                    required
-                  >
-                    {HONOR_CLASSES.map((cls) => (
-                      <option key={cls} value={cls}>
-                        {cls} {cls.startsWith("1") ? "(الأولى متوسط)" : "(الثانية متوسط)"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* اسم التلميذ أو مجموعة تلاميذ */}
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    اسم التلميذ أو مجموعة تلاميذ: <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    className="input text-xs font-bold"
-                    placeholder="اكتب اسم التلميذ، أو عدة تلاميذ مفصولين بفواصل (،) لتطبيق نفس الخصم عليهم..."
-                    value={penaltyStudentNames}
-                    onChange={(e) => setPenaltyStudentNames(e.target.value)}
-                    required
-                  />
-                  <span className="text-[10px] text-slate-400 mt-1 block">
-                    💡 يمكنك كتابة تلميذ واحد أو عدة تلاميذ (مثال: أحمد بلقاسم، ريان، ياسين) لتسجيل الخصم لهم جميعاً دفعة واحدة.
-                  </span>
+            <div className="space-y-3.5">
+              {/* 1. القسم المعني */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  القسم المعني: <span className="text-red-600">*</span>
+                </label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {HONOR_CLASSES.map((cls) => (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => setPenaltyClass(cls)}
+                      className={`py-2 px-1 rounded-xl text-xs font-black transition border ${
+                        penaltyClass === cls
+                          ? "bg-red-600 text-white border-red-600 shadow-xs"
+                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {cls}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* مقدار الخصم والعقوبة مع أزرار سريعة */}
+              {/* 2. إضافة التلاميذ - إمكانية إضافة أكثر من طالب بسهولة تامة */}
+              <div className="space-y-2 bg-red-50/40 p-3 rounded-2xl border border-red-100">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-red-950 flex items-center gap-1.5">
+                    <UserPlus className="w-4 h-4 text-red-600" />
+                    <span>إضافة التلاميذ المعنيين بالعقوبة:</span>
+                    <span className="text-red-600">*</span>
+                  </label>
+                  {penaltyStudents.length > 0 && (
+                    <span className="text-[11px] font-black text-red-700 bg-red-100/90 px-2 py-0.5 rounded-lg border border-red-200">
+                      تم اختيار ({penaltyStudents.length}) تلاميذ
+                    </span>
+                  )}
+                </div>
+
+                {/* حقل كتابة اسم التلميذ مع زر إضافة أو الضغط على Enter */}
+                <div className="flex gap-1.5">
+                  <input
+                    className="input text-xs font-bold flex-1"
+                    placeholder="اكتب اسم التلميذ واضغط Enter أو زر الإضافة..."
+                    value={currentStudentName}
+                    onChange={(e) => setCurrentStudentName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddStudent();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddStudent}
+                    className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs shrink-0 flex items-center gap-1 transition shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>إضافة</span>
+                  </button>
+                </div>
+
+                {/* قائمة شارات التلاميذ المحددين */}
+                {penaltyStudents.length > 0 ? (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="text-[11px] font-bold text-red-900 flex items-center justify-between">
+                      <span>التلاميذ المحددين لنفس العقوبة والتوقيت ({penaltyStudents.length}):</span>
+                      <button
+                        type="button"
+                        onClick={() => setPenaltyStudents([])}
+                        className="text-[10px] text-red-500 hover:text-red-700 underline font-bold"
+                      >
+                        مسح الكل
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-red-200 max-h-36 overflow-y-auto">
+                      {penaltyStudents.map((stName, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 text-red-950 font-black text-xs border border-red-200 shadow-2xs"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                          <span>{stName}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveStudent(stName)}
+                            className="text-red-400 hover:text-red-700 font-black text-xs hover:bg-red-100 rounded-full w-4 h-4 flex items-center justify-center transition"
+                            title="إزالة هذا التلميذ"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    💡 اكتب اسم التلميذ واضغط <b>Enter</b> أو زر <b>إضافة</b>، أو الصق عدة أسماء مفصولة بفواصل. يمكنك إضافة طالبين أو 5 أو 10 طلاب دفعة واحدة ثم حفظهم معاً بنقرة واحدة.
+                  </p>
+                )}
+              </div>
+
+              {/* 3. مقدار الخصم والعقوبة مع أزرار سريعة */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 block">
                   مقدار الخصم أو نوع العقوبة: <span className="text-red-600">*</span>
@@ -1416,7 +1532,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               </div>
 
-              {/* سبب العقوبة مع أزرار سريعة */}
+              {/* 4. سبب العقوبة مع أزرار سريعة */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 block">
                   سبب العقوبة: <span className="text-red-600">*</span>
@@ -1451,29 +1567,107 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               </div>
 
-              {/* التاريخ (اختياري) */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  تاريخ الحادثة (اختياري، يترك فارغاً لليوم الحالي تلقائياً):
+              {/* 5. تاريخ وتوقيت الحصة الموحد */}
+              <div className="space-y-2 bg-slate-50/80 p-3 rounded-2xl border border-slate-200">
+                <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-red-600" />
+                  <span>تاريخ وتوقيت الحصة (موحد لجميع التلاميذ المحددين):</span>
                 </label>
-                <input
-                  className="input text-xs"
-                  placeholder="مثال: يوم الثلاثاء 6 أكتوبر، أو اتركه فارغاً"
-                  value={penaltyDate}
-                  onChange={(e) => setPenaltyDate(e.target.value)}
-                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-0.5">التاريخ:</label>
+                    <input
+                      className="input text-xs"
+                      placeholder="مثال: الأربعاء 07 أكتوبر 2026"
+                      value={penaltyDate}
+                      onChange={(e) => setPenaltyDate(e.target.value)}
+                    />
+                    <div className="flex gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date();
+                          setPenaltyDate(
+                            now.toLocaleDateString("ar-DZ", {
+                              weekday: "long",
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })
+                          );
+                        }}
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 transition active:scale-95"
+                      >
+                        📅 اليوم تلقائياً
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() - 1);
+                          setPenaltyDate(
+                            d.toLocaleDateString("ar-DZ", {
+                              weekday: "long",
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })
+                          );
+                        }}
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 transition active:scale-95"
+                      >
+                        📅 يوم أمس
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-0.5">توقيت الحصة:</label>
+                    <input
+                      className="input text-xs"
+                      placeholder="مثال: حصة 10:00 - 11:00"
+                      value={penaltyTiming}
+                      onChange={(e) => setPenaltyTiming(e.target.value)}
+                    />
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {[
+                        "حصة 08:00 - 09:00",
+                        "حصة 09:00 - 10:00",
+                        "حصة 10:00 - 11:00",
+                        "حصة 11:00 - 12:00",
+                        "حصة 13:00 - 14:00",
+                        "حصة 14:00 - 15:00",
+                        "حصة 15:00 - 16:00",
+                      ].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setPenaltyTiming(t)}
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border transition ${
+                            penaltyTiming === t
+                              ? "bg-red-600 text-white border-red-600"
+                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* ملاحظات وتوجيه إضافي لولي الأمر */}
+              {/* 6. ملاحظات وتوجيه إضافي لولي الأمر */}
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   ملاحظة وتوجيه إضافي لولي الأمر والتلميذ (اختياري):
                 </label>
                 <textarea
-                  className="input text-xs min-h-[60px]"
+                  className="input text-xs min-h-[55px]"
                   value={penaltyNotes}
                   onChange={(e) => setPenaltyNotes(e.target.value)}
-                  placeholder="مثال: على ولي الأمر تفقد كراس ابنه ومتابعة سلوكه في القسم فوراً..."
+                  placeholder="مثال: على أولياء الأمور تفقد كراريس أبنائهم ومتابعة انضباطهم فوراً..."
                 />
               </div>
             </div>
@@ -1485,12 +1679,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>جاري تسجيل الخصم...</span>
+                  <span>جاري تسجيل العقوبة لجميع التلاميذ...</span>
                 </>
               ) : (
                 <>
                   <OctagonAlert className="w-4 h-4" />
-                  <span>تسجيل العقوبة والخصم فورياً باللون الأحمر ⚠️</span>
+                  <span>
+                    {penaltyStudents.length > 1
+                      ? `حفظ وتسجيل العقوبة لجميع الـ (${penaltyStudents.length}) تلاميذ دفعة واحدة بنفس التوقيت ⚠️`
+                      : penaltyStudents.length === 1
+                      ? `حفظ وتسجيل العقوبة للتلميذ (${penaltyStudents[0]}) ⚠️`
+                      : "حفظ وتسجيل العقوبة ⚠️"}
+                  </span>
                 </>
               )}
             </button>
@@ -2907,7 +3107,7 @@ function EditPenaltyModal({
             </div>
           </div>
 
-          <div>
+          <div className="space-y-1">
             <label className="text-xs font-bold text-slate-700 block mb-1">مقدار الخصم / العقوبة:</label>
             <input
               className="input text-xs font-bold text-red-700 bg-red-50/40 border-red-200"
@@ -2916,9 +3116,27 @@ function EditPenaltyModal({
               placeholder="مثال: ناقص 3 في التقويم المستمر (-3)"
               required
             />
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {[
+                "ناقص 3 في التقويم المستمر (-3)",
+                "ناقص 2 في التقويم المستمر (-2)",
+                "ناقص 1 في التقويم المستمر (-1)",
+                "ناقص 5 في التقويم المستمر (-5)",
+                "خصم نقطة السلوك والمواظبة (-2)",
+              ].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDeduction(d)}
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200"
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div>
+          <div className="space-y-1">
             <label className="text-xs font-bold text-slate-700 block mb-1">سبب العقوبة:</label>
             <input
               className="input text-xs"
@@ -2927,16 +3145,56 @@ function EditPenaltyModal({
               placeholder="مثال: هروب من الحصة يوم كذا..."
               required
             />
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {[
+                "هروب من الحصة",
+                "تشويش متكرر وإخلال بنظام القسم",
+                "عدم إحضار كراس الدروس 192 صفحة",
+                "عدم حل الواجب المنزلي في البيت",
+                "دروس ناقصة في الكراس وإهمال الكتابة",
+              ].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setReason(r)}
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-50 text-slate-700 border border-slate-200"
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">التاريخ:</label>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-700 block mb-1">التاريخ والتوقيت:</label>
             <input
               className="input text-xs"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              placeholder="مثال: الأربعاء 07 أكتوبر 2026"
+              placeholder="مثال: الأربعاء 07 أكتوبر 2026 (حصة 10:00 - 11:00)"
             />
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {[
+                "حصة 08:00 - 09:00",
+                "حصة 09:00 - 10:00",
+                "حصة 10:00 - 11:00",
+                "حصة 11:00 - 12:00",
+                "حصة 13:00 - 14:00",
+                "حصة 14:00 - 15:00",
+              ].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    const baseDate = date ? date.split("(")[0].trim() : "الأربعاء 07 أكتوبر 2026";
+                    setDate(`${baseDate} (${t})`);
+                  }}
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-50 text-slate-700 border border-slate-200"
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>
