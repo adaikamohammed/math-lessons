@@ -32,6 +32,9 @@ import {
   Sparkles,
   Star,
   GraduationCap,
+  OctagonAlert,
+  MinusCircle,
+  FileWarning,
 } from "lucide-react";
 import {
   LEVELS,
@@ -42,6 +45,7 @@ import {
   type NotebookType,
   type ParentSummons,
   type HonorStudent,
+  type Penalty,
 } from "@/lib/types";
 
 export default function AdminPage() {
@@ -135,12 +139,13 @@ function Login({ onLogin }: { onLogin: () => void }) {
 
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
 function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [mainTab, setMainTab] = useState<"lessons" | "summons" | "honors">("lessons");
+  const [mainTab, setMainTab] = useState<"lessons" | "summons" | "honors" | "penalties">("lessons");
   const [level, setLevel] = useState<1 | 2>(1);
   const [notebookTab, setNotebookTab] = useState<NotebookType>("lessons");
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [summonsList, setSummonsList] = useState<ParentSummons[]>([]);
   const [honorsList, setHonorsList] = useState<HonorStudent[]>([]);
+  const [penaltiesList, setPenaltiesList] = useState<Penalty[]>([]);
   const [loading, setLoading] = useState(true);
 
   // حقول إضافة درس
@@ -163,6 +168,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [honorBadge, setHonorBadge] = useState("");
   const [selectedHonorFilter, setSelectedHonorFilter] = useState<string>("all");
 
+  // حقول إضافة عقوبة أو خصم (تلميذ أو مجموعة تلاميذ)
+  const [penaltyStudentNames, setPenaltyStudentNames] = useState("");
+  const [penaltyClass, setPenaltyClass] = useState<string>("1 م 1");
+  const [penaltyDeduction, setPenaltyDeduction] = useState("ناقص 3 في التقويم المستمر (-3)");
+  const [penaltyReason, setPenaltyReason] = useState("");
+  const [penaltyDate, setPenaltyDate] = useState("");
+  const [penaltyNotes, setPenaltyNotes] = useState("");
+  const [selectedPenaltyFilter, setSelectedPenaltyFilter] = useState<string>("all");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -174,6 +188,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [deletingSummons, setDeletingSummons] = useState<ParentSummons | null>(null);
   const [editingHonor, setEditingHonor] = useState<HonorStudent | null>(null);
   const [deletingHonor, setDeletingHonor] = useState<HonorStudent | null>(null);
+  const [editingPenalty, setEditingPenalty] = useState<Penalty | null>(null);
+  const [deletingPenalty, setDeletingPenalty] = useState<Penalty | null>(null);
 
   const loadLessons = useCallback(async () => {
     try {
@@ -209,11 +225,25 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, []);
 
+  const loadPenalties = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/penalties?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
+      const data = await res.json();
+      setPenaltiesList(data.penalties || []);
+    } catch {
+      setPenaltiesList([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadLessons();
     loadSummons();
     loadHonors();
-  }, [loadLessons, loadSummons, loadHonors]);
+    loadPenalties();
+  }, [loadLessons, loadSummons, loadHonors, loadPenalties]);
 
   const showToast = (type: "success" | "error", text: string) => {
     setToastMsg({ type, text });
@@ -369,6 +399,51 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
+  // 4. إضافة عقوبة أو خصم لتلميذ أو مجموعة تلاميذ مع تحديث فوري مباشر
+  const addPenalty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!penaltyStudentNames.trim() || !penaltyClass.trim() || !penaltyReason.trim()) {
+      showToast("error", "يرجى كتابة اسم التلميذ، القسم، وسبب العقوبة");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/penalties", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentNames: penaltyStudentNames.trim(),
+          className: penaltyClass.trim(),
+          deduction: penaltyDeduction.trim(),
+          reason: penaltyReason.trim(),
+          date: penaltyDate.trim() || undefined,
+          notes: penaltyNotes.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل تسجيل العقوبة");
+
+      setPenaltyStudentNames("");
+      setPenaltyReason("");
+      setPenaltyNotes("");
+      setPenaltyDate("");
+
+      // تحديث فوري مباشر
+      const newItems = Array.isArray(data.penalties) ? data.penalties : [data.penalty];
+      setPenaltiesList((prev) => [...newItems, ...prev]);
+
+      showToast(
+        "success",
+        `✓ تم تسجيل الخصم والعقوبة بنجاح لـ (${newItems.length}) تلميذ باللون الأحمر! ⚠️`
+      );
+    } catch (e: any) {
+      showToast("error", "خطأ: " + (e.message || "تعذر تسجيل العقوبة"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // تجميع كراس الدروس حسب الميدان والمقطع
   const groupedLessons = useMemo(() => {
     if (notebookTab !== "lessons") return [];
@@ -437,7 +512,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         {/* أزرار سريعة للمعاينة */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-100 text-xs font-bold">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 border-t border-slate-100 text-xs font-bold">
           <Link
             href="/"
             target="_blank"
@@ -463,6 +538,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <span>صفحة الأولياء</span>
           </Link>
           <Link
+            href="/penalties"
+            target="_blank"
+            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-red-50 text-red-800 border border-red-200/80 hover:bg-red-100 transition text-[11px]"
+          >
+            <OctagonAlert className="w-3.5 h-3.5 text-red-600" />
+            <span>سجل الخصومات</span>
+          </Link>
+          <Link
             href="/announcement"
             target="_blank"
             className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
@@ -473,8 +556,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
-      {/* التبويب الرئيسي: إدارة الدروس أو استدعاءات الأولياء أو لوحة الشرف */}
-      <div className="grid grid-cols-3 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
+      {/* التبويب الرئيسي: إدارة الدروس أو استدعاءات الأولياء أو لوحة الشرف أو الخصومات والعقوبات */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
         <button
           onClick={() => setMainTab("lessons")}
           className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
@@ -509,6 +592,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         >
           <Trophy className="w-3.5 h-3.5" />
           <span>لوحة الشرف ({honorsList.length})</span>
+        </button>
+
+        <button
+          onClick={() => setMainTab("penalties")}
+          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+            mainTab === "penalties"
+              ? "bg-red-600 text-white shadow-sm"
+              : "text-red-700 bg-red-50/70 hover:bg-red-100 border border-red-200/60"
+          }`}
+        >
+          <OctagonAlert className="w-3.5 h-3.5 text-red-600" />
+          <span>الخصومات ({penaltiesList.length})</span>
         </button>
       </div>
 
@@ -1002,7 +1097,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             )}
           </div>
         </div>
-      ) : (
+      ) : mainTab === "honors" ? (
         /* ==================== 3. تبويب لوحة الشرف ==================== */
         <div className="space-y-4">
           {/* نموذج إضافة تلميذ إلى لوحة الشرف */}
@@ -1230,6 +1325,294 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             )}
           </div>
         </div>
+      ) : (
+        /* ==================== 4. تبويب الخصومات والعقوبات ==================== */
+        <div className="space-y-4">
+          {/* نموذج إضافة عقوبة أو خصم لتلميذ أو مجموعة تلاميذ */}
+          <form
+            onSubmit={addPenalty}
+            className="bg-white rounded-2xl p-4 border-2 border-red-200/90 shadow-sm space-y-3.5"
+          >
+            <div className="flex items-center justify-between pb-1 border-b border-red-100">
+              <span className="text-xs font-black text-red-950 flex items-center gap-1.5">
+                <OctagonAlert className="w-4 h-4 text-red-600" />
+                <span>تسجيل خصم أو عقوبة في التقويم المستمر</span>
+              </span>
+              <span className="text-[10px] bg-red-50 text-red-700 font-extrabold px-2.5 py-0.5 rounded-full border border-red-200">
+                سجل الانضباط ⚠️
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {/* القسم المعني */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    القسم المعني: <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    className="input text-xs font-black text-red-950 bg-red-50/40 border-red-200"
+                    value={penaltyClass}
+                    onChange={(e) => setPenaltyClass(e.target.value)}
+                    required
+                  >
+                    {HONOR_CLASSES.map((cls) => (
+                      <option key={cls} value={cls}>
+                        {cls} {cls.startsWith("1") ? "(الأولى متوسط)" : "(الثانية متوسط)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* اسم التلميذ أو مجموعة تلاميذ */}
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    اسم التلميذ أو مجموعة تلاميذ: <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    className="input text-xs font-bold"
+                    placeholder="اكتب اسم التلميذ، أو عدة تلاميذ مفصولين بفواصل (،) لتطبيق نفس الخصم عليهم..."
+                    value={penaltyStudentNames}
+                    onChange={(e) => setPenaltyStudentNames(e.target.value)}
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    💡 يمكنك كتابة تلميذ واحد أو عدة تلاميذ (مثال: أحمد بلقاسم، ريان، ياسين) لتسجيل الخصم لهم جميعاً دفعة واحدة.
+                  </span>
+                </div>
+              </div>
+
+              {/* مقدار الخصم والعقوبة مع أزرار سريعة */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">
+                  مقدار الخصم أو نوع العقوبة: <span className="text-red-600">*</span>
+                </label>
+                <input
+                  className="input text-xs font-bold text-red-700 bg-red-50/30 border-red-200"
+                  value={penaltyDeduction}
+                  onChange={(e) => setPenaltyDeduction(e.target.value)}
+                  placeholder="مثال: ناقص 3 في التقويم المستمر (-3)..."
+                  required
+                />
+                {/* أزرار سريعة لمقدار الخصم بنقرة واحدة */}
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {[
+                    "ناقص 3 في التقويم المستمر (-3)",
+                    "ناقص 2 في التقويم المستمر (-2)",
+                    "ناقص 1 في التقويم المستمر (-1)",
+                    "ناقص 5 في التقويم المستمر (-5)",
+                    "خصم نقطة السلوك والمواظبة (-2)",
+                    "إنذار شفهي مسجل",
+                  ].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setPenaltyDeduction(d)}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-red-50 text-red-800 border border-red-200/80 hover:bg-red-100 transition active:scale-95"
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* سبب العقوبة مع أزرار سريعة */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">
+                  سبب العقوبة: <span className="text-red-600">*</span>
+                </label>
+                <input
+                  className="input text-xs"
+                  value={penaltyReason}
+                  onChange={(e) => setPenaltyReason(e.target.value)}
+                  placeholder="مثال: هروب من الحصة، تشويش متكرر، إهمال حل الواجبات..."
+                  required
+                />
+                {/* أسباب شائعة جاهزة */}
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {[
+                    "هروب من الحصة",
+                    "تشويش متكرر وإخلال بنظام القسم",
+                    "عدم إحضار كراس الدروس 192 صفحة",
+                    "عدم حل الواجب المنزلي في البيت",
+                    "دروس ناقصة في الكراس وإهمال الكتابة",
+                    "عدم إحضار الأدوات الهندسية",
+                    "رفض المشاركة والمحاولة",
+                  ].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setPenaltyReason(r)}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition active:scale-95"
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* التاريخ (اختياري) */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  تاريخ الحادثة (اختياري، يترك فارغاً لليوم الحالي تلقائياً):
+                </label>
+                <input
+                  className="input text-xs"
+                  placeholder="مثال: يوم الثلاثاء 6 أكتوبر، أو اتركه فارغاً"
+                  value={penaltyDate}
+                  onChange={(e) => setPenaltyDate(e.target.value)}
+                />
+              </div>
+
+              {/* ملاحظات وتوجيه إضافي لولي الأمر */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  ملاحظة وتوجيه إضافي لولي الأمر والتلميذ (اختياري):
+                </label>
+                <textarea
+                  className="input text-xs min-h-[60px]"
+                  value={penaltyNotes}
+                  onChange={(e) => setPenaltyNotes(e.target.value)}
+                  placeholder="مثال: على ولي الأمر تفقد كراس ابنه ومتابعة سلوكه في القسم فوراً..."
+                />
+              </div>
+            </div>
+
+            <button
+              disabled={isSubmitting}
+              className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-[0.99]"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>جاري تسجيل الخصم...</span>
+                </>
+              ) : (
+                <>
+                  <OctagonAlert className="w-4 h-4" />
+                  <span>تسجيل العقوبة والخصم فورياً باللون الأحمر ⚠️</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* قائمة الخصومات والعقوبات الحالية */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+              <span>العقوبات والخصومات المسجلة:</span>
+              <span className="text-[11px] bg-red-50 text-red-700 px-2.5 py-0.5 rounded-full font-extrabold border border-red-200">
+                {penaltiesList.length} خصم مسجل
+              </span>
+            </div>
+
+            {/* فلتر الأقسام الأربعة */}
+            <div className="grid grid-cols-5 gap-1 bg-white p-1 rounded-xl border border-slate-100 text-center">
+              <button
+                type="button"
+                onClick={() => setSelectedPenaltyFilter("all")}
+                className={`py-1.5 rounded-lg text-xs font-bold transition ${
+                  selectedPenaltyFilter === "all"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                الكل ({penaltiesList.length})
+              </button>
+              {HONOR_CLASSES.map((cls) => {
+                const count = penaltiesList.filter(
+                  (p) => (p.className || "").replace(/\s+/g, "") === cls.replace(/\s+/g, "")
+                ).length;
+                return (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setSelectedPenaltyFilter(cls)}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition ${
+                      selectedPenaltyFilter === cls
+                        ? "bg-red-600 text-white"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {cls} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* عرض بطاقات العقوبات */}
+            {penaltiesList.length === 0 ? (
+              <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-red-200 text-xs text-slate-400 p-4 space-y-1">
+                <div className="text-emerald-500 text-lg">👏</div>
+                <div>لا توجد خصومات أو عقوبات مسجلة حالياً.</div>
+                <div className="text-[11px] text-slate-400">جميع الأقسام منضبطة والحمد لله!</div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {penaltiesList
+                  .filter(
+                    (p) =>
+                      selectedPenaltyFilter === "all" ||
+                      (p.className || "").replace(/\s+/g, "") === selectedPenaltyFilter.replace(/\s+/g, "")
+                  )
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      className="bg-white p-3.5 rounded-2xl border-2 border-red-100 shadow-2xs space-y-2 relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 bottom-0 w-1 bg-red-600" />
+                      <div className="flex items-start justify-between gap-2 pr-1.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-xs text-slate-900">{item.studentName}</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-red-50 text-red-800 border border-red-200">
+                              قسم {item.className}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-red-600 text-white shadow-2xs">
+                              {item.deduction}
+                            </span>
+                          </div>
+
+                          <div className="bg-red-50/60 p-2 rounded-xl border border-red-100 mt-2 text-xs">
+                            <span className="font-black text-red-800 ml-1">السبب:</span>
+                            <span className="font-bold text-red-950">{item.reason}</span>
+                          </div>
+
+                          {item.date && (
+                            <div className="text-[11px] text-slate-400 mt-1 font-medium flex items-center gap-1">
+                              <span>📅 {item.date}</span>
+                            </div>
+                          )}
+
+                          {item.notes && (
+                            <p className="text-xs text-amber-900 mt-1 bg-amber-50/60 p-2 rounded-lg font-medium border border-amber-200/50">
+                              📌 {item.notes}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => setEditingPenalty(item)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-700 hover:bg-red-50 transition"
+                            title="تعديل بيانات العقوبة"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingPenalty(item)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                            title="إلغاء وحذف العقوبة"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* نافذة تعديل الدرس */}
@@ -1313,6 +1696,34 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             // تحديث فوري مباشر للحالة
             setHonorsList((prev) => prev.filter((h) => h.id !== deletedId));
             showToast("success", "✓ تم حذف التلميذ من لوحة الشرف!");
+          }}
+        />
+      )}
+
+      {/* نافذة تعديل العقوبة */}
+      {editingPenalty && (
+        <EditPenaltyModal
+          penalty={editingPenalty}
+          onClose={() => setEditingPenalty(null)}
+          onSuccess={(updated) => {
+            setEditingPenalty(null);
+            // تحديث فوري مباشر للحالة
+            setPenaltiesList((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+            showToast("success", "✓ تم تحديث بيانات الخصم والعقوبة بنجاح! ⚠️");
+          }}
+        />
+      )}
+
+      {/* نافذة تأكيد حذف العقوبة */}
+      {deletingPenalty && (
+        <DeletePenaltyModal
+          penalty={deletingPenalty}
+          onClose={() => setDeletingPenalty(null)}
+          onSuccess={(deletedId) => {
+            setDeletingPenalty(null);
+            // تحديث فوري مباشر للحالة
+            setPenaltiesList((prev) => prev.filter((p) => p.id !== deletedId));
+            showToast("success", "✓ تم حذف العقوبة وإلغاء الخصم بنجاح!");
           }}
         />
       )}
@@ -2375,6 +2786,252 @@ function DeleteHonorModal({
             className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الآن"}
+          </button>
+          <button
+            disabled={busy}
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+          >
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- 10. نافذة تعديل بيانات عقوبة أو خصم ---------------- */
+function EditPenaltyModal({
+  penalty,
+  onClose,
+  onSuccess,
+}: {
+  penalty: Penalty;
+  onClose: () => void;
+  onSuccess: (updated: Penalty) => void;
+}) {
+  const [studentName, setStudentName] = useState(penalty.studentName);
+  const [className, setClassName] = useState(penalty.className);
+  const [deduction, setDeduction] = useState(penalty.deduction);
+  const [reason, setReason] = useState(penalty.reason);
+  const [date, setDate] = useState(penalty.date || "");
+  const [notes, setNotes] = useState(penalty.notes || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/penalties", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: penalty.id,
+          studentName,
+          className,
+          deduction,
+          reason,
+          date,
+          notes,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل التعديل");
+      onSuccess(data.penalty);
+    } catch (e: any) {
+      setErr(e.message || "حدث خطأ أثناء محاولة التعديل");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <form
+        onSubmit={submitEdit}
+        className="bg-white rounded-3xl p-5 max-w-md w-full space-y-4 shadow-xl border border-red-100 fade-up"
+      >
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="p-2 rounded-xl bg-red-50 text-red-700">
+              <OctagonAlert className="w-5 h-5" />
+            </span>
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-900">تعديل بيانات الخصم / العقوبة</h3>
+              <p className="text-[11px] text-slate-400">تحديث خصم التلميذ وسببه</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {err && (
+          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold border border-red-200">
+            {err}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+              <input
+                className="input text-xs font-bold"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="col-span-1">
+              <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
+              <select
+                className="input text-xs font-black text-red-900 bg-red-50/40 border-red-200"
+                value={className}
+                onChange={(e) => setClassName(e.target.value)}
+                required
+              >
+                {HONOR_CLASSES.map((cls) => (
+                  <option key={cls} value={cls}>
+                    {cls}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">مقدار الخصم / العقوبة:</label>
+            <input
+              className="input text-xs font-bold text-red-700 bg-red-50/40 border-red-200"
+              value={deduction}
+              onChange={(e) => setDeduction(e.target.value)}
+              placeholder="مثال: ناقص 3 في التقويم المستمر (-3)"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">سبب العقوبة:</label>
+            <input
+              className="input text-xs"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="مثال: هروب من الحصة يوم كذا..."
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">التاريخ:</label>
+            <input
+              className="input text-xs"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              placeholder="مثال: الأربعاء 07 أكتوبر 2026"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">
+              ملاحظة للأستاذ أو ولي الأمر (اختيارية):
+            </label>
+            <textarea
+              className="input text-xs min-h-[60px]"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="اكتب ملاحظة إن أردت..."
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs bg-red-600 hover:bg-red-700">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التعديل"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+          >
+            إلغاء
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* ---------------- 11. نافذة تأكيد حذف عقوبة أو خصم ---------------- */
+function DeletePenaltyModal({
+  penalty,
+  onClose,
+  onSuccess,
+}: {
+  penalty: Penalty;
+  onClose: () => void;
+  onSuccess: (deletedId: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submitDelete = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch(`/api/penalties?id=${encodeURIComponent(penalty.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل الحذف");
+      onSuccess(penalty.id);
+    } catch (e: any) {
+      setErr(e.message || "حدث خطأ أثناء محاولة الحذف");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-red-100 text-center fade-up">
+        <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto text-xl">
+          🛑
+        </div>
+
+        <div>
+          <h3 className="font-extrabold text-sm text-slate-900">إلغاء وحذف الخصم / العقوبة</h3>
+          <p className="text-xs font-bold text-red-800 mt-2 bg-red-50 p-2.5 rounded-xl border border-red-100">
+            التلميذ: {penalty.studentName} ({penalty.className})
+            <br />
+            <span className="text-[11px] font-black">{penalty.deduction}</span>
+          </p>
+          <p className="text-[11px] text-slate-500 mt-2">
+            هل أنت متأكد من حذف هذه العقوبة وإلغائها نهائياً؟
+          </p>
+        </div>
+
+        {err && (
+          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold">
+            {err}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button
+            disabled={busy}
+            onClick={submitDelete}
+            className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف العقوبة"}
           </button>
           <button
             disabled={busy}

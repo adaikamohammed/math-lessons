@@ -54,6 +54,7 @@ export async function getLessonsData(): Promise<LessonsData> {
               lessons: Array.isArray(json.lessons) ? json.lessons : [],
               summons: Array.isArray(json.summons) ? json.summons : [],
               honors: Array.isArray(json.honors) ? json.honors : [],
+              penalties: Array.isArray(json.penalties) ? json.penalties : [],
             };
             // حفظ نسخة محلية احتياطية
             ensureLocalDirs()
@@ -84,6 +85,7 @@ export async function getLessonsData(): Promise<LessonsData> {
               lessons: Array.isArray(json.lessons) ? json.lessons : [],
               summons: Array.isArray(json.summons) ? json.summons : [],
               honors: Array.isArray(json.honors) ? json.honors : [],
+              penalties: Array.isArray(json.penalties) ? json.penalties : [],
             };
           }
         } catch (getErr) {
@@ -104,9 +106,10 @@ export async function getLessonsData(): Promise<LessonsData> {
       lessons: Array.isArray(json.lessons) ? json.lessons : [],
       summons: Array.isArray(json.summons) ? json.summons : [],
       honors: Array.isArray(json.honors) ? json.honors : [],
+      penalties: Array.isArray(json.penalties) ? json.penalties : [],
     };
   } catch {
-    return { lessons: [], summons: [], honors: [] };
+    return { lessons: [], summons: [], honors: [], penalties: [] };
   }
 }
 

@@ -42,10 +42,22 @@ export type HonorStudent = {
 export const HONOR_CLASSES = ["1 م 1", "1 م 2", "1 م 3", "2 م 3"] as const;
 export type HonorClass = (typeof HONOR_CLASSES)[number];
 
+export type Penalty = {
+  id: string;
+  studentName: string; // اسم التلميذ
+  className: string; // القسم : "1 م 1" ، "1 م 2" ، "1 م 3" ، "2 م 3"
+  deduction: string; // مقدار الخصم أو العقوبة : مثلاً "ناقص 3 في التقويم المستمر (-3)"
+  reason: string; // سبب العقوبة : مثلاً "هروب من الحصة يوم الثلاثاء"
+  date?: string; // تاريخ الحادثة أو الخصم
+  notes?: string; // ملاحظات أو توجيه إضافي من الأستاذ
+  createdAt: string;
+};
+
 export type LessonsData = {
   lessons: Lesson[];
   summons?: ParentSummons[];
   honors?: HonorStudent[];
+  penalties?: Penalty[];
 };
 
 export const LEVELS = {

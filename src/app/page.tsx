@@ -7,6 +7,7 @@ import {
   Users,
   BookOpen,
   Trophy,
+  OctagonAlert,
 } from "lucide-react";
 
 const years = [
@@ -97,6 +98,28 @@ export default function Home() {
             </p>
           </div>
           <ChevronLeft className="w-4 h-4 text-amber-600 group-hover:text-amber-800 transition shrink-0" />
+        </Link>
+      </div>
+
+      {/* 3. سجل الخصومات والعقوبات (متابعة دقيقة للانضباط والتقويم باللون الأحمر) */}
+      <div>
+        <Link
+          href="/penalties"
+          className="flex items-center gap-3.5 bg-gradient-to-r from-red-600/10 via-rose-500/5 to-red-600/10 rounded-2xl p-3.5 border border-red-200/80 shadow-2xs hover:border-red-300 hover:shadow-xs active:scale-[0.98] transition group"
+        >
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 to-rose-700 text-white flex items-center justify-center shrink-0 shadow-sm shadow-red-600/20 group-hover:scale-105 transition-transform">
+            <OctagonAlert className="w-5 h-5 text-red-100" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-xs text-slate-900">سجل الخصومات والعقوبات</span>
+              <span className="text-[10px] bg-red-100 text-red-800 font-black px-1.5 py-0.2 rounded">انضباط ⚠️</span>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 font-medium">
+              خصومات التقويم المستمر والعقوبات المدرسية لكل قسم (1م1، 1م2، 1م3، 2م3)
+            </p>
+          </div>
+          <ChevronLeft className="w-4 h-4 text-red-600 group-hover:text-red-800 transition shrink-0" />
         </Link>
       </div>
 
