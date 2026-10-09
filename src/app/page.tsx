@@ -7,6 +7,7 @@ import {
   Users,
   BookOpen,
   Trophy,
+  Scale,
 } from "lucide-react";
 
 const years = [
@@ -127,6 +128,26 @@ export default function Home() {
       {/* 4. قسم التوجيهات والإعلانات الهامة */}
       <div className="pt-2 space-y-2">
         <div className="text-xs font-bold text-slate-600 px-1">توجيهات وإعلانات هامة:</div>
+
+        {/* بطاقة ميثاق التقويم المستمر (20/20) */}
+        <Link
+          href="/assessment"
+          className="flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs hover:border-emerald-200 active:scale-[0.98] transition group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
+            <Scale className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-xs text-slate-900">ميثاق ومعايير التقويم المستمر (20/20)</span>
+              <span className="text-[10px] bg-teal-50 text-teal-800 font-bold px-1.5 py-0.2 rounded">شفافية ⚖️</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+              توزيع الـ 20 نقطة: الكراريس 5ن • الواجبات 5ن • السلوك 5ن • النشاط 5ن + حاسبة العلامة
+            </p>
+          </div>
+          <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />
+        </Link>
 
         {/* بطاقة الإعلان الهام والتوجيهات (مختصرة ومتناسقة) */}
         <Link

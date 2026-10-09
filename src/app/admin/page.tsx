@@ -36,6 +36,12 @@ import {
   MinusCircle,
   FileWarning,
   HeartHandshake,
+  ClipboardCheck,
+  Calculator,
+  FileText,
+  Check,
+  Search,
+  Scale,
 } from "lucide-react";
 import {
   LEVELS,
@@ -47,6 +53,7 @@ import {
   type ParentSummons,
   type HonorStudent,
   type Penalty,
+  type StudentEvaluation,
 } from "@/lib/types";
 
 export default function AdminPage() {
@@ -140,13 +147,23 @@ function Login({ onLogin }: { onLogin: () => void }) {
 
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
 function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [mainTab, setMainTab] = useState<"lessons" | "summons" | "honors" | "penalties">("lessons");
+  const [mainTab, setMainTab] = useState<"lessons" | "summons" | "honors" | "evaluations" | "penalties">("lessons");
   const [level, setLevel] = useState<1 | 2>(1);
   const [notebookTab, setNotebookTab] = useState<NotebookType>("lessons");
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [summonsList, setSummonsList] = useState<ParentSummons[]>([]);
   const [honorsList, setHonorsList] = useState<HonorStudent[]>([]);
   const [penaltiesList, setPenaltiesList] = useState<Penalty[]>([]);
+  const [evaluationsList, setEvaluationsList] = useState<StudentEvaluation[]>([]);
+  const [evalClass, setEvalClass] = useState<string>("1 م 1");
+  const [evalGroup, setEvalGroup] = useState<"فوج 1" | "فوج 2" | "القسم كامل">("فوج 1");
+  const [evalSearch, setEvalSearch] = useState<string>("");
+  const [singleEvalName, setSingleEvalName] = useState<string>("");
+  const [isBatchEvalModalOpen, setIsBatchEvalModalOpen] = useState(false);
+  const [batchEvalNames, setBatchEvalNames] = useState("");
+  const [batchEvalClass, setBatchEvalClass] = useState("1 م 1");
+  const [batchEvalGroup, setBatchEvalGroup] = useState<"فوج 1" | "فوج 2" | "القسم كامل">("فوج 1");
+  const [batchDefaultFullScore, setBatchDefaultFullScore] = useState(true);
   const [loading, setLoading] = useState(true);
 
   // حقول إضافة درس
@@ -263,12 +280,26 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, []);
 
+  const loadEvaluations = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/evaluations?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
+      const data = await res.json();
+      setEvaluationsList(data.evaluations || []);
+    } catch {
+      setEvaluationsList([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadLessons();
     loadSummons();
     loadHonors();
     loadPenalties();
-  }, [loadLessons, loadSummons, loadHonors, loadPenalties]);
+    loadEvaluations();
+  }, [loadLessons, loadSummons, loadHonors, loadPenalties, loadEvaluations]);
 
   const showToast = (type: "success" | "error", text: string) => {
     setToastMsg({ type, text });
@@ -515,6 +546,266 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
+  // 6. دوال إدارة التقييم الميداني في الحصة
+  const handleQuickRate = async (
+    studentId: string,
+    preset: "excellent" | "medium" | "weak"
+  ) => {
+    let nb = 5, hw = 5, tl = 5, act = 5;
+    if (preset === "medium") {
+      nb = 3; hw = 3; tl = 3; act = 3;
+    } else if (preset === "weak") {
+      nb = 1; hw = 1; tl = 1; act = 1;
+    }
+
+    const total = nb + hw + tl + act;
+    const ratingColor = preset === "excellent" ? "emerald" : preset === "medium" ? "amber" : "rose";
+
+    setEvaluationsList((prev) =>
+      prev.map((e) =>
+        e.id === studentId
+          ? {
+              ...e,
+              notebookScore: nb,
+              notebookComplete: nb >= 4,
+              homeworkScore: hw,
+              homeworkDone: hw >= 4,
+              toolsScore: tl,
+              hasTools: tl >= 4,
+              activityScore: act,
+              totalScore: total,
+              rating: preset,
+              ratingColor,
+              updatedAt: new Date().toISOString(),
+            }
+          : e
+      )
+    );
+
+    try {
+      await fetch("/api/evaluations", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: studentId,
+          notebookScore: nb,
+          homeworkScore: hw,
+          toolsScore: tl,
+          activityScore: act,
+        }),
+      });
+    } catch {
+      showToast("error", "تعذر حفظ التقييم في الخادم");
+    }
+  };
+
+  const handleUpdateCriteria = async (
+    studentId: string,
+    field: "notebookScore" | "homeworkScore" | "toolsScore" | "activityScore",
+    score: number
+  ) => {
+    const val = Math.max(0, Math.min(5, score));
+    setEvaluationsList((prev) =>
+      prev.map((e) => {
+        if (e.id !== studentId) return e;
+        const updated = { ...e, [field]: val };
+        const total =
+          (field === "notebookScore" ? val : updated.notebookScore) +
+          (field === "homeworkScore" ? val : updated.homeworkScore) +
+          (field === "toolsScore" ? val : updated.toolsScore) +
+          (field === "activityScore" ? val : updated.activityScore);
+        const ratingColor = total >= 16 ? "emerald" : total >= 10 ? "amber" : "rose";
+        const rating =
+          total >= 18
+            ? "excellent"
+            : total >= 15
+            ? "very_good"
+            : total >= 12
+            ? "good"
+            : total >= 10
+            ? "medium"
+            : "weak";
+        return {
+          ...updated,
+          totalScore: total,
+          rating,
+          ratingColor,
+          notebookComplete: field === "notebookScore" ? val >= 4 : updated.notebookComplete,
+          homeworkDone: field === "homeworkScore" ? val >= 4 : updated.homeworkDone,
+          hasTools: field === "toolsScore" ? val >= 4 : updated.hasTools,
+        };
+      })
+    );
+
+    try {
+      await fetch("/api/evaluations", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: studentId, [field]: val }),
+      });
+    } catch {
+      showToast("error", "تعذر حفظ المعيار في الخادم");
+    }
+  };
+
+  const handleApplyCatchUp = async (studentId: string) => {
+    const target = evaluationsList.find((e) => e.id === studentId);
+    if (!target) return;
+    const newNb = Math.min(5, (target.notebookScore || 0) + 2.5);
+    const existingNote = target.notes || "";
+    const updatedNote = existingNote ? `${existingNote} • استدراك درس سابق (+2.5)` : "استدراك درس سابق (+2.5)";
+
+    setEvaluationsList((prev) =>
+      prev.map((e) => {
+        if (e.id !== studentId) return e;
+        const total = Math.min(20, newNb + e.homeworkScore + e.toolsScore + e.activityScore);
+        const ratingColor = total >= 16 ? "emerald" : total >= 10 ? "amber" : "rose";
+        const rating =
+          total >= 18
+            ? "excellent"
+            : total >= 15
+            ? "very_good"
+            : total >= 12
+            ? "good"
+            : total >= 10
+            ? "medium"
+            : "weak";
+        return {
+          ...e,
+          notebookScore: newNb,
+          notebookComplete: newNb >= 4,
+          totalScore: total,
+          rating,
+          ratingColor,
+          notes: updatedNote,
+        };
+      })
+    );
+
+    try {
+      await fetch("/api/evaluations", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: studentId,
+          notebookScore: newNb,
+          notes: updatedNote,
+        }),
+      });
+      showToast("success", "✓ تم تطبيق استدراك الدرس (+2.5) وفق ميثاق التقويم! 📖");
+    } catch {
+      showToast("error", "تعذر حفظ الاستدراك في الخادم");
+    }
+  };
+
+  const handleUpdateNote = async (studentId: string, notes: string) => {
+    setEvaluationsList((prev) =>
+      prev.map((e) => (e.id === studentId ? { ...e, notes } : e))
+    );
+    try {
+      await fetch("/api/evaluations", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: studentId, notes }),
+      });
+    } catch {}
+  };
+
+  const handleDeleteEvaluation = async (id: string, name: string) => {
+    if (!window.confirm(`هل أنت متأكد من حذف التلميذ "${name}" من قائمة التقييم؟`)) return;
+    setEvaluationsList((prev) => prev.filter((e) => e.id !== id));
+    try {
+      const res = await fetch(`/api/evaluations?id=${id}`, { method: "DELETE" });
+      if (res.ok) showToast("success", `✓ تم حذف التلميذ "${name}"`);
+    } catch {
+      showToast("error", "تعذر الحذف من الخادم");
+    }
+  };
+
+  const handleAddSingleStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!singleEvalName.trim()) return;
+    try {
+      const res = await fetch("/api/evaluations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentName: singleEvalName.trim(),
+          className: evalClass,
+          groupName: evalGroup,
+          notebookScore: 5,
+          homeworkScore: 5,
+          toolsScore: 5,
+          activityScore: 5,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setEvaluationsList((prev) => [...prev, data.evaluation]);
+      setSingleEvalName("");
+      showToast("success", `✓ تم إضافة التلميذ "${singleEvalName}" إلى ${evalClass} (${evalGroup})`);
+    } catch (e: any) {
+      showToast("error", e.message || "فشل إضافة التلميذ");
+    }
+  };
+
+  const handleBatchImport = async () => {
+    if (!batchEvalNames.trim()) {
+      showToast("error", "يرجى كتابة أو لصق أسماء التلاميذ");
+      return;
+    }
+    const names = batchEvalNames
+      .split(/[\n,،]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (names.length === 0) return;
+
+    try {
+      const score = batchDefaultFullScore ? 5 : 3;
+      const res = await fetch("/api/evaluations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          students: names,
+          className: batchEvalClass,
+          groupName: batchEvalGroup,
+          notebookScore: score,
+          homeworkScore: score,
+          toolsScore: score,
+          activityScore: score,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast(
+        "success",
+        `✓ تم استيراد (${data.count}) تلاميذ بنجاح إلى ${batchEvalClass} (${batchEvalGroup})!`
+      );
+      setIsBatchEvalModalOpen(false);
+      setBatchEvalNames("");
+      loadEvaluations();
+    } catch (e: any) {
+      showToast("error", e.message || "فشل الاستيراد");
+    }
+  };
+
+  const handleClearClassEvals = async () => {
+    if (!window.confirm(`هل أنت متأكد من مسح جميع تقييمات قسم ${evalClass}؟`)) return;
+    try {
+      const res = await fetch(`/api/evaluations?class=${encodeURIComponent(evalClass)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setEvaluationsList((prev) =>
+          prev.filter((e) => (e.className || "").replace(/\s+/g, "") !== evalClass.replace(/\s+/g, ""))
+        );
+        showToast("success", `✓ تم مسح تقييمات قسم ${evalClass}`);
+      }
+    } catch {
+      showToast("error", "تعذر مسح التقييمات");
+    }
+  };
+
   // تجميع كراس الدروس حسب الميدان والمقطع
   const groupedLessons = useMemo(() => {
     if (notebookTab !== "lessons") return [];
@@ -583,7 +874,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         {/* أزرار سريعة للمعاينة */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 border-t border-slate-100 text-xs font-bold">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-1 border-t border-slate-100 text-xs font-bold">
           <Link
             href="/"
             target="_blank"
@@ -591,6 +882,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           >
             <Globe className="w-3.5 h-3.5 text-emerald-600" />
             <span>الموقع الرئيسي</span>
+          </Link>
+          <Link
+            href="/assessment"
+            target="_blank"
+            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200/70 hover:bg-emerald-100 transition text-[11px]"
+          >
+            <Scale className="w-3.5 h-3.5 text-emerald-600" />
+            <span>ميثاق التقويم ⚖️</span>
           </Link>
           <Link
             href="/honor"
@@ -627,8 +926,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
-      {/* التبويب الرئيسي: إدارة الدروس أو أولياء أود استقبالهم أو لوحة الشرف أو الخصومات (سجل خاص) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
+      {/* التبويب الرئيسي: إدارة الدروس أو أولياء أود استقبالهم أو لوحة الشرف أو تقييم الحصة أو الخصومات */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
         <button
           onClick={() => setMainTab("lessons")}
           className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
@@ -639,6 +938,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         >
           <BookOpen className="w-3.5 h-3.5" />
           <span>الدروس</span>
+        </button>
+
+        <button
+          onClick={() => setMainTab("evaluations")}
+          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+            mainTab === "evaluations"
+              ? "bg-emerald-700 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <ClipboardCheck className="w-3.5 h-3.5" />
+          <span>📱 تقييم الحصة ({evaluationsList.length})</span>
         </button>
 
         <button
@@ -1904,6 +2215,622 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       )}
 
+      {/* ==================== 5. تبويب التقييم الميداني السريع (حصة الأعمال الموجهة) ==================== */}
+      {mainTab === "evaluations" && (
+        <div className="space-y-4">
+          {/* مقدمة وأدوات التحكم بالحصة */}
+          <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between pb-2 border-b border-emerald-100 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black">
+                  <ClipboardCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-black text-slate-800">
+                    التقييم الميداني السريع — حصة الأعمال الموجهة (نصف القسم)
+                  </h2>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    تقييم فوري باللمس (أخضر 🟢 / أصفر 🟡 / أحمر 🔴) أثناء الجولة بين الصفوف
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href="/assessment"
+                target="_blank"
+                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1 transition"
+              >
+                <Scale className="w-3.5 h-3.5 text-emerald-600" />
+                <span>ميثاق التقويم (20/20)</span>
+              </Link>
+            </div>
+
+            {/* أزرار اختيار القسم */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">اختر القسم:</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {HONOR_CLASSES.map((cls) => (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setEvalClass(cls)}
+                    className={`py-2 px-2 rounded-xl text-xs font-black transition ${
+                      evalClass === cls
+                        ? "bg-emerald-700 text-white shadow-sm"
+                        : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <span>{cls}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* أزرار اختيار الفوج (التفويج) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">
+                الفوج المعني بحصة الأعمال الموجهة:
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(["فوج 1", "فوج 2", "القسم كامل"] as const).map((grp) => (
+                  <button
+                    key={grp}
+                    type="button"
+                    onClick={() => setEvalGroup(grp)}
+                    className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+                      evalGroup === grp
+                        ? "bg-slate-800 text-white shadow-sm"
+                        : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <span>👥</span>
+                    <span>{grp}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* شريط الإجراءات: استيراد دفعة، بحث، إضافة تلميذ، ومسح */}
+            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    className="input text-xs pl-8 py-2"
+                    placeholder="ابحث عن اسم تلميذ..."
+                    value={evalSearch}
+                    onChange={(e) => setEvalSearch(e.target.value)}
+                  />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBatchEvalClass(evalClass);
+                    setBatchEvalGroup(evalGroup === "القسم كامل" ? "فوج 1" : evalGroup);
+                    setIsBatchEvalModalOpen(true);
+                  }}
+                  className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shrink-0 flex items-center gap-1 shadow-sm transition active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>استيراد الفوج</span>
+                </button>
+              </div>
+
+              {/* زر مسح القسم إذا لزم الأمر */}
+              <button
+                type="button"
+                onClick={handleClearClassEvals}
+                className="text-[11px] text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 rounded-lg border border-red-200 font-bold transition shrink-0"
+                title={`مسح كافة تقييمات ${evalClass}`}
+              >
+                <span>مسح القسم</span>
+              </button>
+            </div>
+
+            {/* إضافة تلميذ فردي سريع */}
+            <form onSubmit={handleAddSingleStudent} className="flex gap-1.5 pt-1">
+              <input
+                className="input text-xs flex-1 py-1.5"
+                placeholder="إضافة تلميذ جديد مباشرة إلى هذا الفوج..."
+                value={singleEvalName}
+                onChange={(e) => setSingleEvalName(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="py-1.5 px-3 rounded-xl bg-slate-800 text-white text-xs font-bold hover:bg-slate-900 transition shrink-0"
+              >
+                إضافة
+              </button>
+            </form>
+          </div>
+
+          {/* بطاقات التلاميذ والتقييم السريع */}
+          {(() => {
+            const currentEvals = evaluationsList.filter((e) => {
+              const matchClass =
+                (e.className || "").replace(/\s+/g, "") === evalClass.replace(/\s+/g, "");
+              const matchGroup =
+                evalGroup === "القسم كامل" || e.groupName === evalGroup;
+              const matchSearch =
+                !evalSearch.trim() ||
+                e.studentName.toLowerCase().includes(evalSearch.trim().toLowerCase());
+              return matchClass && matchGroup && matchSearch;
+            });
+
+            const totalInView = currentEvals.length;
+            const excellentCount = currentEvals.filter((e) => e.totalScore >= 18).length;
+            const mediumCount = currentEvals.filter(
+              (e) => e.totalScore >= 10 && e.totalScore < 18
+            ).length;
+            const weakCount = currentEvals.filter((e) => e.totalScore < 10).length;
+            const avg = totalInView
+              ? (
+                  currentEvals.reduce((acc, curr) => acc + curr.totalScore, 0) / totalInView
+                ).toFixed(1)
+              : "0";
+
+            return (
+              <div className="space-y-3">
+                {/* إحصائيات سريعة للقسم والفوج */}
+                <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs flex items-center justify-between text-xs font-bold text-slate-700 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-slate-900">
+                      {evalClass} ({evalGroup})
+                    </span>
+                    <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[11px]">
+                      {totalInView} تلميذ
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-[11px] font-black">
+                    <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-200">
+                      🟢 ممتاز: {excellentCount}
+                    </span>
+                    <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md border border-amber-200">
+                      🟡 متوسط: {mediumCount}
+                    </span>
+                    <span className="bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md border border-rose-200">
+                      🔴 ضعيف: {weakCount}
+                    </span>
+                    <span className="bg-slate-900 text-white px-2 py-0.5 rounded-md">
+                      معدل الفوج: {avg}/20
+                    </span>
+                  </div>
+                </div>
+
+                {currentEvals.length === 0 ? (
+                  <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-emerald-200 p-6 space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-xl font-black">
+                      📋
+                    </div>
+                    <div>
+                      <h3 className="font-black text-sm text-slate-800">
+                        لا يوجد تلاميذ مسجلين في {evalClass} ({evalGroup})
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                        اضغط على الزر أدناه لاستيراد قائمة أسماء تلاميذ الفوج دفعة واحدة والبدء في التقييم الميداني فوراً.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBatchEvalClass(evalClass);
+                        setBatchEvalGroup(evalGroup === "القسم كامل" ? "فوج 1" : evalGroup);
+                        setIsBatchEvalModalOpen(true);
+                      }}
+                      className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm transition active:scale-95 inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>+ استيراد قائمة تلاميذ {evalClass} ({evalGroup})</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {currentEvals.map((student) => {
+                      const isExc = student.totalScore >= 18;
+                      const isVeryGood = student.totalScore >= 15 && student.totalScore < 18;
+                      const isGood = student.totalScore >= 12 && student.totalScore < 15;
+                      const isMed = student.totalScore >= 10 && student.totalScore < 12;
+                      const isWeak = student.totalScore < 10;
+
+                      return (
+                        <div
+                          key={student.id}
+                          className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs space-y-3 hover:border-emerald-300 transition"
+                        >
+                          {/* رأس بطاقة التلميذ: الاسم والعلامة الكلية */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black text-sm text-slate-900 break-words">
+                                  {student.studentName}
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-700">
+                                  {student.className} • {student.groupName}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* شارة العلامة والتقدير */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <div
+                                className={`px-3 py-1 rounded-xl font-black text-xs shadow-2xs flex items-center gap-1 ${
+                                  isExc
+                                    ? "bg-emerald-600 text-white"
+                                    : isVeryGood
+                                    ? "bg-emerald-500 text-white"
+                                    : isGood
+                                    ? "bg-sky-600 text-white"
+                                    : isMed
+                                    ? "bg-amber-500 text-white"
+                                    : "bg-rose-600 text-white"
+                                }`}
+                              >
+                                <span>
+                                  {isExc
+                                    ? "🟢 ممتاز"
+                                    : isVeryGood
+                                    ? "🟢 جيد جداً"
+                                    : isGood
+                                    ? "🔵 جيد"
+                                    : isMed
+                                    ? "🟡 متوسط"
+                                    : "🔴 ضعيف"}
+                                </span>
+                                <span className="text-[10px] opacity-80">•</span>
+                                <span className="text-sm tracking-tight">
+                                  {student.totalScore}/20
+                                </span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEvaluation(student.id, student.studentName)}
+                                className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition"
+                                title="إزالة التلميذ من القائمة"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 1. التقييم الفوري السريع بلمسة واحدة (أثناء جولة الأستاذ) */}
+                          <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-100 space-y-1">
+                            <span className="text-[10px] font-black text-slate-600 block">
+                              ⚡ تقييم فوري سريع بلمسة واحدة (أثناء المرور بين الطاولات):
+                            </span>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleQuickRate(student.id, "excellent")}
+                                className={`py-1.5 px-2 rounded-lg text-xs font-black transition active:scale-95 flex items-center justify-center gap-1 ${
+                                  isExc
+                                    ? "bg-emerald-600 text-white shadow-2xs ring-2 ring-emerald-400"
+                                    : "bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50"
+                                }`}
+                              >
+                                <span>🟢</span>
+                                <span>ممتاز (20)</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleQuickRate(student.id, "medium")}
+                                className={`py-1.5 px-2 rounded-lg text-xs font-black transition active:scale-95 flex items-center justify-center gap-1 ${
+                                  isMed || isGood
+                                    ? "bg-amber-500 text-white shadow-2xs ring-2 ring-amber-300"
+                                    : "bg-white text-amber-800 border border-amber-200 hover:bg-amber-50"
+                                }`}
+                              >
+                                <span>🟡</span>
+                                <span>متوسط (12)</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleQuickRate(student.id, "weak")}
+                                className={`py-1.5 px-2 rounded-lg text-xs font-black transition active:scale-95 flex items-center justify-center gap-1 ${
+                                  isWeak
+                                    ? "bg-rose-600 text-white shadow-2xs ring-2 ring-rose-400"
+                                    : "bg-white text-rose-800 border border-rose-200 hover:bg-rose-50"
+                                }`}
+                              >
+                                <span>🔴</span>
+                                <span>ضعيف (04)</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 2. توزيع المحاور الأربعة بالتفصيل حسب الميثاق (5 + 5 + 5 + 5 = 20) */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                            {/* محور 1: الكراس */}
+                            <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100 space-y-1">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-emerald-900">
+                                <span>📘 الكراس (192ص+96ص)</span>
+                                <span className="font-black text-emerald-700">
+                                  {student.notebookScore}/5
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-6 gap-0.5 pt-0.5">
+                                {[0, 1, 2, 3, 4, 5].map((val) => (
+                                  <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() =>
+                                      handleUpdateCriteria(student.id, "notebookScore", val)
+                                    }
+                                    className={`py-1 text-[10px] font-black rounded transition ${
+                                      Math.round(student.notebookScore) === val
+                                        ? "bg-emerald-700 text-white"
+                                        : "bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50"
+                                    }`}
+                                  >
+                                    {val}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* محور 2: الواجب */}
+                            <div className="bg-sky-50/50 p-2 rounded-xl border border-sky-100 space-y-1">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-sky-900">
+                                <span>📝 الواجبات والمحاولات</span>
+                                <span className="font-black text-sky-700">
+                                  {student.homeworkScore}/5
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-6 gap-0.5 pt-0.5">
+                                {[0, 1, 2, 3, 4, 5].map((val) => (
+                                  <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() =>
+                                      handleUpdateCriteria(student.id, "homeworkScore", val)
+                                    }
+                                    className={`py-1 text-[10px] font-black rounded transition ${
+                                      Math.round(student.homeworkScore) === val
+                                        ? "bg-sky-700 text-white"
+                                        : "bg-white text-slate-700 border border-slate-200 hover:bg-sky-50"
+                                    }`}
+                                  >
+                                    {val}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* محور 3: الأدوات والانضباط */}
+                            <div className="bg-amber-50/50 p-2 rounded-xl border border-amber-100 space-y-1">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-amber-900">
+                                <span>📐 الأدوات والانضباط</span>
+                                <span className="font-black text-amber-700">
+                                  {student.toolsScore}/5
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-6 gap-0.5 pt-0.5">
+                                {[0, 1, 2, 3, 4, 5].map((val) => (
+                                  <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() =>
+                                      handleUpdateCriteria(student.id, "toolsScore", val)
+                                    }
+                                    className={`py-1 text-[10px] font-black rounded transition ${
+                                      Math.round(student.toolsScore) === val
+                                        ? "bg-amber-600 text-white"
+                                        : "bg-white text-slate-700 border border-slate-200 hover:bg-amber-50"
+                                    }`}
+                                  >
+                                    {val}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* محور 4: النشاط والمحاولة */}
+                            <div className="bg-purple-50/50 p-2 rounded-xl border border-purple-100 space-y-1">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-purple-900">
+                                <span>💡 محاولة النشاط والسبورة</span>
+                                <span className="font-black text-purple-700">
+                                  {student.activityScore}/5
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-6 gap-0.5 pt-0.5">
+                                {[0, 1, 2, 3, 4, 5].map((val) => (
+                                  <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() =>
+                                      handleUpdateCriteria(student.id, "activityScore", val)
+                                    }
+                                    className={`py-1 text-[10px] font-black rounded transition ${
+                                      Math.round(student.activityScore) === val
+                                        ? "bg-purple-700 text-white"
+                                        : "bg-white text-slate-700 border border-slate-200 hover:bg-purple-50"
+                                    }`}
+                                  >
+                                    {val}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 3. زر استدراك الدرس السابق والملاحظات */}
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-100 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => handleApplyCatchUp(student.id)}
+                              className="text-emerald-800 hover:bg-emerald-100 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 font-bold transition flex items-center gap-1 active:scale-95"
+                              title="استدراك درس متأخر كان ناقصاً في المراقبة السابقة (يسترجع 50% من علامته وفق الميثاق)"
+                            >
+                              <span>📖 استدراك درس سابق (+2.5)</span>
+                            </button>
+
+                            {/* أزرار سريعة للملاحظات والخصومات */}
+                            <div className="flex flex-wrap items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUpdateCriteria(
+                                    student.id,
+                                    "toolsScore",
+                                    Math.max(0, student.toolsScore - 2)
+                                  );
+                                  handleUpdateNote(
+                                    student.id,
+                                    student.notes
+                                      ? `${student.notes} • ناقص أدوات هندسية (-2)`
+                                      : "ناقص أدوات هندسية (-2)"
+                                  );
+                                }}
+                                className="text-slate-600 hover:bg-slate-100 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px] font-medium"
+                              >
+                                📐 ناقص أدوات (-2)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUpdateCriteria(
+                                    student.id,
+                                    "homeworkScore",
+                                    Math.max(0, student.homeworkScore - 2)
+                                  );
+                                  handleUpdateNote(
+                                    student.id,
+                                    student.notes
+                                      ? `${student.notes} • واجب غير كامل (-2)`
+                                      : "واجب غير كامل (-2)"
+                                  );
+                                }}
+                                className="text-slate-600 hover:bg-slate-100 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px] font-medium"
+                              >
+                                📝 واجب ناقص (-2)
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* عرض الملاحظة إن وجدت مع حقل تعديلها */}
+                          {student.notes && (
+                            <div className="text-[11px] text-amber-900 bg-amber-50/70 p-2 rounded-xl border border-amber-200/60 font-medium">
+                              📌 <b>ملاحظة مسجلة:</b> {student.notes}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* نافذة استيراد قائمة تلاميذ الفوج دفعة واحدة */}
+      {isBatchEvalModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-5 max-w-md w-full space-y-4 shadow-xl border border-slate-100 fade-up my-auto max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <Users className="w-4 h-4" />
+                </div>
+                <h3 className="font-extrabold text-sm text-slate-800">
+                  استيراد قائمة تلاميذ الفوج دفعة واحدة
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBatchEvalModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
+                <select
+                  className="input text-xs font-bold"
+                  value={batchEvalClass}
+                  onChange={(e) => setBatchEvalClass(e.target.value)}
+                >
+                  {HONOR_CLASSES.map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">الفوج:</label>
+                <select
+                  className="input text-xs font-bold"
+                  value={batchEvalGroup}
+                  onChange={(e) =>
+                    setBatchEvalGroup(e.target.value as "فوج 1" | "فوج 2" | "القسم كامل")
+                  }
+                >
+                  <option value="فوج 1">فوج 1 (نصف القسم)</option>
+                  <option value="فوج 2">فوج 2 (نصف القسم)</option>
+                  <option value="القسم كامل">القسم كامل</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                الصق أسماء التلاميذ هنا (كل اسم في سطر، أو مفصولة بفواصل):
+              </label>
+              <textarea
+                className="input text-xs min-h-[140px] font-mono leading-relaxed"
+                placeholder={"أحمد بوخالفة\nسارة لعريبي\nيونس بلحاج\nمحمد زياني..."}
+                value={batchEvalNames}
+                onChange={(e) => setBatchEvalNames(e.target.value)}
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                يمكنك نسخ القائمة مباشرة من ملف إكسل أو وورد ولصقها هنا.
+              </p>
+            </div>
+
+            {/* خيار النقطة الابتدائية */}
+            <label className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-emerald-600 rounded border-slate-300"
+                checked={batchDefaultFullScore}
+                onChange={(e) => setBatchDefaultFullScore(e.target.checked)}
+              />
+              <span className="text-xs font-bold text-emerald-950">
+                تعيين النقطة الابتدائية 20/20 للجميع (لأقوم بالخصم فقط أثناء المرور)
+              </span>
+            </label>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleBatchImport}
+                className="btn-primary flex-1 py-2.5 text-xs bg-emerald-600 hover:bg-emerald-700"
+              >
+                حفظ واستيراد القائمة مباشرة
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBatchEvalModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* نافذة تعديل الدرس */}
       {editingLesson && (
         <EditLessonModal
@@ -2042,15 +2969,21 @@ function LessonCard({
   const [previewImg, setPreviewImg] = useState<string | null>(null);
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
   const [isDeletingImg, setIsDeletingImg] = useState(false);
+  const [deletingHwImageId, setDeletingHwImageId] = useState<string | null>(null);
+  const [isDeletingHwImg, setIsDeletingHwImg] = useState(false);
 
   const isDirectedWork = lesson.type === "directed_work";
 
-  const uploadFiles = async (files: FileList | null) => {
+  const uploadFiles = async (files: FileList | null, isHomework: boolean = false) => {
     if (!files?.length) return;
     const list = Array.from(files);
 
     for (let k = 0; k < list.length; k++) {
-      setUploading(`جاري ضغط ورفع الصورة ${k + 1} من ${list.length}...`);
+      setUploading(
+        isHomework
+          ? `جاري ضغط ورفع حل الواجب ${k + 1} من ${list.length}...`
+          : `جاري ضغط ورفع صورة السبورة ${k + 1} من ${list.length}...`
+      );
       try {
         const compressed = await imageCompression(list[k], {
           maxSizeMB: 0.8,
@@ -2061,6 +2994,7 @@ function LessonCard({
 
         const formData = new FormData();
         formData.append("lessonId", lesson.id);
+        if (isHomework) formData.append("isHomework", "true");
         formData.append("file", compressed, list[k].name);
 
         const res = await fetch("/api/upload", {
@@ -2078,7 +3012,12 @@ function LessonCard({
     }
 
     setUploading("");
-    showToast("success", `✓ تم رفع الصور بنجاح إلى "${lesson.title}"`);
+    showToast(
+      "success",
+      isHomework
+        ? `✓ تم رفع صور الحل النموذجي للواجب بنجاح إلى "${lesson.title}" 📝`
+        : `✓ تم رفع صور السبورة بنجاح إلى "${lesson.title}" 📷`
+    );
 
     // جلب الدرس المحدث وتحديث الحالة محلياً مباشرة
     const res = await fetch(`/api/lessons/${lesson.id}?_t=${Date.now()}`, { cache: "no-store" });
@@ -2142,6 +3081,66 @@ function LessonCard({
     }
   };
 
+  const confirmDeleteHwImage = async () => {
+    if (!deletingHwImageId) return;
+    setIsDeletingHwImg(true);
+    try {
+      const res = await fetch(
+        `/api/images?lessonId=${lesson.id}&imageId=${deletingHwImageId}&isHomework=true`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (res.ok) {
+        showToast("success", "✓ تم حذف صورة حل الواجب بنجاح");
+        const updated = {
+          ...lesson,
+          homeworkImages: (lesson.homeworkImages || []).filter(
+            (img) => img.id !== deletingHwImageId
+          ),
+        };
+        onLessonUpdated(updated);
+        setDeletingHwImageId(null);
+      } else {
+        const data = await res.json();
+        showToast("error", data.error || "تعذر حذف صورة حل الواجب");
+      }
+    } catch {
+      showToast("error", "تعذر الاتصال بالخادم لحذف صورة الواجب");
+    } finally {
+      setIsDeletingHwImg(false);
+    }
+  };
+
+  const moveHwImage = async (index: number, direction: "prev" | "next") => {
+    const images = [...(lesson.homeworkImages || [])];
+    const targetIndex = direction === "prev" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= images.length) return;
+
+    const temp = images[index];
+    images[index] = images[targetIndex];
+    images[targetIndex] = temp;
+
+    onLessonUpdated({ ...lesson, homeworkImages: images });
+
+    try {
+      const res = await fetch("/api/images", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lessonId: lesson.id,
+          imageIds: images.map((img) => img.id),
+          isHomework: true,
+        }),
+      });
+      if (!res.ok) {
+        showToast("error", "فشل حفظ ترتيب صور الواجب في الخادم");
+      }
+    } catch {
+      showToast("error", "فشل تغيير ترتيب صور الواجب");
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-2xs overflow-hidden transition">
       <div className="p-3 flex items-start justify-between gap-2">
@@ -2163,7 +3162,15 @@ function LessonCard({
             <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-slate-400">
               <span>{isDirectedWork ? "حصة" : "مورد"} {lesson.number}</span>
               <span>•</span>
-              <span className="font-bold text-slate-500">{lesson.images?.length || 0} صور</span>
+              <span className="font-bold text-slate-500">{lesson.images?.length || 0} صور سبورة</span>
+              {(lesson.homeworkImages?.length || 0) > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                    📝 {lesson.homeworkImages?.length} حل واجب
+                  </span>
+                </>
+              )}
               {lesson.notes && (
                 <>
                   <span>•</span>
@@ -2313,6 +3320,119 @@ function LessonCard({
             />
           </label>
 
+          {/* قسم 2: الحل النموذجي للواجب المنزلي */}
+          <div className="pt-3 border-t border-slate-200/90 space-y-3">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+              <span className="flex items-center gap-1.5 text-blue-900 font-black">
+                <FileText className="w-4 h-4 text-blue-600" />
+                <span>الحل النموذجي للواجب المنزلي ({lesson.homeworkImages?.length || 0}):</span>
+              </span>
+              <span className="text-[11px] text-blue-600 font-medium">يُرفع بعد تصحيح الواجب في القسم</span>
+            </div>
+
+            {lesson.homeworkNotes && (
+              <div className="bg-blue-50/80 p-2.5 rounded-xl border border-blue-200 text-xs text-blue-900 space-y-1">
+                <span className="font-black text-[11px] flex items-center gap-1">
+                  <StickyNote className="w-3.5 h-3.5 text-blue-600" /> تفاصيل وتمارين الواجب:
+                </span>
+                <p className="whitespace-pre-line leading-relaxed font-medium">{lesson.homeworkNotes}</p>
+              </div>
+            )}
+
+            {lesson.homeworkImages && lesson.homeworkImages.length > 0 ? (
+              <div className="space-y-2">
+                {lesson.homeworkImages.map((img, idx) => (
+                  <div
+                    key={img.id}
+                    className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-blue-100 shadow-2xs"
+                  >
+                    <span className="w-7 h-7 shrink-0 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center">
+                      {idx + 1}
+                    </span>
+
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.url}
+                      alt=""
+                      onClick={() => setPreviewImg(img.url)}
+                      className="w-14 h-14 object-cover rounded-lg border border-slate-100 shrink-0 cursor-pointer hover:opacity-90 transition"
+                    />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-slate-700 truncate">
+                        حل الواجب صفحة {idx + 1}
+                      </div>
+                      <button
+                        onClick={() => setPreviewImg(img.url)}
+                        className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+                      >
+                        <Eye className="w-3 h-3" /> معاينة كاملة
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        disabled={idx === 0}
+                        onClick={() => moveHwImage(idx, "prev")}
+                        className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                          idx === 0
+                            ? "opacity-30 cursor-not-allowed text-slate-300"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                        title="تقديم لأعلى"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        disabled={idx === (lesson.homeworkImages?.length ?? 0) - 1}
+                        onClick={() => moveHwImage(idx, "next")}
+                        className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                          idx === (lesson.homeworkImages?.length ?? 0) - 1
+                            ? "opacity-30 cursor-not-allowed text-slate-300"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                        title="تأخير لأسفل"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => setDeletingHwImageId(img.id)}
+                      className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
+                      title="حذف هذه الصورة"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-5 bg-white rounded-xl border border-dashed border-blue-200 text-xs text-slate-400">
+                لم يتم رفع صور الحل النموذجي للواجب بعد. ارفعها بعد تصحيح الحصة ليتفقدها التلاميذ في البيت.
+              </div>
+            )}
+
+            <label
+              className={`w-full py-2.5 px-3 rounded-xl border border-blue-300 bg-blue-50/70 hover:bg-blue-100 text-blue-800 text-xs font-bold cursor-pointer transition flex items-center justify-center gap-1.5 shadow-2xs ${
+                uploading ? "opacity-70 pointer-events-none" : ""
+              }`}
+            >
+              <Upload className="w-4 h-4 text-blue-600" />
+              <span>📝 رفع صور الحل النموذجي للواجب (يمكن اختيار صورة أو عدة صور)</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  uploadFiles(e.target.files, true);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+
           <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60">
             <a
               href={`/lesson/${lesson.id}`}
@@ -2364,6 +3484,38 @@ function LessonCard({
         </div>
       )}
 
+      {deletingHwImageId && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-800">تأكيد حذف صورة حل الواجب</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                هل أنت متأكد من حذف صورة الحل النموذجي هذه من "{lesson.title}"؟
+              </p>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                disabled={isDeletingHwImg}
+                onClick={confirmDeleteHwImage}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center justify-center gap-1"
+              >
+                {isDeletingHwImg ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الصورة"}
+              </button>
+              <button
+                disabled={isDeletingHwImg}
+                onClick={() => setDeletingHwImageId(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {previewImg && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-3"
@@ -2404,6 +3556,7 @@ function EditLessonModal({
   const [field, setField] = useState(lesson.field || "أنشطة عددية");
   const [section, setSection] = useState(lesson.section || "المقطع 1 : الأعداد الطبيعية والأعداد العشرية");
   const [notes, setNotes] = useState(lesson.notes || "");
+  const [homeworkNotes, setHomeworkNotes] = useState(lesson.homeworkNotes || "");
   const [type, setType] = useState<NotebookType>(lesson.type || "lessons");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -2430,6 +3583,7 @@ function EditLessonModal({
           field: type === "lessons" ? field.trim() : undefined,
           section: type === "lessons" ? section.trim() : undefined,
           notes: notes.trim() || undefined,
+          homeworkNotes: homeworkNotes.trim() || undefined,
         }),
       });
 
@@ -2549,13 +3703,26 @@ function EditLessonModal({
 
         <div>
           <label className="text-xs font-bold text-slate-600 block mb-1">
-            ملاحظات وتوجيهات الأستاذ:
+            ملاحظات وتوجيهات الأستاذ للدرس:
           </label>
           <textarea
-            className="input text-xs min-h-[60px]"
+            className="input text-xs min-h-[50px]"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="اكتب ملاحظة إن أردت..."
+            placeholder="اكتب ملاحظة للدرس إن أردت..."
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-blue-800 block mb-1 flex items-center gap-1">
+            <FileText className="w-3.5 h-3.5 text-blue-600" />
+            <span>تفاصيل وتمارين الواجب المنزلي (اختياري):</span>
+          </label>
+          <textarea
+            className="input text-xs min-h-[50px] border-blue-200 bg-blue-50/20"
+            value={homeworkNotes}
+            onChange={(e) => setHomeworkNotes(e.target.value)}
+            placeholder="مثال: حل التمارين 14 و 15 ص 30 في كراس المحاولات 96ص..."
           />
         </div>
 

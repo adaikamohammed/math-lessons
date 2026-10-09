@@ -24,9 +24,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "الدرس غير موجود" }, { status: 404 });
     }
 
+    const isHomework = formData.get("isHomework") === "true" || formData.get("type") === "homework";
+
     const { url, downloadUrl } = await uploadImageFile(
       file,
-      file.name || "lesson-image.jpg",
+      file.name || (isHomework ? "homework-solution.jpg" : "lesson-image.jpg"),
       lessonId,
       lesson.level
     );
@@ -35,14 +37,19 @@ export async function POST(req: NextRequest) {
       id: `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       url,
       downloadUrl,
-      name: file.name || "صورة الدرس",
+      name: file.name || (isHomework ? "حل الواجب المنزلي" : "صورة الدرس"),
       createdAt: new Date().toISOString(),
     };
 
-    lesson.images.push(newImage);
+    if (isHomework) {
+      if (!Array.isArray(lesson.homeworkImages)) lesson.homeworkImages = [];
+      lesson.homeworkImages.push(newImage);
+    } else {
+      lesson.images.push(newImage);
+    }
     await saveLessonsData(data);
 
-    return NextResponse.json({ image: newImage, lesson });
+    return NextResponse.json({ image: newImage, lesson, isHomework });
   } catch (err: any) {
     console.error("Upload error:", err);
     return NextResponse.json({ error: err.message || "فشل رفع الصورة" }, { status: 500 });

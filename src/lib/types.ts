@@ -19,6 +19,8 @@ export type Lesson = {
   notes?: string; // ملاحظات وتوجيهات الأستاذ
   createdAt: string;
   images: LessonImage[];
+  homeworkImages?: LessonImage[]; // صور الحل النموذجي للواجب المنزلي
+  homeworkNotes?: string; // ملاحظات أو رقم تمارين الواجب المنزلي
 };
 
 export type ParentSummons = {
@@ -53,11 +55,44 @@ export type Penalty = {
   createdAt: string;
 };
 
+export type EvaluationRating = "excellent" | "very_good" | "good" | "medium" | "weak";
+// التقييم اللفظي والألوان:
+// ممتاز (أخضر داكن 🟢) = 18-20
+// جيد جداً (أخضر 🟢) = 15-17
+// جيد (أزرق/سماوي 🔵) = 12-14
+// متوسط (برتقالي 🟡) = 10-11
+// ضعيف (أحمر 🔴) = أقل من 10
+
+export type StudentEvaluation = {
+  id: string;
+  studentName: string; // اسم التلميذ
+  className: string; // القسم : "1 م 1" ، "1 م 2" ، "1 م 3" ، "2 م 3"
+  groupName: "فوج 1" | "فوج 2" | "القسم كامل"; // الفوج في حصة التفويج (أعمال موجهة)
+  // 1. كراس الدروس والأعمال الموجهة (5 نقاط)
+  notebookScore: number; // 0 إلى 5
+  notebookComplete?: boolean; // كراس كامل دون نقص دروس
+  // 2. الواجبات المنزلية (5 نقاط)
+  homeworkScore: number; // 0 إلى 5
+  homeworkDone?: boolean; // واجب كراس المحاولات منجز
+  // 3. السلوك والانضباط وإحضار الأدوات والكتاب (5 نقاط)
+  toolsScore: number; // 0 إلى 5
+  hasTools?: boolean; // إحضار الأدوات الهندسية والكتاب
+  // 4. حل النشاط والمشاركة الفعالة (5 نقاط)
+  activityScore: number; // 0 إلى 5
+  // المجموع الإجمالي التلقائي من 20
+  totalScore: number; // 0 إلى 20
+  rating: EvaluationRating; // التقدير اللفظي
+  ratingColor: "green" | "emerald" | "amber" | "rose"; // شارة اللون السريعة
+  notes?: string; // ملاحظة الأستاذ (مثلاً: استدراك درس سابق، كراس نموذجي...)
+  updatedAt: string;
+};
+
 export type LessonsData = {
   lessons: Lesson[];
   summons?: ParentSummons[];
   honors?: HonorStudent[];
   penalties?: Penalty[];
+  evaluations?: StudentEvaluation[];
 };
 
 export const LEVELS = {

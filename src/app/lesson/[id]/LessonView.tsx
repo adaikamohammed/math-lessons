@@ -11,6 +11,9 @@ import {
   StickyNote,
   BookOpen,
   ArrowRight,
+  FileText,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { LEVELS, NOTEBOOKS, type Lesson, type LessonImage } from "@/lib/types";
@@ -18,6 +21,7 @@ import { Loading, Empty } from "@/components/ui";
 
 export function LessonView({ id }: { id: string }) {
   const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [viewMode, setViewMode] = useState<"lesson" | "homework">("lesson");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +36,7 @@ export function LessonView({ id }: { id: string }) {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const images = lesson?.images || [];
+  const images = viewMode === "homework" ? lesson?.homeworkImages || [] : lesson?.images || [];
   const activeImage: LessonImage | null =
     selectedIndex !== null && images[selectedIndex] ? images[selectedIndex] : null;
 
@@ -132,8 +136,61 @@ export function LessonView({ id }: { id: string }) {
         <Empty text="الدرس غير موجود" />
       ) : (
         <div className="space-y-4">
-          {/* صندوق ملاحظات وتوجيهات الأستاذ إن وجدت */}
-          {lesson.notes && (
+          {/* شريط التبديل الواضح بين صور الدرس والحل النموذجي للواجب المنزلي */}
+          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode("lesson");
+                setSelectedIndex(null);
+              }}
+              className={`py-3 px-2 sm:px-4 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 sm:gap-2 ${
+                viewMode === "lesson"
+                  ? "bg-white text-emerald-850 shadow-xs border border-emerald-300/80 text-emerald-900"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <BookOpen className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>صور الدرس (السبورة)</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  viewMode === "lesson"
+                    ? "bg-emerald-50 text-emerald-800"
+                    : "bg-slate-200 text-slate-700"
+                }`}
+              >
+                {lesson.images?.length || 0}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode("homework");
+                setSelectedIndex(null);
+              }}
+              className={`py-3 px-2 sm:px-4 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 sm:gap-2 ${
+                viewMode === "homework"
+                  ? "bg-white text-blue-900 shadow-xs border border-blue-300/80"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>حل الواجب المنزلي</span>
+              {lesson.homeworkImages && lesson.homeworkImages.length > 0 ? (
+                <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-black">
+                  {lesson.homeworkImages.length} صور
+                </span>
+              ) : (
+                <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full font-bold">
+                  قريباً ⏳
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* صندوق ملاحظات وتوجيهات الأستاذ للدرس */}
+          {viewMode === "lesson" && lesson.notes && (
             <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 space-y-2 shadow-2xs">
               <div className="flex items-center gap-2 text-amber-900 font-black text-xs">
                 <StickyNote className="w-4 h-4 text-amber-600" />
@@ -145,19 +202,56 @@ export function LessonView({ id }: { id: string }) {
             </div>
           )}
 
-          {/* صور السبورة */}
-          {images.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200 p-6">
-              <ImageIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="font-bold text-slate-700 text-sm">لا توجد صور لهذا الدرس حالياً</h3>
-              <p className="text-xs text-slate-400 mt-1">
-                سيقوم الأستاذ برفع صور السبورة والملخصات قريباً.
+          {/* صندوق توجيهات وملاحظات الواجب المنزلي إن وجدت */}
+          {viewMode === "homework" && lesson.homeworkNotes && (
+            <div className="bg-blue-50/90 border border-blue-200 rounded-2xl p-4 space-y-2 shadow-2xs">
+              <div className="flex items-center gap-2 text-blue-950 font-black text-xs">
+                <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                <span>تمارين وتفاصيل الواجب المنزلي:</span>
+              </div>
+              <p className="text-xs text-blue-950 font-bold whitespace-pre-line leading-relaxed pr-6">
+                {lesson.homeworkNotes}
               </p>
             </div>
+          )}
+
+          {/* صور المعاينة */}
+          {images.length === 0 ? (
+            viewMode === "homework" ? (
+              <div className="text-center py-12 px-4 bg-white rounded-3xl border-2 border-dashed border-blue-200 shadow-2xs space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto text-2xl">
+                  📝
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-black text-slate-800 text-sm">
+                    الحل النموذجي للواجب المنزلي
+                  </h3>
+                  <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed font-semibold">
+                    «سيقوم الأستاذ محمد عدايكة برفع الحل النموذجي المفصل هنا بعد مناقشته وتصحيحه في القسم مع التلاميذ، لتمكينكم من المراجعة والتصحيح الذاتي في كراس المحاولات (96 صفحة).»
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-900 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+                  <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>تذكير: المحاولة الفردية في كراس المحاولات ضرورية قبل الاطلاع على الحل!</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200 p-6">
+                <ImageIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <h3 className="font-bold text-slate-700 text-sm">لا توجد صور لهذا الدرس حالياً</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  سيقوم الأستاذ برفع صور السبورة والملخصات قريباً.
+                </p>
+              </div>
+            )
           ) : (
             <div className="space-y-5">
               <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
-                <span>صور السبورة المرفوعة ({images.length}):</span>
+                <span>
+                  {viewMode === "homework"
+                    ? `صور حل الواجب المنزلي (${images.length}):`
+                    : `صور السبورة المرفوعة (${images.length}):`}
+                </span>
                 <span className="text-[11px] text-slate-400 font-normal">
                   يمكنك الضغط على الصورة لتكبيرها بملء الشاشة
                 </span>
@@ -171,10 +265,18 @@ export function LessonView({ id }: { id: string }) {
                   {/* شريط رقم الصورة */}
                   <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
                     <span className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-black">
+                      <span
+                        className={`w-6 h-6 rounded-lg text-white flex items-center justify-center text-xs font-black ${
+                          viewMode === "homework" ? "bg-blue-600" : "bg-emerald-600"
+                        }`}
+                      >
                         {i + 1}
                       </span>
-                      <span>الصورة رقم {i + 1} من {images.length}</span>
+                      <span>
+                        {viewMode === "homework"
+                          ? `حل الواجب • صورة رقم ${i + 1} من ${images.length}`
+                          : `صورة رقم ${i + 1} من ${images.length}`}
+                      </span>
                     </span>
                     <span className="text-[11px] text-slate-400">اضغط للتكبير</span>
                   </div>
@@ -187,7 +289,11 @@ export function LessonView({ id }: { id: string }) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={img.url}
-                      alt={`صورة السبورة رقم ${i + 1}`}
+                      alt={
+                        viewMode === "homework"
+                          ? `حل الواجب صورة رقم ${i + 1}`
+                          : `صورة السبورة رقم ${i + 1}`
+                      }
                       loading="lazy"
                       className="w-full h-auto max-h-[550px] object-contain mx-auto transition-transform group-hover:scale-[1.01]"
                     />
@@ -199,15 +305,27 @@ export function LessonView({ id }: { id: string }) {
                       onClick={() => setSelectedIndex(i)}
                       className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition"
                     >
-                      <Maximize2 className="w-4 h-4 text-emerald-600" />
+                      <Maximize2
+                        className={`w-4 h-4 ${
+                          viewMode === "homework" ? "text-blue-600" : "text-emerald-600"
+                        }`}
+                      />
                       <span>تكبير بملء الشاشة</span>
                     </button>
                     <a
                       href={img.downloadUrl || img.url}
-                      download={fileName(i)}
+                      download={
+                        viewMode === "homework"
+                          ? `حل-واجب-درس-${lesson?.number ?? ""}-صورة-${i + 1}.jpg`
+                          : fileName(i)
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold active:scale-95 transition shadow-sm"
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-white text-xs font-bold active:scale-95 transition shadow-sm ${
+                        viewMode === "homework"
+                          ? "bg-blue-600 hover:bg-blue-700"
+                          : "bg-emerald-600 hover:bg-emerald-700"
+                      }`}
                     >
                       <Download className="w-4 h-4" />
                       <span>تحميل الصورة على الهاتف</span>
@@ -233,7 +351,7 @@ export function LessonView({ id }: { id: string }) {
           >
             <div className="flex items-center gap-2">
               <span className="text-white text-xs font-bold bg-white/20 px-3 py-1.5 rounded-lg">
-                صورة {selectedIndex + 1} من {images.length}
+                {viewMode === "homework" ? "حل الواجب • " : ""}صورة {selectedIndex + 1} من {images.length}
               </span>
               <a
                 href={activeImage.downloadUrl || activeImage.url}
