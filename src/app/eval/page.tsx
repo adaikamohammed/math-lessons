@@ -203,17 +203,23 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     };
   }, []);
 
-  // 2. تحميل البيانات محلياً من ذاكرة الهاتف فوراً عند فتح الصفحة
+  // 2. تحميل البيانات محلياً من ذاكرة الهاتف فوراً عند فتح الصفحة أو تبديل القسم
   useEffect(() => {
     try {
       const localData = localStorage.getItem(CACHE_KEY);
       if (localData) {
         const parsed = JSON.parse(localData);
-        if (parsed.sessions && parsed.sessions.length > 0) setSessions(parsed.sessions);
-        if (parsed.roster && parsed.roster.length > 0) setRoster(parsed.roster);
-        if (parsed.sessions?.length > 0 && !activeSessionId) {
+        setSessions(Array.isArray(parsed.sessions) ? parsed.sessions : []);
+        setRoster(Array.isArray(parsed.roster) ? parsed.roster : []);
+        if (parsed.sessions?.length > 0) {
           setActiveSessionId(parsed.sessions[parsed.sessions.length - 1].id);
+        } else {
+          setActiveSessionId(null);
         }
+      } else {
+        setSessions([]);
+        setRoster([]);
+        setActiveSessionId(null);
       }
       const pendingData = localStorage.getItem(PENDING_KEY);
       if (pendingData) {
@@ -225,9 +231,17 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, [CACHE_KEY]);
 
-  // 3. حفظ نسخة احتياطية في ذاكرة الهاتف تلقائياً مع كل تعديل
+  // 3. حفظ نسخة احتياطية في ذاكرة الهاتف تلقائياً مع كل تعديل (مع التأكد الصارم من تطابق القسم)
   useEffect(() => {
-    if (sessions.length > 0 || roster.length > 0) {
+    const curCls = selectedClass.replace(/\s+/g, "");
+    const rosterMatches =
+      roster.length === 0 ||
+      roster.every((r) => (r.className || "").replace(/\s+/g, "") === curCls);
+    const sessionsMatch =
+      sessions.length === 0 ||
+      sessions.every((s) => (s.className || "").replace(/\s+/g, "") === curCls);
+
+    if (rosterMatches && sessionsMatch && (sessions.length > 0 || roster.length > 0)) {
       try {
         localStorage.setItem(
           CACHE_KEY,
@@ -237,7 +251,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
         console.warn("Could not write local cache", e);
       }
     }
-  }, [sessions, roster, CACHE_KEY]);
+  }, [sessions, roster, CACHE_KEY, selectedClass]);
 
   // جلب البيانات من الخادم (إن وُجد اتصال)
   const loadData = useCallback(async () => {
@@ -448,11 +462,13 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
 
   // قائمة أسماء تلاميذ الفوج الحالي
   const currentStudentsList = useMemo(() => {
-    const list = roster.filter(
-      (r) =>
-        (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "") &&
-        (r.groupName === selectedGroup || r.groupName === "القسم كامل")
-    );
+    const list = roster.filter((r) => {
+      const matchClass =
+        (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "");
+      if (!matchClass) return false;
+      if (selectedGroup === "القسم كامل") return true;
+      return r.groupName === selectedGroup || r.groupName === "القسم كامل";
+    });
     // ترتيب أبجدي
     return list.sort((a, b) => a.studentName.localeCompare(b.studentName, "ar"));
   }, [roster, selectedClass, selectedGroup]);
@@ -822,24 +838,19 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
-      {/* محدد القسم والفوج السريع */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs space-y-2">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-          <span>القسم:</span>
-          <span>الفوج (حصة التفويج):</span>
-        </div>
-
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          {/* اختيار القسم */}
-          <div className="grid grid-cols-4 gap-1 flex-1 min-w-[180px]">
+      {/* محدد القسم والفوج السريع - متجاوب تماماً مع شاشات الهواتف */}
+      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs space-y-2.5">
+        <div>
+          <div className="text-[11px] font-black text-slate-700 mb-1">القسم المعني:</div>
+          <div className="grid grid-cols-4 gap-1.5">
             {HONOR_CLASSES.map((cls) => (
               <button
                 key={cls}
                 type="button"
                 onClick={() => setSelectedClass(cls)}
-                className={`py-1.5 rounded-xl text-xs font-black transition ${
+                className={`py-2 rounded-xl text-xs font-black transition ${
                   selectedClass === cls
-                    ? "bg-emerald-600 text-white shadow-2xs"
+                    ? "bg-emerald-600 text-white shadow-2xs ring-2 ring-emerald-300"
                     : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
                 }`}
               >
@@ -847,21 +858,23 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
               </button>
             ))}
           </div>
+        </div>
 
-          {/* اختيار الفوج */}
-          <div className="flex gap-1 shrink-0">
+        <div>
+          <div className="text-[11px] font-black text-slate-700 mb-1">الفوج (حصة التفويج):</div>
+          <div className="grid grid-cols-3 gap-1.5">
             {(["فوج 1", "فوج 2", "القسم كامل"] as const).map((grp) => (
               <button
                 key={grp}
                 type="button"
                 onClick={() => setSelectedGroup(grp)}
-                className={`py-1.5 px-2 rounded-xl text-xs font-black transition ${
+                className={`py-2 px-1 rounded-xl text-xs font-black transition flex items-center justify-center gap-1 ${
                   selectedGroup === grp
-                    ? "bg-slate-800 text-white shadow-2xs"
+                    ? "bg-slate-900 text-white shadow-2xs ring-2 ring-slate-400"
                     : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
                 }`}
               >
-                {grp}
+                <span>{grp === "فوج 1" ? "🟢 فوج 1" : grp === "فوج 2" ? "🔵 فوج 2" : "👥 القسم كامل"}</span>
               </button>
             ))}
           </div>
@@ -1071,121 +1084,197 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
                             </span>
                           </button>
 
-                          {/* معايير التفقد الأربعة التفصيلية */}
-                          <div className="grid grid-cols-2 gap-2 text-xs pt-0.5">
+                          {/* معايير التفقد الأربعة التفصيلية - أزرار لمس مريحة للهاتف */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-0.5">
                             {/* 1. كراس الدروس */}
-                            <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-200 space-y-1">
-                              <div className="flex justify-between items-center text-[11px] font-black text-slate-700">
+                            <div className="bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex justify-between items-center text-xs font-black text-slate-700">
                                 <span>📘 كراس الدروس:</span>
-                                <span className="text-emerald-700 font-extrabold">
-                                  {rec.lessonsDone} من {currentSession.totalLessons}
+                                <span className="text-emerald-700 font-extrabold bg-emerald-100/70 px-2 py-0.5 rounded-md text-[11px]">
+                                  {rec.lessonsDone} / {currentSession.totalLessons}
                                 </span>
                               </div>
-                              {/* أزرار سريعة لاختيار عدد الدروس المكتوبة */}
-                              <div className="flex flex-wrap gap-1">
-                                {Array.from({ length: currentSession.totalLessons + 1 }, (_, i) => i)
-                                  .reverse()
-                                  .slice(0, 6)
-                                  .map((n) => (
-                                    <button
-                                      key={n}
-                                      type="button"
-                                      onClick={() =>
-                                        handleUpdateRecord(student.studentName, { lessonsDone: n })
-                                      }
-                                      className={`flex-1 py-1 rounded text-[10px] font-black transition ${
-                                        rec.lessonsDone === n
-                                          ? "bg-emerald-600 text-white shadow-2xs"
-                                          : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
-                                      }`}
-                                    >
-                                      {n}
-                                    </button>
-                                  ))}
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      lessonsDone: Math.max(0, rec.lessonsDone - 1),
+                                    })
+                                  }
+                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
+                                  title="إنقاص درس"
+                                >
+                                  -
+                                </button>
+                                <div className="flex-1 text-center font-black text-xs text-slate-800 bg-white py-2 rounded-xl border border-slate-100 shadow-inner">
+                                  {rec.lessonsDone === currentSession.totalLessons ? "كامل ✓" : `${rec.lessonsDone} درس`}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      lessonsDone: Math.min(currentSession.totalLessons, rec.lessonsDone + 1),
+                                    })
+                                  }
+                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
+                                  title="زيادة درس"
+                                >
+                                  +
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      lessonsDone: currentSession.totalLessons,
+                                    })
+                                  }
+                                  className="px-2 h-9 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-black text-[11px] active:scale-95 transition shrink-0"
+                                >
+                                  كامل
+                                </button>
                               </div>
                             </div>
 
                             {/* 2. حل الواجبات */}
-                            <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-200 space-y-1">
-                              <div className="flex justify-between items-center text-[11px] font-black text-slate-700">
+                            <div className="bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex justify-between items-center text-xs font-black text-slate-700">
                                 <span>📝 حل الواجبات:</span>
-                                <span className="text-sky-700 font-extrabold">
-                                  {rec.homeworksDone} من {currentSession.totalHomeworks}
+                                <span className="text-sky-700 font-extrabold bg-sky-100/70 px-2 py-0.5 rounded-md text-[11px]">
+                                  {rec.homeworksDone} / {currentSession.totalHomeworks}
                                 </span>
                               </div>
-                              {/* أزرار سريعة لاختيار عدد الواجبات المنجزة */}
-                              <div className="flex flex-wrap gap-1">
-                                {Array.from({ length: currentSession.totalHomeworks + 1 }, (_, i) => i)
-                                  .reverse()
-                                  .slice(0, 6)
-                                  .map((n) => (
-                                    <button
-                                      key={n}
-                                      type="button"
-                                      onClick={() =>
-                                        handleUpdateRecord(student.studentName, { homeworksDone: n })
-                                      }
-                                      className={`flex-1 py-1 rounded text-[10px] font-black transition ${
-                                        rec.homeworksDone === n
-                                          ? "bg-sky-600 text-white shadow-2xs"
-                                          : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
-                                      }`}
-                                    >
-                                      {n}
-                                    </button>
-                                  ))}
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      homeworksDone: Math.max(0, rec.homeworksDone - 1),
+                                    })
+                                  }
+                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
+                                  title="إنقاص واجب"
+                                >
+                                  -
+                                </button>
+                                <div className="flex-1 text-center font-black text-xs text-slate-800 bg-white py-2 rounded-xl border border-slate-100 shadow-inner">
+                                  {rec.homeworksDone === currentSession.totalHomeworks ? "كامل ✓" : `${rec.homeworksDone} واجب`}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      homeworksDone: Math.min(currentSession.totalHomeworks, rec.homeworksDone + 1),
+                                    })
+                                  }
+                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
+                                  title="زيادة واجب"
+                                >
+                                  +
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      homeworksDone: currentSession.totalHomeworks,
+                                    })
+                                  }
+                                  className="px-2 h-9 rounded-xl bg-sky-50 border border-sky-200 text-sky-800 font-black text-[11px] active:scale-95 transition shrink-0"
+                                >
+                                  كامل
+                                </button>
                               </div>
                             </div>
 
                             {/* 3. علامة السلوك والأدوات */}
-                            <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-200 space-y-1">
-                              <div className="flex justify-between items-center text-[11px] font-black text-slate-700">
+                            <div className="bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex justify-between items-center text-xs font-black text-slate-700">
                                 <span>⚖️ السلوك والأدوات:</span>
-                                <span className="text-amber-700 font-extrabold">{rec.behaviorScore}/5</span>
+                                <span className="text-amber-700 font-extrabold bg-amber-100/70 px-2 py-0.5 rounded-md text-[11px]">
+                                  {rec.behaviorScore} / 5
+                                </span>
                               </div>
-                              <div className="grid grid-cols-6 gap-0.5">
-                                {[5, 4, 3, 2, 1, 0].map((s) => (
-                                  <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() =>
-                                      handleUpdateRecord(student.studentName, { behaviorScore: s })
-                                    }
-                                    className={`py-1 rounded text-[10px] font-black transition ${
-                                      rec.behaviorScore === s
-                                        ? "bg-amber-600 text-white shadow-2xs"
-                                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
-                                    }`}
-                                  >
-                                    {s}
-                                  </button>
-                                ))}
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      behaviorScore: Math.max(0, rec.behaviorScore - 1),
+                                    })
+                                  }
+                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-700 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
+                                >
+                                  -
+                                </button>
+                                <div className="flex-1 text-center font-black text-xs text-slate-800 bg-white py-2 rounded-xl border border-slate-100 shadow-inner">
+                                  {rec.behaviorScore} من 5
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      behaviorScore: Math.min(5, rec.behaviorScore + 1),
+                                    })
+                                  }
+                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-amber-50 hover:text-amber-700 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
+                                >
+                                  +
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, { behaviorScore: 5 })
+                                  }
+                                  className="px-2 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-black text-[11px] active:scale-95 transition shrink-0"
+                                >
+                                  5ن
+                                </button>
                               </div>
                             </div>
 
                             {/* 4. علامة حل النشاط والمشاركة */}
-                            <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-200 space-y-1">
-                              <div className="flex justify-between items-center text-[11px] font-black text-slate-700">
+                            <div className="bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                              <div className="flex justify-between items-center text-xs font-black text-slate-700">
                                 <span>💡 حل النشاط:</span>
-                                <span className="text-purple-700 font-extrabold">{rec.activityScore}/5</span>
+                                <span className="text-purple-700 font-extrabold bg-purple-100/70 px-2 py-0.5 rounded-md text-[11px]">
+                                  {rec.activityScore} / 5
+                                </span>
                               </div>
-                              <div className="grid grid-cols-6 gap-0.5">
-                                {[5, 4, 3, 2, 1, 0].map((s) => (
-                                  <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() =>
-                                      handleUpdateRecord(student.studentName, { activityScore: s })
-                                    }
-                                    className={`py-1 rounded text-[10px] font-black transition ${
-                                      rec.activityScore === s
-                                        ? "bg-purple-600 text-white shadow-2xs"
-                                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
-                                    }`}
-                                  >
-                                    {s}
-                                  </button>
-                                ))}
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      activityScore: Math.max(0, rec.activityScore - 1),
+                                    })
+                                  }
+                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-700 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
+                                >
+                                  -
+                                </button>
+                                <div className="flex-1 text-center font-black text-xs text-slate-800 bg-white py-2 rounded-xl border border-slate-100 shadow-inner">
+                                  {rec.activityScore} من 5
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, {
+                                      activityScore: Math.min(5, rec.activityScore + 1),
+                                    })
+                                  }
+                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-purple-50 hover:text-purple-700 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
+                                >
+                                  +
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateRecord(student.studentName, { activityScore: 5 })
+                                  }
+                                  className="px-2 h-9 rounded-xl bg-purple-50 border border-purple-200 text-purple-800 font-black text-[11px] active:scale-95 transition shrink-0"
+                                >
+                                  5ن
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -1377,6 +1466,21 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
                 </button>
               </div>
             </div>
+
+            {/* تنبيه ذكي عند وجود جميع التلاميذ في فوج واحد */}
+            {allClassStudents.length > 0 && group2Count === 0 && (
+              <div className="bg-amber-50/80 border border-amber-200/90 p-3 rounded-xl text-xs text-amber-900 space-y-1">
+                <div className="font-black flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  <span>تلميح لتنظيم حصص التفويج:</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-amber-800 font-medium">
+                  جميع تلاميذ هذا القسم ({allClassStudents.length} تلميذ) مسجلون حالياً ضمن <strong>فوج 1</strong>.
+                  يمكنك الضغط على زر <strong>[⚡ تقسيم آلي (50/50)]</strong> أعلاه لتوزيع نصفهم إلى فوج 2 بنقرة واحدة،
+                  أو النقر على زر الفوج بجانب أي تلميذ بالأسفل لنقله مباشرة.
+                </p>
+              </div>
+            )}
 
             {/* فلتر عرض الأفواج */}
             <div className="grid grid-cols-3 gap-1 bg-slate-100/80 p-1 rounded-xl text-center text-xs font-black">

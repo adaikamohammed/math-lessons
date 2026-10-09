@@ -24,6 +24,72 @@ async function ensureLocalDirs() {
 // Mutex lock to serialize writes and prevent concurrent race conditions
 let writeQueue: Promise<any> = Promise.resolve();
 
+// استخراج الطابع الزمني الرقمي من مسار النسخة db/v-123456.json
+function getVersionTs(pathname: string, uploadedAt?: string | Date): number {
+  const match = pathname.match(/v-(\d+)\.json/);
+  if (match) return Number(match[1]);
+  return uploadedAt ? new Date(uploadedAt).getTime() : 0;
+}
+
+// مزامنة تامة ومتبادلة بين قائمة تلاميذ القسم (studentRoster) وسجلات التقويم (evaluations)
+export function synchronizeStudents(data: LessonsData): LessonsData {
+  if (!data.studentRoster) data.studentRoster = [];
+  if (!data.evaluations) data.evaluations = [];
+
+  // 1. كل تلميذ في studentRoster ينعكس تلقائياً في evaluations
+  for (const r of data.studentRoster) {
+    const rName = (r.studentName || "").trim();
+    if (!rName) continue;
+    const rCls = (r.className || "").replace(/\s+/g, "");
+    const exists = data.evaluations.some(
+      (e) =>
+        (e.studentName || "").trim().toLowerCase() === rName.toLowerCase() &&
+        (e.className || "").replace(/\s+/g, "") === rCls
+    );
+    if (!exists) {
+      data.evaluations.push({
+        id: `eval_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        studentName: rName,
+        className: r.className,
+        groupName: r.groupName || "فوج 1",
+        notebookScore: 5,
+        notebookComplete: true,
+        homeworkScore: 5,
+        homeworkDone: true,
+        toolsScore: 5,
+        hasTools: true,
+        activityScore: 5,
+        totalScore: 20,
+        rating: "excellent",
+        ratingColor: "emerald",
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  // 2. كل تلميذ في evaluations ينعكس تلقائياً في studentRoster
+  for (const e of data.evaluations) {
+    const eName = (e.studentName || "").trim();
+    if (!eName) continue;
+    const eCls = (e.className || "").replace(/\s+/g, "");
+    const exists = data.studentRoster.some(
+      (r) =>
+        (r.studentName || "").trim().toLowerCase() === eName.toLowerCase() &&
+        (r.className || "").replace(/\s+/g, "") === eCls
+    );
+    if (!exists) {
+      data.studentRoster.push({
+        id: `rst_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        studentName: eName,
+        className: e.className,
+        groupName: e.groupName || "فوج 1",
+      });
+    }
+  }
+
+  return data;
+}
+
 // ----------------- قراءة بيانات الدروس -----------------
 export async function getLessonsData(): Promise<LessonsData> {
   const token = getBlobToken();
@@ -34,9 +100,9 @@ export async function getLessonsData(): Promise<LessonsData> {
       // كل نسخة ذات اسم فريد تضمن تخطي كاش الـ Edge CDN بنسبة 100% لأن رابطها لم يسبق طلبه
       const versionList = await list({ prefix: "db/v-", token });
       if (versionList.blobs && versionList.blobs.length > 0) {
-        // ترتيب تنازلي حسب تاريخ الرفع للحصول على أحدث نسخة فوراً
+        // ترتيب تنازلي حازم حسب الطابع الزمني المضمن في الاسم للحصول على أحدث نسخة مطلقاً
         const sorted = versionList.blobs.sort(
-          (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+          (a, b) => getVersionTs(b.pathname, b.uploadedAt) - getVersionTs(a.pathname, a.uploadedAt)
         );
         const latest = sorted[0];
 
@@ -50,7 +116,7 @@ export async function getLessonsData(): Promise<LessonsData> {
           });
           if (res.ok) {
             const json = await res.json();
-            const result: LessonsData = {
+            const rawResult: LessonsData = {
               lessons: Array.isArray(json.lessons) ? json.lessons : [],
               summons: Array.isArray(json.summons) ? json.summons : [],
               honors: Array.isArray(json.honors) ? json.honors : [],
@@ -59,6 +125,7 @@ export async function getLessonsData(): Promise<LessonsData> {
               inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
               studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
             };
+            const result = synchronizeStudents(rawResult);
             // حفظ نسخة محلية احتياطية
             ensureLocalDirs()
               .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
@@ -132,6 +199,7 @@ export async function getLessonsData(): Promise<LessonsData> {
 
 // ----------------- حفظ بيانات الدروس -----------------
 async function executeSave(data: LessonsData): Promise<void> {
+  synchronizeStudents(data);
   const token = getBlobToken();
 
   if (token) {

@@ -65,7 +65,8 @@ export async function GET(req: NextRequest) {
 
   if (groupName && groupName !== "all" && groupName !== "القسم كامل") {
     sessions = sessions.filter((s) => s.groupName === groupName || s.groupName === "القسم كامل");
-    roster = roster.filter((r) => r.groupName === groupName || r.groupName === "القسم كامل");
+    // ملاحظة حاسمة: لا نفلتر قائمة التلاميذ (roster) بحسب الفوج على الخادم
+    // لكي يتوفر لدى المتصفح دائماً كافة تلاميذ القسم للتبديل بينهم أو تفويجهم بسلاسة
   }
 
   // ترتيب الجلسات حسب تاريخ الإنشاء أو رقم الجلسة
