@@ -7,7 +7,6 @@ import {
   Users,
   BookOpen,
   Trophy,
-  OctagonAlert,
 } from "lucide-react";
 
 const years = [
@@ -79,8 +78,32 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 2. لوحة الشرف (تحفيزية وتنافسية شريفة للتلاميذ والأولياء) */}
+      {/* 2. خانة: أولياء أود استقبالهم (ظاهرة وسهلة الوصول - لصالح أبنائكم) */}
       <div className="pt-1">
+        <Link
+          href="/parents"
+          className="flex items-center gap-3.5 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-emerald-500/10 rounded-2xl p-4 border-2 border-sky-300/80 shadow-xs hover:border-sky-400 hover:shadow-sm active:scale-[0.98] transition group"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-600 to-blue-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-sky-600/25 group-hover:scale-105 transition-transform">
+            <Users className="w-6 h-6 text-sky-100" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-black text-sm text-slate-900">أولياء أود استقبالهم</span>
+              <span className="text-[10px] bg-sky-100 text-sky-800 font-black px-2 py-0.5 rounded-md border border-sky-200">
+                لصالح أبنائكم 🤝
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-1 line-clamp-1 font-semibold">
+              أود التحدث معكم للتشاور ولمصلحة أبنائكم • المواعيد وقائمة التلاميذ
+            </p>
+          </div>
+          <ChevronLeft className="w-5 h-5 text-sky-600 group-hover:text-sky-800 transition shrink-0" />
+        </Link>
+      </div>
+
+      {/* 3. لوحة الشرف (تحفيزية وتنافسية شريفة للتلاميذ والأولياء) */}
+      <div>
         <Link
           href="/honor"
           className="flex items-center gap-3.5 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-emerald-500/10 rounded-2xl p-3.5 border border-amber-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs active:scale-[0.98] transition group"
@@ -101,51 +124,9 @@ export default function Home() {
         </Link>
       </div>
 
-      {/* 3. سجل الخصومات والعقوبات (متابعة دقيقة للانضباط والتقويم باللون الأحمر) */}
-      <div>
-        <Link
-          href="/penalties"
-          className="flex items-center gap-3.5 bg-gradient-to-r from-red-600/10 via-rose-500/5 to-red-600/10 rounded-2xl p-3.5 border border-red-200/80 shadow-2xs hover:border-red-300 hover:shadow-xs active:scale-[0.98] transition group"
-        >
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 to-rose-700 text-white flex items-center justify-center shrink-0 shadow-sm shadow-red-600/20 group-hover:scale-105 transition-transform">
-            <OctagonAlert className="w-5 h-5 text-red-100" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs text-slate-900">سجل الخصومات والعقوبات</span>
-              <span className="text-[10px] bg-red-100 text-red-800 font-black px-1.5 py-0.2 rounded">انضباط ⚠️</span>
-            </div>
-            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 font-medium">
-              خصومات التقويم المستمر والعقوبات المدرسية لكل قسم (1م1، 1م2، 1م3، 2م3)
-            </p>
-          </div>
-          <ChevronLeft className="w-4 h-4 text-red-600 group-hover:text-red-800 transition shrink-0" />
-        </Link>
-      </div>
-
-      {/* 3. قسم المتابعة والإعلانات (متوافق مع ألوان وتصميم الموقع وبنص مختصر) */}
+      {/* 4. قسم التوجيهات والإعلانات الهامة */}
       <div className="pt-2 space-y-2">
-        <div className="text-xs font-bold text-slate-600 px-1">توجيهات واستقبال الأولياء:</div>
-
-        {/* بطاقة استدعاء الأولياء (مختصرة ومتناسقة) */}
-        <Link
-          href="/parents"
-          className="flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs hover:border-slate-200 active:scale-[0.98] transition group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center shrink-0">
-            <Users className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs text-slate-900">استدعاء الأولياء ومواعيد الاستقبال</span>
-              <span className="text-[10px] bg-rose-50 text-rose-700 font-bold px-1.5 py-0.2 rounded">تنبيه</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-              الأربعاء 10:00-11:00 • الأحد 08:00-09:00 (توقيت إضافي) • قائمة التلاميذ المعنيين
-            </p>
-          </div>
-          <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />
-        </Link>
+        <div className="text-xs font-bold text-slate-600 px-1">توجيهات وإعلانات هامة:</div>
 
         {/* بطاقة الإعلان الهام والتوجيهات (مختصرة ومتناسقة) */}
         <Link

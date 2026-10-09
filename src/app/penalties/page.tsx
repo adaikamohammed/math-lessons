@@ -24,7 +24,18 @@ export default function PenaltiesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPenalties();
+    fetch("/api/auth")
+      .then((res) => res.json())
+      .then((authData) => {
+        if (!authData.authenticated) {
+          window.location.href = "/";
+        } else {
+          fetchPenalties();
+        }
+      })
+      .catch(() => {
+        window.location.href = "/";
+      });
   }, []);
 
   const fetchPenalties = async () => {
@@ -84,6 +95,14 @@ export default function PenaltiesPage() {
             الأستاذ محمد عدايكة — متوسطة المجاهد باهي علي
           </p>
         </div>
+      </div>
+
+      {/* إشعار خاص بالأستاذ */}
+      <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-3 text-xs font-bold flex items-center gap-2">
+        <span className="text-base shrink-0">🔒</span>
+        <span>
+          <b>تنبيه خاص:</b> هذا السجل يظهر لك أنت فقط بصفتك الأستاذ (تم إخفاؤه تماماً عن الطلاب وأولياء الأمور في الموقع العام حتى لا يزعجهم).
+        </span>
       </div>
 
       {/* بنر تحذيري وتوضيحي باللون الأحمر */}

@@ -6,8 +6,22 @@ import { Penalty } from "@/lib/types";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// جلب قائمة الخصومات والعقوبات (عام للجميع مع إمكانية التصفية حسب القسم)
+// جلب قائمة الخصومات والعقوبات (خاص بالأستاذ فقط - محمي تماماً من الطلاب والأولياء)
 export async function GET(req: NextRequest) {
+  const isAuth = await verifyAdminSession();
+  if (!isAuth) {
+    return NextResponse.json(
+      { penalties: [] },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const className = searchParams.get("class");
 
@@ -160,7 +174,19 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "غير مصرح لك - يرجى تسجيل الدخول" }, { status: 401 });
   }
 
-  let id = new URL(req.url).searchParams.get("id");
+  const searchParams = new URL(req.url).searchParams;
+  if (searchParams.get("all") === "true") {
+    try {
+      const data = await getLessonsData();
+      data.penalties = [];
+      await saveLessonsData(data);
+      return NextResponse.json({ success: true, message: "تم مسح كافة سجلات الخصومات بنجاح" });
+    } catch (err: any) {
+      return NextResponse.json({ error: err?.message || "فشل مسح الخصومات" }, { status: 500 });
+    }
+  }
+
+  let id = searchParams.get("id");
   if (!id) {
     try {
       const body = await req.json();

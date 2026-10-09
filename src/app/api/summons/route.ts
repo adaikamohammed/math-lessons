@@ -39,28 +39,40 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { studentName, className, notes, isUrgent } = body;
+    const { studentName, studentNames, className, notes, isUrgent } = body;
+    const rawNames = studentNames || studentName || "";
+    const names: string[] = Array.isArray(rawNames)
+      ? rawNames.map((s) => String(s).trim()).filter(Boolean)
+      : String(rawNames)
+          .split(/[\n,،]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
 
-    if (!studentName?.trim() || !className?.trim()) {
-      return NextResponse.json({ error: "اسم التلميذ واسم الفوج مطلوبان" }, { status: 400 });
+    if (names.length === 0 || !className?.trim()) {
+      return NextResponse.json({ error: "اسم التلميذ والقسم مطلوبان" }, { status: 400 });
     }
 
     const data = await getLessonsData();
     data.summons = data.summons || [];
 
-    const newSummons: ParentSummons = {
-      id: `summons_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      studentName: String(studentName).trim(),
-      className: String(className).trim(),
-      notes: notes ? String(notes).trim() : undefined,
-      isUrgent: Boolean(isUrgent),
-      createdAt: new Date().toISOString(),
-    };
+    const created: ParentSummons[] = [];
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i];
+      const newSummons: ParentSummons = {
+        id: `summons_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${i}`,
+        studentName: name,
+        className: String(className).trim(),
+        notes: notes ? String(notes).trim() : undefined,
+        isUrgent: Boolean(isUrgent),
+        createdAt: new Date(Date.now() + i).toISOString(),
+      };
+      created.push(newSummons);
+      data.summons.unshift(newSummons);
+    }
 
-    data.summons.unshift(newSummons);
     await saveLessonsData(data);
 
-    return NextResponse.json({ success: true, summons: newSummons });
+    return NextResponse.json({ success: true, summons: created[0], allSummons: created });
   } catch (err: any) {
     console.error("POST /api/summons error:", err);
     return NextResponse.json({ error: err?.message || "فشل تسجيل الاستدعاء" }, { status: 500 });

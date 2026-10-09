@@ -35,6 +35,7 @@ import {
   OctagonAlert,
   MinusCircle,
   FileWarning,
+  HeartHandshake,
 } from "lucide-react";
 import {
   LEVELS,
@@ -347,11 +348,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  // 2. إضافة استدعاء ولي أمر مع تحديث فوري مباشر للواجهة
+  // 2. إضافة تلميذ إلى قائمة أولياء أود استقبالهم مع تحديث فوري مباشر
   const addSummons = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim() || !className.trim()) {
-      showToast("error", "يرجى كتابة اسم التلميذ والفوج");
+      showToast("error", "يرجى كتابة اسم التلميذ والقسم");
       return;
     }
 
@@ -361,7 +362,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentName: studentName.trim(),
+          studentNames: studentName.trim(),
           className: className.trim(),
           notes: summonsNotes.trim() || undefined,
           isUrgent: isExtraSunday,
@@ -375,11 +376,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       setIsExtraSunday(false);
 
       // تحديث فوري مباشر
-      setSummonsList((prev) => [data.summons, ...prev]);
+      const newItems = Array.isArray(data.allSummons) ? data.allSummons : [data.summons];
+      setSummonsList((prev) => [...newItems, ...prev]);
 
-      showToast("success", `✓ تم إضافة التلميذ "${data.summons.studentName}" فورياً إلى جدول الاستقبال!`);
+      showToast(
+        "success",
+        `✓ تم إضافة التلميذ إلى قائمة "أولياء أود استقبالهم" بنجاح! 🤝`
+      );
     } catch (e: any) {
-      showToast("error", "خطأ: " + (e.message || "تعذر تسجيل الاستدعاء"));
+      showToast("error", "خطأ: " + (e.message || "تعذر تسجيل الموعد"));
     } finally {
       setIsSubmitting(false);
     }
@@ -496,6 +501,20 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
+  // 5. مسح كافة الخصومات نهائياً
+  const clearAllPenalties = async () => {
+    if (!window.confirm("هل أنت متأكد من رغبتك في مسح كافة الخصومات المسجلة نهائياً؟")) return;
+    try {
+      const res = await fetch("/api/penalties?all=true", { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل مسح الخصومات");
+      setPenaltiesList([]);
+      showToast("success", "✓ تم مسح كافة سجلات الخصومات بنجاح!");
+    } catch (e: any) {
+      showToast("error", "خطأ: " + (e.message || "تعذر مسح الخصومات"));
+    }
+  };
+
   // تجميع كراس الدروس حسب الميدان والمقطع
   const groupedLessons = useMemo(() => {
     if (notebookTab !== "lessons") return [];
@@ -584,18 +603,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           <Link
             href="/parents"
             target="_blank"
-            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-rose-50 text-rose-800 border border-rose-200/70 hover:bg-rose-100 transition text-[11px]"
+            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-sky-50 text-sky-800 border border-sky-200/70 hover:bg-sky-100 transition text-[11px]"
           >
-            <Users className="w-3.5 h-3.5 text-rose-600" />
-            <span>صفحة الأولياء</span>
+            <Users className="w-3.5 h-3.5 text-sky-600" />
+            <span>أولياء أود استقبالهم</span>
           </Link>
           <Link
             href="/penalties"
             target="_blank"
-            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-red-50 text-red-800 border border-red-200/80 hover:bg-red-100 transition text-[11px]"
+            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
           >
-            <OctagonAlert className="w-3.5 h-3.5 text-red-600" />
-            <span>سجل الخصومات</span>
+            <Lock className="w-3.5 h-3.5 text-slate-500" />
+            <span>الخصومات (خاص 🔒)</span>
           </Link>
           <Link
             href="/announcement"
@@ -608,7 +627,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
-      {/* التبويب الرئيسي: إدارة الدروس أو استدعاءات الأولياء أو لوحة الشرف أو الخصومات والعقوبات */}
+      {/* التبويب الرئيسي: إدارة الدروس أو أولياء أود استقبالهم أو لوحة الشرف أو الخصومات (سجل خاص) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
         <button
           onClick={() => setMainTab("lessons")}
@@ -626,12 +645,12 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           onClick={() => setMainTab("summons")}
           className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
             mainTab === "summons"
-              ? "bg-rose-600 text-white shadow-sm"
+              ? "bg-sky-600 text-white shadow-sm"
               : "text-slate-600 hover:bg-slate-50"
           }`}
         >
           <Users className="w-3.5 h-3.5" />
-          <span>الاستدعاء ({summonsList.length})</span>
+          <span>أولياء أود استقبالهم ({summonsList.length})</span>
         </button>
 
         <button
@@ -650,12 +669,12 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           onClick={() => setMainTab("penalties")}
           className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
             mainTab === "penalties"
-              ? "bg-red-600 text-white shadow-sm"
-              : "text-red-700 bg-red-50/70 hover:bg-red-100 border border-red-200/60"
+              ? "bg-slate-800 text-white shadow-sm"
+              : "text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200"
           }`}
         >
-          <OctagonAlert className="w-3.5 h-3.5 text-red-600" />
-          <span>الخصومات ({penaltiesList.length})</span>
+          <OctagonAlert className="w-3.5 h-3.5 text-slate-500" />
+          <span>الخصومات (خاص 🔒) ({penaltiesList.length})</span>
         </button>
       </div>
 
@@ -972,22 +991,31 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
       ) : mainTab === "summons" ? (
-        /* ==================== 2. تبويب استدعاءات الأولياء ==================== */
+        /* ==================== 2. تبويب أولياء أود استقبالهم ==================== */
         <div className="space-y-4">
-          {/* نموذج إضافة استدعاء */}
+          {/* نموذج إضافة ولي تلميذ للاستقبال */}
           <form
             onSubmit={addSummons}
-            className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3.5"
+            className="bg-white rounded-2xl p-4 border border-sky-100 shadow-sm space-y-3.5"
           >
-            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-              <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                <UserPlus className="w-4 h-4 text-rose-600" />
-                <span>إضافة تلميذ إلى جدول استدعاء الأولياء</span>
-              </span>
+            <div className="flex items-center justify-between pb-1 border-b border-sky-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center">
+                  <HeartHandshake className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-slate-900">
+                    تسجيل تلميذ أود استقبال وليه (لصالح ابنه 🤝)
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    ليس استدعاءً عقابياً، بل للتشاور والاطلاع على كراس ومستوى التلميذ
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={loadSummons}
-                className="text-[11px] text-slate-400 hover:text-rose-600 flex items-center gap-1"
+                className="text-[11px] text-slate-400 hover:text-sky-600 flex items-center gap-1 transition"
                 title="تحديث"
               >
                 <RefreshCw className="w-3 h-3" /> تحديث
@@ -995,22 +1023,26 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </div>
 
             <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-2">
-                <div className="col-span-2">
-                  <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    اسم التلميذ: <span className="text-sky-600">*</span>
+                  </label>
                   <input
                     className="input text-xs font-bold"
-                    placeholder="مثال: محمد بلقاسم"
+                    placeholder="اكتب اسم التلميذ، أو عدة أسماء مفصولة بفواصل..."
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
                     required
                   />
                 </div>
-                <div className="col-span-1">
-                  <label className="text-xs font-bold text-slate-700 block mb-1">الفوج:</label>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    القسم: <span className="text-sky-600">*</span>
+                  </label>
                   <input
-                    className="input text-xs text-center font-black text-rose-700 bg-rose-50/40 border-rose-200"
-                    placeholder="مثال: 1م3"
+                    className="input text-xs text-center font-black text-sky-900 bg-sky-50/40 border-sky-200"
+                    placeholder="مثال: 1 م 3"
                     value={className}
                     onChange={(e) => setClassName(e.target.value)}
                     required
@@ -1018,39 +1050,64 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               </div>
 
-              {/* أزرار سريعة للأفواج */}
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-[11px]">
-                {["1م1", "1م2", "1م3", "1م4", "2م1", "2م2", "2م3", "2م4"].map((cls) => (
-                  <button
-                    key={cls}
-                    type="button"
-                    onClick={() => setClassName(cls)}
-                    className={`px-2 py-0.5 rounded-lg border font-bold transition shrink-0 ${
-                      className === cls
-                        ? "bg-rose-50 text-rose-800 border-rose-300"
-                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                    }`}
-                  >
-                    {cls}
-                  </button>
-                ))}
+              {/* أزرار سريعة لأقسام الأستاذ */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                  اختيار سريع للقسم:
+                </label>
+                <div className="grid grid-cols-4 gap-1.5 text-xs font-bold">
+                  {HONOR_CLASSES.map((cls) => (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => setClassName(cls)}
+                      className={`py-1.5 rounded-xl border transition ${
+                        className.replace(/\s+/g, "") === cls.replace(/\s+/g, "")
+                          ? "bg-sky-600 text-white border-sky-600 shadow-xs"
+                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {cls}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1 flex items-center gap-1">
-                  <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                  <span>ملاحظة وسبب الاستدعاء لولي الأمر:</span>
+              {/* سبب المقابلة وملاحظة الأستاذ لولي الأمر */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block flex items-center gap-1">
+                  <StickyNote className="w-3.5 h-3.5 text-sky-600" />
+                  <span>ملاحظة وتوجيه لولي الأمر (لصالح ابنه - اختياري):</span>
                 </label>
                 <textarea
-                  className="input text-xs min-h-[60px] resize-y"
-                  placeholder="مثال: إهمال الكراس والواجبات، كراس الدروس ناقص عدة دروس..."
+                  className="input text-xs min-h-[55px] resize-y"
+                  placeholder="مثال: تشاور حول كراس الدروس وإكماله، معالجة صعوبة في الفهم..."
                   value={summonsNotes}
                   onChange={(e) => setSummonsNotes(e.target.value)}
                 />
+                {/* ملاحظات وتوجيهات شائعة بنقرة واحدة */}
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {[
+                    "تشاور حول كراس الدروس وإكماله",
+                    "معالجة صعوبات الفهم في مادة الرياضيات",
+                    "الحرص على حل الواجبات وإحضار الأدوات",
+                    "تشجيع التلميذ ومتابعة تطور مستواه",
+                    "متابعة تنظيم الخط ونظافة الكراس",
+                  ].map((presetNote) => (
+                    <button
+                      key={presetNote}
+                      type="button"
+                      onClick={() => setSummonsNotes(presetNote)}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-sky-50 text-sky-800 border border-sky-200/80 hover:bg-sky-100 transition active:scale-95"
+                    >
+                      {presetNote}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* خيار التوقيت الإضافي ليوم الأحد */}
-              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-sky-50/70 border border-sky-200 cursor-pointer">
+              <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-sky-50/70 border border-sky-200 cursor-pointer hover:bg-sky-50 transition">
                 <input
                   type="checkbox"
                   className="w-4 h-4 text-sky-600 rounded border-slate-300 focus:ring-sky-500"
@@ -1059,10 +1116,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 />
                 <div className="text-xs">
                   <span className="font-black text-sky-950 block">
-                    توقيت إضافي: الأحد صباحاً (08:00 إلى 09:00)
+                    ⏰ اقتراح موعد إضافي: الأحد صباحاً (08:00 إلى 09:00)
                   </span>
                   <span className="text-[10px] text-sky-800">
-                    مبادرة من الأستاذ لعدم الانتظار لأسبوع كامل (وليس ساعة استقبال رسمية)
+                    مبادرة من الأستاذ لعدم الانتظار أسبوعاً كاملاً (الموعد الرسمي الأساسي: الأربعاء 10:00 إلى 11:00)
                   </span>
                 </div>
               </label>
@@ -1070,7 +1127,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
             <button
               disabled={isSubmitting}
-              className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition"
+              className="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-[0.99]"
             >
               {isSubmitting ? (
                 <>
@@ -1080,48 +1137,54 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               ) : (
                 <>
                   <UserPlus className="w-4 h-4" />
-                  <span>تسجيل استدعاء الولي فورياً</span>
+                  <span>تسجيل التلميذ في قائمة الاستقبال 🤝</span>
                 </>
               )}
             </button>
           </form>
 
-          {/* قائمة الاستدعاءات الحالية */}
+          {/* قائمة الأولياء المسجلين للاستقبال */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
               <span>التلاميذ المسجلين لاستقبال أوليائهم:</span>
-              <span className="text-[11px] bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-full font-extrabold border border-rose-200">
+              <span className="text-[11px] bg-sky-50 text-sky-700 px-2.5 py-0.5 rounded-full font-extrabold border border-sky-200">
                 {summonsList.length} تلميذ
               </span>
             </div>
 
             {summonsList.length === 0 ? (
-              <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 p-4">
-                لا توجد استدعاءات مسجلة حالياً.
+              <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 p-4 space-y-1">
+                <div>👏</div>
+                <div>لا توجد مواعيد مقابلة مسجلة حالياً.</div>
+                <div className="text-[10px] text-slate-400">ساعة الاستقبال مفتوحة كل أربعاء للجميع.</div>
               </div>
             ) : (
               <div className="space-y-2">
                 {summonsList.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs space-y-1.5"
+                    className="bg-white p-3.5 rounded-2xl border border-sky-100 shadow-2xs space-y-2 hover:border-sky-200 transition"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-black text-xs text-slate-900">{item.studentName}</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-800">
-                            فوج {item.className}
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-sky-50 text-sky-800 border border-sky-200">
+                            قسم {item.className}
                           </span>
-                          {item.isUrgent && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-sky-50 text-sky-800 border border-sky-200">
-                              توقيت إضافي (الأحد 08:00 - 09:00)
+                          {item.isUrgent ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-sky-100 text-sky-900 border border-sky-200">
+                              ⏰ الأحد (08:00 - 09:00)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              🗓️ الأربعاء (10:00 - 11:00)
                             </span>
                           )}
                         </div>
                         {item.notes && (
-                          <p className="text-xs text-slate-600 mt-1 whitespace-pre-line bg-slate-50 p-2 rounded-lg font-medium">
-                            {item.notes}
+                          <p className="text-xs text-slate-700 mt-1.5 whitespace-pre-line bg-sky-50/50 p-2.5 rounded-xl font-medium border border-sky-100/60">
+                            📌 <b>ملاحظة لولي الأمر:</b> {item.notes}
                           </p>
                         )}
                       </div>
@@ -1129,15 +1192,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => setEditingSummons(item)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-700 hover:bg-rose-50 transition"
-                          title="تعديل الاستدعاء"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-sky-700 hover:bg-sky-50 transition"
+                          title="تعديل الموعد والملاحظة"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setDeletingSummons(item)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
-                          title="حذف الاستدعاء"
+                          title="إلغاء الموعد"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1378,8 +1441,21 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
       ) : (
-        /* ==================== 4. تبويب الخصومات والعقوبات ==================== */
+        /* ==================== 4. تبويب الخصومات والعقوبات (خاص بالأستاذ) ==================== */
         <div className="space-y-4">
+          {/* تنبيه الخصوصية: خاص بالأستاذ ومحجوب عن الجميع */}
+          <div className="p-3.5 rounded-2xl bg-slate-900 text-white flex items-start gap-3 shadow-sm border border-slate-800">
+            <Lock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <div className="font-extrabold text-amber-400 flex items-center gap-1.5">
+                <span>سجل الخصومات الداخلي (خاص بك كأستاذ فقط 🔒)</span>
+              </div>
+              <p className="text-slate-300 leading-relaxed text-[11px]">
+                هذا السجل محجوب ومخفي تماماً عن التلاميذ والأولياء ولا يظهر في الواجهة الرئيسية للموقع حفاظاً على الراحة النفسية. يمكنك تدوين الخصومات لمتابعتها وضبط التقويم المستمر، أو مسحها نهائياً متى شئت.
+              </p>
+            </div>
+          </div>
+
           {/* نموذج إضافة عقوبة أو خصم لتلميذ أو مجموعة تلاميذ */}
           <form
             onSubmit={addPenalty}
@@ -1699,10 +1775,23 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           {/* قائمة الخصومات والعقوبات الحالية */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
-              <span>العقوبات والخصومات المسجلة:</span>
-              <span className="text-[11px] bg-red-50 text-red-700 px-2.5 py-0.5 rounded-full font-extrabold border border-red-200">
-                {penaltiesList.length} خصم مسجل
-              </span>
+              <div className="flex items-center gap-2">
+                <span>العقوبات والخصومات المسجلة:</span>
+                <span className="text-[11px] bg-red-50 text-red-700 px-2.5 py-0.5 rounded-full font-extrabold border border-red-200">
+                  {penaltiesList.length} خصم مسجل
+                </span>
+              </div>
+              {penaltiesList.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllPenalties}
+                  className="text-[11px] text-red-600 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg border border-red-200 font-extrabold flex items-center gap-1 transition"
+                  title="مسح كافة الخصومات المسجلة نهائياً"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>مسح كافة السجلات</span>
+                </button>
+              )}
             </div>
 
             {/* فلتر الأقسام الأربعة */}
@@ -2562,7 +2651,7 @@ function DeleteLessonModal({
   );
 }
 
-/* ---------------- 6. نافذة تعديل استدعاء الولي ---------------- */
+/* ---------------- 6. نافذة تعديل موعد استقبال الولي ---------------- */
 function EditSummonsModal({
   summons,
   onClose,
@@ -2607,7 +2696,7 @@ function EditSummonsModal({
 
       onSuccess(data.summons);
     } catch (e: any) {
-      setErr(e.message || "حدث خطأ أثناء تعديل الاستدعاء");
+      setErr(e.message || "حدث خطأ أثناء تعديل البيانات");
     } finally {
       setBusy(false);
     }
@@ -2621,10 +2710,10 @@ function EditSummonsModal({
       >
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center">
               <Pencil className="w-4 h-4" />
             </div>
-            <h3 className="font-extrabold text-sm text-slate-800">تعديل استدعاء ولي التلميذ</h3>
+            <h3 className="font-extrabold text-sm text-slate-800">تعديل موعد استقبال ولي التلميذ 🤝</h3>
           </div>
           <button
             type="button"
@@ -2656,7 +2745,7 @@ function EditSummonsModal({
             <div className="col-span-1">
               <label className="text-xs font-bold text-slate-700 block mb-1">الفوج:</label>
               <input
-                className="input text-xs text-center font-black text-rose-700 bg-rose-50/40 border-rose-200"
+                className="input text-xs text-center font-black text-sky-700 bg-sky-50/50 border-sky-200"
                 value={className}
                 onChange={(e) => setClassName(e.target.value)}
                 required
@@ -2670,7 +2759,7 @@ function EditSummonsModal({
               className="input text-xs min-h-[60px]"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="اكتب ملاحظة أو سبب الاستدعاء..."
+              placeholder="اكتب ملاحظة ودية لولي الأمر أو سبب اللقاء..."
             />
           </div>
 
@@ -2688,7 +2777,7 @@ function EditSummonsModal({
         </div>
 
         <div className="flex gap-2 pt-1">
-          <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs bg-rose-600 hover:bg-rose-700">
+          <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs bg-sky-600 hover:bg-sky-700">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التعديل"}
           </button>
           <button
@@ -2705,7 +2794,7 @@ function EditSummonsModal({
   );
 }
 
-/* ---------------- 7. نافذة تأكيد حذف استدعاء الولي ---------------- */
+/* ---------------- 7. نافذة تأكيد إزالة اسم من قائمة الاستقبال ---------------- */
 function DeleteSummonsModal({
   summons,
   onClose,
@@ -2738,17 +2827,17 @@ function DeleteSummonsModal({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
-        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-          <Trash2 className="w-6 h-6" />
+        <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mx-auto">
+          <Users className="w-6 h-6" />
         </div>
 
         <div>
-          <h3 className="font-extrabold text-sm text-slate-900">حذف استدعاء الولي من القائمة</h3>
+          <h3 className="font-extrabold text-sm text-slate-900">إزالة اسم التلميذ من قائمة الاستقبال</h3>
           <p className="text-xs font-bold text-slate-700 mt-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
             التلميذ: {summons.studentName} (فوج {summons.className})
           </p>
           <p className="text-[11px] text-slate-500 mt-2">
-            هل حضر ولي الأمر أو تم حل الإشكال وترغب في إزالة اسمه من جدول الاستدعاء؟
+            هل تم اللقاء مع ولي الأمر أو التواصل وترغب في إزالة اسمه من قائمة الاستقبال؟
           </p>
         </div>
 
@@ -2762,16 +2851,16 @@ function DeleteSummonsModal({
           <button
             disabled={busy}
             onClick={submitDelete}
-            className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
+            className="flex-1 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
           >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الآن"}
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، إزالة من القائمة"}
           </button>
           <button
             disabled={busy}
             onClick={onClose}
             className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
           >
-            إلغاء
+            إلغاء وتراجع
           </button>
         </div>
       </div>
