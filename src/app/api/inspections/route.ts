@@ -95,7 +95,78 @@ export async function POST(req: NextRequest) {
     if (!data.inspectionSessions) data.inspectionSessions = [];
     if (!data.studentRoster) data.studentRoster = [];
 
-    // أ) استيراد قائمة تلاميذ للقسم والفوج
+    // أ) مزامنة بيانات الأوفلاين كاملة من العميل عند عودة الاتصال
+    if (body.type === "syncOfflineData") {
+      if (Array.isArray(body.sessions)) {
+        // دمج الجلسات حسب المعرف لتفادي التكرار
+        const existingSessionIds = new Set(data.inspectionSessions.map((s) => s.id));
+        for (const s of body.sessions) {
+          const idx = data.inspectionSessions.findIndex((cur) => cur.id === s.id);
+          if (idx >= 0) {
+            data.inspectionSessions[idx] = s;
+          } else {
+            data.inspectionSessions.push(s);
+          }
+        }
+      }
+
+      if (Array.isArray(body.roster)) {
+        for (const r of body.roster) {
+          const idx = data.studentRoster.findIndex(
+            (cur) =>
+              cur.studentName === r.studentName &&
+              cur.className.replace(/\s+/g, "") === r.className.replace(/\s+/g, "")
+          );
+          if (idx >= 0) {
+            data.studentRoster[idx] = r;
+          } else {
+            data.studentRoster.push(r);
+          }
+        }
+      }
+
+      await saveLessonsData(data);
+      return NextResponse.json({
+        success: true,
+        sessions: data.inspectionSessions,
+        roster: data.studentRoster,
+      });
+    }
+
+    // ب) تغيير فوج تلميذ محدد (بين فوج 1 وفوج 2)
+    if (body.type === "switchGroup" || body.type === "updateStudentGroup") {
+      const { studentName, className, newGroup } = body;
+      const target = data.studentRoster.find(
+        (r) =>
+          r.studentName === studentName &&
+          r.className.replace(/\s+/g, "") === String(className || "").replace(/\s+/g, "")
+      );
+      if (target) {
+        target.groupName = newGroup;
+        await saveLessonsData(data);
+        return NextResponse.json({ success: true, item: target, roster: data.studentRoster });
+      }
+      return NextResponse.json({ error: "التلميذ غير موجود" }, { status: 404 });
+    }
+
+    // ج) تعيين جماعي للأفواج (مثلاً تقسيم تلقائي 50/50 أو نقل مجموعة)
+    if (body.type === "batchAssignGroups" && Array.isArray(body.assignments)) {
+      const cls = String(body.className || "").replace(/\s+/g, "");
+      for (const item of body.assignments) {
+        const found = data.studentRoster.find(
+          (r) =>
+            r.studentName === item.studentName &&
+            (!cls || r.className.replace(/\s+/g, "") === cls)
+        );
+        if (found) {
+          found.groupName = item.groupName;
+        }
+      }
+      await saveLessonsData(data);
+      return NextResponse.json({ success: true, roster: data.studentRoster });
+    }
+
+    // د) استيراد قائمة تلاميذ للقسم والفوج
     if (body.type === "roster" || Array.isArray(body.students)) {
       const cls = String(body.className || "1 م 1").trim();
       const grp = (body.groupName || "فوج 1") as "فوج 1" | "فوج 2" | "القسم كامل";
@@ -127,7 +198,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, addedCount, roster: data.studentRoster });
     }
 
-    // ب) إنشاء جلسة مراقبة جديدة (مثلاً: المراقبة 1 من الدرس 1 إلى 8)
+    // هـ) إنشاء جلسة مراقبة جديدة (مثلاً: المراقبة 1 من الدرس 1 إلى 8)
     const {
       className,
       groupName = "فوج 1",

@@ -1,0 +1,18 @@
+{
+  "name": "دروس الرياضيات | الأستاذ محمد عدايكة",
+  "short_name": "رياضيات عدايكة",
+  "description": "منصة دروس مادة الرياضيات ودفتر التقييم الميداني السريع - متوسطة باهي علي",
+  "start_url": "/eval",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#059669",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

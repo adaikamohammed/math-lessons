@@ -27,6 +27,12 @@ import {
   Scale,
   LogOut,
   Loader2,
+  Download,
+  Upload,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   HONOR_CLASSES,
@@ -136,13 +142,19 @@ function FastLogin({ onLogin }: { onLogin: () => void }) {
 function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<"sessions" | "averages" | "roster">("sessions");
   const [selectedClass, setSelectedClass] = useState<string>("1 م 1");
-  const [selectedGroup, setSelectedGroup] = useState<"فوج 1" | "فوج 2">("فوج 1");
+  const [selectedGroup, setSelectedGroup] = useState<"فوج 1" | "فوج 2" | "القسم كامل">("فوج 1");
   const [searchStudent, setSearchStudent] = useState("");
+  const [rosterGroupFilter, setRosterGroupFilter] = useState<"all" | "فوج 1" | "فوج 2">("all");
 
   const [sessions, setSessions] = useState<InspectionSession[]>([]);
   const [roster, setRoster] = useState<StudentRosterItem[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // حالة الاتصال والأوفلاين
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // حالات نافذة إنشاء جلسة جديدة
   const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
@@ -166,7 +178,68 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     }, 3500);
   };
 
-  // جلب البيانات من الخادم
+  const CACHE_KEY = `math_eval_cache_${selectedClass.replace(/\s+/g, "")}`;
+  const PENDING_KEY = `math_eval_pending_${selectedClass.replace(/\s+/g, "")}`;
+
+  // 1. مراقبة حالة الاتصال بالإنترنت
+  useEffect(() => {
+    setIsOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast("success", "🟢 تم استعادة الاتصال بالإنترنت! يمكنك مزامنة التحديثات.");
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast("error", "🔴 أنت الآن في وضع أوفلاين (بدون إنترنت). يتم الحفظ محلياً بأمان.");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // 2. تحميل البيانات محلياً من ذاكرة الهاتف فوراً عند فتح الصفحة
+  useEffect(() => {
+    try {
+      const localData = localStorage.getItem(CACHE_KEY);
+      if (localData) {
+        const parsed = JSON.parse(localData);
+        if (parsed.sessions && parsed.sessions.length > 0) setSessions(parsed.sessions);
+        if (parsed.roster && parsed.roster.length > 0) setRoster(parsed.roster);
+        if (parsed.sessions?.length > 0 && !activeSessionId) {
+          setActiveSessionId(parsed.sessions[parsed.sessions.length - 1].id);
+        }
+      }
+      const pendingData = localStorage.getItem(PENDING_KEY);
+      if (pendingData) {
+        const pList = JSON.parse(pendingData);
+        setPendingSyncCount(Array.isArray(pList) ? pList.length : 0);
+      }
+    } catch (e) {
+      console.warn("Could not read local cache", e);
+    }
+  }, [CACHE_KEY]);
+
+  // 3. حفظ نسخة احتياطية في ذاكرة الهاتف تلقائياً مع كل تعديل
+  useEffect(() => {
+    if (sessions.length > 0 || roster.length > 0) {
+      try {
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({ sessions, roster, updatedAt: new Date().toISOString() })
+        );
+      } catch (e) {
+        console.warn("Could not write local cache", e);
+      }
+    }
+  }, [sessions, roster, CACHE_KEY]);
+
+  // جلب البيانات من الخادم (إن وُجد اتصال)
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -176,24 +249,24 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
         )}&_t=${Date.now()}`,
         { cache: "no-store" }
       );
-      const data = await res.json();
-      const loadedSessions: InspectionSession[] = data.sessions || [];
-      const loadedRoster: StudentRosterItem[] = data.roster || [];
+      if (res.ok) {
+        const data = await res.json();
+        const loadedSessions: InspectionSession[] = data.sessions || [];
+        const loadedRoster: StudentRosterItem[] = data.roster || [];
 
-      setSessions(loadedSessions);
-      setRoster(loadedRoster);
+        setSessions(loadedSessions);
+        setRoster(loadedRoster);
 
-      // تحديد آخر جلسة تلقائياً إذا لم تكن محددة
-      if (loadedSessions.length > 0) {
-        setActiveSessionId((prev) => {
-          if (prev && loadedSessions.some((s) => s.id === prev)) return prev;
-          return loadedSessions[loadedSessions.length - 1].id;
-        });
-      } else {
-        setActiveSessionId(null);
+        if (loadedSessions.length > 0) {
+          setActiveSessionId((prev) => {
+            if (prev && loadedSessions.some((s) => s.id === prev)) return prev;
+            return loadedSessions[loadedSessions.length - 1].id;
+          });
+        }
       }
     } catch {
-      showToast("error", "تعذر تحميل البيانات");
+      // وضع أوفلاين: الاعتماد على ذاكرة الهاتف
+      setIsOnline(false);
     } finally {
       setLoading(false);
     }
@@ -202,6 +275,171 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // 4. دالة المزامنة اليدوية مع السيرفر عند توفر الإنترنت
+  const handleSyncWithServer = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch("/api/inspections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "syncOfflineData",
+          className: selectedClass,
+          sessions,
+          roster,
+        }),
+      });
+      if (res.ok) {
+        localStorage.removeItem(PENDING_KEY);
+        setPendingSyncCount(0);
+        showToast("success", "✓ تمت مزامنة كافة بيانات التقييم مع السيرفر بنجاح! ☁️");
+      } else {
+        throw new Error("فشلت المزامنة من السيرفر");
+      }
+    } catch {
+      showToast("error", "تعذر الاتصال بالسيرفر حالياً. بياناتك محفوظة بأمان على جهازك.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // 5. تصدير ملف JSON آمن للتحميل على الهاتف أو الحاسوب
+  const handleExportJson = () => {
+    const exportObject = {
+      platform: "MathLessonsEvaluation",
+      teacher: "محمد عدايكة",
+      className: selectedClass,
+      exportedAt: new Date().toISOString(),
+      dateArabic: new Date().toLocaleDateString("ar-DZ"),
+      sessions,
+      roster,
+    };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute(
+      "download",
+      `تقييم_${selectedClass.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.json`
+    );
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    showToast("success", "✓ تم حفظ وتنزيل ملف JSON الآمن على جهازك بنجاح! 📥");
+  };
+
+  // 6. استيراد ملف JSON آمن واسترجاع البيانات محلياً وفورياً
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+
+        if (parsed.sessions && Array.isArray(parsed.sessions)) {
+          setSessions(parsed.sessions);
+          if (parsed.sessions.length > 0) setActiveSessionId(parsed.sessions[0].id);
+        }
+        if (parsed.roster && Array.isArray(parsed.roster)) {
+          setRoster(parsed.roster);
+        }
+
+        showToast("success", "✓ تم استيراد وتحميل البيانات بنجاح من ملف JSON! 📤");
+
+        // محاولة مزامنة السيرفر إن كان متصلاً
+        if (navigator.onLine) {
+          fetch("/api/inspections", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "syncOfflineData",
+              className: selectedClass,
+              sessions: parsed.sessions || [],
+              roster: parsed.roster || [],
+            }),
+          }).catch(() => {});
+        }
+      } catch {
+        showToast("error", "ملف JSON غير صالح أو به خطأ في البنية");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  // 7. تغيير فوج تلميذ بنقرة واحدة (بين فوج 1 وفوج 2)
+  const handleToggleStudentGroup = async (student: StudentRosterItem) => {
+    const nextGroup = student.groupName === "فوج 1" ? "فوج 2" : "فوج 1";
+    setRoster((prev) =>
+      prev.map((r) =>
+        r.studentName === student.studentName && r.className === student.className
+          ? { ...r, groupName: nextGroup }
+          : r
+      )
+    );
+    showToast("success", `✓ تم نقل التلميذ (${student.studentName}) إلى ${nextGroup}`);
+
+    if (navigator.onLine) {
+      try {
+        await fetch("/api/inspections", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "switchGroup",
+            studentName: student.studentName,
+            className: student.className,
+            newGroup: nextGroup,
+          }),
+        });
+      } catch {}
+    }
+  };
+
+  // 8. تقسيم تلقائي 50/50 لتلاميذ القسم بين الفوج 1 والفوج 2
+  const handleAutoSplitGroups = async () => {
+    const allInClass = roster.filter(
+      (r) => r.className.replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "")
+    );
+    if (allInClass.length === 0) {
+      showToast("error", "لا يوجد تلاميذ مسجلين في هذا القسم لتقسيمهم");
+      return;
+    }
+    if (!window.confirm(`هل تريد تقسيم (${allInClass.length}) تلميذ في قسم ${selectedClass} تلقائياً بالتساوي بين الفوج 1 والفوج 2؟`))
+      return;
+
+    const half = Math.ceil(allInClass.length / 2);
+    const assignments: { studentName: string; groupName: "فوج 1" | "فوج 2" }[] = [];
+
+    const updatedRoster = roster.map((r) => {
+      if (r.className.replace(/\s+/g, "") !== selectedClass.replace(/\s+/g, "")) return r;
+      const idx = allInClass.findIndex((item) => item.studentName === r.studentName);
+      const grp: "فوج 1" | "فوج 2" = idx < half ? "فوج 1" : "فوج 2";
+      assignments.push({ studentName: r.studentName, groupName: grp });
+      return { ...r, groupName: grp };
+    });
+
+    setRoster(updatedRoster);
+    showToast("success", `✓ تم تقسيم القسم: (${half}) تلاميذ في فوج 1 و (${allInClass.length - half}) تلاميذ في فوج 2!`);
+
+    if (navigator.onLine) {
+      try {
+        await fetch("/api/inspections", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "batchAssignGroups",
+            className: selectedClass,
+            assignments,
+          }),
+        });
+      } catch {}
+    }
+  };
 
   // الجلسة الحالية المعروضة
   const currentSession = useMemo(() => {
@@ -393,9 +631,15 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
       })
     );
 
-    // إرسال للخادم في الخلفية
+    // إرسال للخادم أو حفظ محلي في حالة عدم توفر الإنترنت
+    if (!navigator.onLine) {
+      setPendingSyncCount((c) => c + 1);
+      showToast("success", `✓ تم الحفظ محلياً (${studentName}) 📶 وضع أوفلاين`);
+      return;
+    }
+
     try {
-      await fetch("/api/inspections", {
+      const res = await fetch("/api/inspections", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -404,8 +648,10 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
           ...updates,
         }),
       });
+      if (!res.ok) throw new Error("تعذر الحفظ في السيرفر");
     } catch {
-      showToast("error", "تعذر حفظ التقييم في الخادم");
+      setPendingSyncCount((c) => c + 1);
+      showToast("success", `✓ تم الحفظ في الهاتف (سيتم الرفع عند عودة الاتصال) 📱`);
     }
   };
 
@@ -517,6 +763,63 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
             <span>قائمة الفوج ({currentStudentsList.length})</span>
           </button>
         </div>
+
+        {/* شريط حالة الأوفلاين والمزامنة والنسخ الاحتياطي JSON */}
+        <div className="flex items-center justify-between text-[11px] font-bold pt-2 border-t border-slate-100 flex-wrap gap-1.5">
+          {/* مؤشر الاتصال */}
+          <div className="flex items-center gap-1.5">
+            {isOnline ? (
+              <span className="flex items-center gap-1 text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[10px]">
+                <Wifi className="w-3 h-3 text-emerald-600" />
+                <span>متصل بالإنترنت</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-300 text-[10px]">
+                <WifiOff className="w-3 h-3 text-amber-600" />
+                <span>أوفلاين (حفظ محلي)</span>
+              </span>
+            )}
+
+            {pendingSyncCount > 0 && (
+              <span className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.2 rounded font-black border border-red-200">
+                {pendingSyncCount} معلق
+              </span>
+            )}
+          </div>
+
+          {/* أزرار المزامنة وتصدير/استيراد JSON */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleSyncWithServer}
+              disabled={isSyncing}
+              className="py-1 px-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition flex items-center gap-1 text-[11px]"
+              title="مزامنة التعديلات مع السيرفر"
+            >
+              <RefreshCw className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`} />
+              <span>مزامنة</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportJson}
+              className="py-1 px-2 rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition flex items-center gap-1 text-[11px]"
+              title="تصدير نسخة احتياطية من التقييمات كملف JSON آمن"
+            >
+              <Download className="w-3 h-3 text-slate-500" />
+              <span>حفظ JSON 📥</span>
+            </button>
+
+            <label
+              className="py-1 px-2 rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition flex items-center gap-1 text-[11px] cursor-pointer"
+              title="استيراد ملف JSON آمن محلياً"
+            >
+              <Upload className="w-3 h-3 text-slate-500" />
+              <span>استيراد 📤</span>
+              <input type="file" accept=".json,application/json" hidden onChange={handleImportJson} />
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* محدد القسم والفوج السريع */}
@@ -526,9 +829,9 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
           <span>الفوج (حصة التفويج):</span>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           {/* اختيار القسم */}
-          <div className="grid grid-cols-4 gap-1 flex-1">
+          <div className="grid grid-cols-4 gap-1 flex-1 min-w-[180px]">
             {HONOR_CLASSES.map((cls) => (
               <button
                 key={cls}
@@ -546,13 +849,13 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
           </div>
 
           {/* اختيار الفوج */}
-          <div className="grid grid-cols-2 gap-1 w-32">
-            {(["فوج 1", "فوج 2"] as const).map((grp) => (
+          <div className="flex gap-1 shrink-0">
+            {(["فوج 1", "فوج 2", "القسم كامل"] as const).map((grp) => (
               <button
                 key={grp}
                 type="button"
                 onClick={() => setSelectedGroup(grp)}
-                className={`py-1.5 rounded-xl text-xs font-black transition ${
+                className={`py-1.5 px-2 rounded-xl text-xs font-black transition ${
                   selectedGroup === grp
                     ? "bg-slate-800 text-white shadow-2xs"
                     : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
@@ -1028,74 +1331,154 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
       )}
 
       {/* ======================================================== */}
-      {/* 3. تبويب إدارة قائمة تلاميذ الفوج */}
+      {/* 3. تبويب إدارة قائمة وتفويج تلاميذ القسم */}
       {/* ======================================================== */}
-      {activeTab === "roster" && (
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs space-y-3.5">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <div>
-              <h2 className="text-xs font-black text-slate-900">
-                قائمة تلاميذ {selectedClass} ({selectedGroup})
-              </h2>
-              <p className="text-[10px] text-slate-400">إجمالي المسجلين: {currentStudentsList.length} تلميذ</p>
+      {activeTab === "roster" && (() => {
+        const allClassStudents = roster.filter(
+          (r) => (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "")
+        );
+        const group1Count = allClassStudents.filter((r) => r.groupName === "فوج 1").length;
+        const group2Count = allClassStudents.filter((r) => r.groupName === "فوج 2").length;
+
+        const displayedStudents = allClassStudents
+          .filter((r) => (rosterGroupFilter === "all" ? true : r.groupName === rosterGroupFilter))
+          .sort((a, b) => a.studentName.localeCompare(b.studentName, "ar"));
+
+        return (
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs space-y-3.5">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+              <div>
+                <h2 className="text-xs font-black text-slate-900">
+                  قائمة وتفويج تلاميذ {selectedClass}
+                </h2>
+                <p className="text-[10px] text-slate-400">
+                  إجمالي القسم: {allClassStudents.length} تلميذ • (فوج 1: {group1Count} • فوج 2: {group2Count})
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleAutoSplitGroups}
+                  className="py-1 px-2.5 rounded-xl bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200 font-bold text-xs flex items-center gap-1 transition"
+                  title="تقسيم التلاميذ تلقائياً بالتساوي بين الفوجين"
+                >
+                  <ArrowLeftRight className="w-3.5 h-3.5 text-purple-600" />
+                  <span>تقسيم آلي (50/50)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsRosterModalOpen(true)}
+                  className="py-1 px-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>استيراد أسماء</span>
+                </button>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsRosterModalOpen(true)}
-              className="py-1 px-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs transition"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>استيراد دفعة أسماء</span>
-            </button>
-          </div>
-
-          {/* إضافة تلميذ فردي */}
-          <form onSubmit={handleAddSingleStudent} className="flex gap-1.5">
-            <input
-              className="flex-1 py-1.5 px-3 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
-              placeholder="اسم ولقب تلميذ جديد..."
-              value={singleStudentName}
-              onChange={(e) => setSingleStudentName(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="py-1.5 px-3 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition"
-            >
-              إضافة
-            </button>
-          </form>
-
-          {/* عرض أسماء التلاميذ */}
-          {currentStudentsList.length === 0 ? (
-            <div className="text-center py-8 text-xs text-slate-400">
-              لا توجد أسماء مسجلة في هذا الفوج. اضغط "استيراد دفعة أسماء" لإضافتهم دفعة واحدة.
+            {/* فلتر عرض الأفواج */}
+            <div className="grid grid-cols-3 gap-1 bg-slate-100/80 p-1 rounded-xl text-center text-xs font-black">
+              <button
+                type="button"
+                onClick={() => setRosterGroupFilter("all")}
+                className={`py-1 rounded-lg transition ${
+                  rosterGroupFilter === "all"
+                    ? "bg-white text-slate-900 shadow-2xs"
+                    : "text-slate-600 hover:bg-white/40"
+                }`}
+              >
+                الكل ({allClassStudents.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setRosterGroupFilter("فوج 1")}
+                className={`py-1 rounded-lg transition ${
+                  rosterGroupFilter === "فوج 1"
+                    ? "bg-emerald-600 text-white shadow-2xs"
+                    : "text-slate-600 hover:bg-white/40"
+                }`}
+              >
+                فوج 1 ({group1Count}) 🟢
+              </button>
+              <button
+                type="button"
+                onClick={() => setRosterGroupFilter("فوج 2")}
+                className={`py-1 rounded-lg transition ${
+                  rosterGroupFilter === "فوج 2"
+                    ? "bg-blue-600 text-white shadow-2xs"
+                    : "text-slate-600 hover:bg-white/40"
+                }`}
+              >
+                فوج 2 ({group2Count}) 🔵
+              </button>
             </div>
-          ) : (
-            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
-              {currentStudentsList.map((st, idx) => (
-                <div key={st.studentName} className="py-2 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 font-bold text-[10px] flex items-center justify-center">
-                      {idx + 1}
-                    </span>
-                    <span className="font-bold text-slate-800">{st.studentName}</span>
+
+            {/* إضافة تلميذ فردي */}
+            <form onSubmit={handleAddSingleStudent} className="flex gap-1.5">
+              <input
+                className="flex-1 py-1.5 px-3 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
+                placeholder="اسم ولقب تلميذ جديد..."
+                value={singleStudentName}
+                onChange={(e) => setSingleStudentName(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="py-1.5 px-3 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition"
+              >
+                إضافة
+              </button>
+            </form>
+
+            {/* عرض أسماء التلاميذ مع زر التبديل بين الفوجين بنقرة واحدة */}
+            {displayedStudents.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-400">
+                لا توجد أسماء مسجلة في هذا الفوج. اضغط "استيراد أسماء" لإضافتهم دفعة واحدة.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                {displayedStudents.map((st, idx) => (
+                  <div key={st.studentName} className="py-2 flex items-center justify-between text-xs gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 font-bold text-[10px] flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <span className="font-bold text-slate-800 truncate">{st.studentName}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* زر تبديل الفوج بنقرة واحدة */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStudentGroup(st)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition flex items-center gap-1 active:scale-95 border ${
+                          st.groupName === "فوج 1"
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                            : "bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100"
+                        }`}
+                        title="انقر لنقل التلميذ مباشرة إلى الفوج الآخر"
+                      >
+                        <ArrowLeftRight className="w-3 h-3" />
+                        <span>{st.groupName === "فوج 1" ? "فوج 1 🟢" : "فوج 2 🔵"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteStudent(st.studentName)}
+                        className="p-1 text-slate-300 hover:text-red-600 transition"
+                        title="حذف هذا التلميذ"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteStudent(st.studentName)}
-                    className="p-1 text-slate-300 hover:text-red-600 transition"
-                    title="حذف هذا التلميذ"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ======================================================== */}
       {/* نافذة منبثقة: بدء جلسة مراقبة جديدة */}

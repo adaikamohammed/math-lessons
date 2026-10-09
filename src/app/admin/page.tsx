@@ -3044,6 +3044,7 @@ function LessonCard({
   const [isDeletingImg, setIsDeletingImg] = useState(false);
   const [deletingHwImageId, setDeletingHwImageId] = useState<string | null>(null);
   const [isDeletingHwImg, setIsDeletingHwImg] = useState(false);
+  const [cardTab, setCardTab] = useState<"homework" | "board">("homework");
 
   const isDirectedWork = lesson.type === "directed_work";
 
@@ -3236,11 +3237,18 @@ function LessonCard({
               <span>{isDirectedWork ? "حصة" : "مورد"} {lesson.number}</span>
               <span>•</span>
               <span className="font-bold text-slate-500">{lesson.images?.length || 0} صور سبورة</span>
-              {(lesson.homeworkImages?.length || 0) > 0 && (
+              {(lesson.homeworkImages?.length || 0) > 0 ? (
                 <>
                   <span>•</span>
-                  <span className="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                    📝 {lesson.homeworkImages?.length} حل واجب
+                  <span className="text-blue-800 font-black bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                    📝 {lesson.homeworkImages?.length} حل واجب ✓
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>•</span>
+                  <span className="text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[10px]">
+                    ⚠️ لم يُرفع حل الواجب بعد
                   </span>
                 </>
               )}
@@ -3258,19 +3266,29 @@ function LessonCard({
         </button>
 
         <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-          <button
-            type="button"
+          {/* زر مباشر لاختيار ورفع صورة حل الواجب فوراً في ثانية واحدة */}
+          <label
             onClick={(e) => {
               e.stopPropagation();
               if (!open) onToggle();
+              setCardTab("homework");
             }}
-            className="px-2 py-1 rounded-lg text-[11px] font-black bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition flex items-center gap-1 shrink-0 active:scale-95 shadow-2xs"
-            title="فتح الدرس لرفع صور الحل النموذجي للواجب"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shrink-0 active:scale-95 shadow-sm cursor-pointer"
+            title="اضغط هنا فوراً لرفع صورة حل الواجب لهذا الدرس من الهاتف أو الحاسوب"
           >
-            <FileText className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">رفع حل الواجب</span>
-            <span className="sm:hidden">حل الواجب</span>
-          </button>
+            <FileText className="w-3.5 h-3.5 text-white" />
+            <span>📝 رفع حل الواجب</span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                uploadFiles(e.target.files, true);
+                e.target.value = "";
+              }}
+            />
+          </label>
           <button
             onClick={onEdit}
             className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition"
@@ -3299,225 +3317,274 @@ function LessonCard({
             </div>
           )}
 
-          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-            <span>صور السبورة لهذا الدرس ({lesson.images?.length || 0}):</span>
-            <span className="text-[11px] text-slate-400 font-normal">مرتبة بالتسلسل</span>
+          {/* تبويبات بطاقة الدرس: حل الواجب مقابل صور السبورة */}
+          <div className="grid grid-cols-2 gap-1.5 bg-slate-200/70 p-1 rounded-xl text-center">
+            <button
+              type="button"
+              onClick={() => setCardTab("homework")}
+              className={`py-2 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 ${
+                cardTab === "homework"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "text-slate-700 hover:bg-white/60"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>📝 حل الواجب المنزلي ({lesson.homeworkImages?.length || 0})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCardTab("board")}
+              className={`py-2 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 ${
+                cardTab === "board"
+                  ? "bg-emerald-700 text-white shadow-2xs"
+                  : "text-slate-700 hover:bg-white/60"
+              }`}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>📷 صور السبورة ({lesson.images?.length || 0})</span>
+            </button>
           </div>
 
-          {lesson.images && lesson.images.length > 0 ? (
-            <div className="space-y-2">
-              {lesson.images.map((img, idx) => (
-                <div
-                  key={img.id}
-                  className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-slate-100 shadow-2xs"
-                >
-                  <span className="w-7 h-7 shrink-0 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center">
-                    {idx + 1}
+          {/* ================= 1. قسم الحل النموذجي للواجب المنزلي ================= */}
+          {cardTab === "homework" && (
+            <div className="space-y-3 bg-blue-50/40 p-3 rounded-2xl border border-blue-200/80">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span className="flex items-center gap-1.5 text-blue-900 font-black">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  <span>صور الحل النموذجي للواجب المنزلي ({lesson.homeworkImages?.length || 0}):</span>
+                </span>
+                <span className="text-[11px] text-blue-700 font-bold bg-blue-100 px-2 py-0.5 rounded">
+                  يُرفع بعد تصحيح الواجب في القسم 📝
+                </span>
+              </div>
+
+              {lesson.homeworkNotes && (
+                <div className="bg-white p-2.5 rounded-xl border border-blue-200 text-xs text-blue-900 space-y-1">
+                  <span className="font-black text-[11px] flex items-center gap-1">
+                    <StickyNote className="w-3.5 h-3.5 text-blue-600" /> تفاصيل وتمارين الواجب:
                   </span>
-
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img.url}
-                    alt=""
-                    onClick={() => setPreviewImg(img.url)}
-                    className="w-14 h-14 object-cover rounded-lg border border-slate-100 shrink-0 cursor-pointer hover:opacity-90 transition"
-                  />
-
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold text-slate-700 truncate">
-                      صورة السبورة {idx + 1}
-                    </div>
-                    <button
-                      onClick={() => setPreviewImg(img.url)}
-                      className="text-[11px] text-emerald-600 hover:underline flex items-center gap-1 mt-0.5"
-                    >
-                      <Eye className="w-3 h-3" /> معاينة كاملة
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      disabled={idx === 0}
-                      onClick={() => moveImage(idx, "prev")}
-                      className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
-                        idx === 0
-                          ? "opacity-30 cursor-not-allowed text-slate-300"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }`}
-                      title="تقديم لأعلى"
-                    >
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      disabled={idx === lesson.images.length - 1}
-                      onClick={() => moveImage(idx, "next")}
-                      className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
-                        idx === lesson.images.length - 1
-                          ? "opacity-30 cursor-not-allowed text-slate-300"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }`}
-                      title="تأخير لأسفل"
-                    >
-                      <ArrowLeft className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => setDeletingImageId(img.id)}
-                    className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
-                    title="حذف هذه الصورة"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <p className="whitespace-pre-line leading-relaxed font-medium">{lesson.homeworkNotes}</p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-6 bg-white rounded-xl border border-dashed border-slate-200 text-xs text-slate-400">
-              لا توجد صور مرفوعة لهذا الدرس بعد. اضغط الزر أدناه لرفع صور السبورة.
+              )}
+
+              {lesson.homeworkImages && lesson.homeworkImages.length > 0 ? (
+                <div className="space-y-2">
+                  {lesson.homeworkImages.map((img, idx) => (
+                    <div
+                      key={img.id}
+                      className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-blue-100 shadow-2xs"
+                    >
+                      <span className="w-7 h-7 shrink-0 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={img.url}
+                        alt=""
+                        onClick={() => setPreviewImg(img.url)}
+                        className="w-14 h-14 object-cover rounded-lg border border-slate-100 shrink-0 cursor-pointer hover:opacity-90 transition"
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold text-slate-700 truncate">
+                          حل الواجب صفحة {idx + 1}
+                        </div>
+                        <button
+                          onClick={() => setPreviewImg(img.url)}
+                          className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+                        >
+                          <Eye className="w-3 h-3" /> معاينة كاملة
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          disabled={idx === 0}
+                          onClick={() => moveHwImage(idx, "prev")}
+                          className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                            idx === 0
+                              ? "opacity-30 cursor-not-allowed text-slate-300"
+                              : "text-slate-600 hover:bg-slate-100"
+                          }`}
+                          title="تقديم لأعلى"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          disabled={idx === (lesson.homeworkImages?.length ?? 0) - 1}
+                          onClick={() => moveHwImage(idx, "next")}
+                          className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                            idx === (lesson.homeworkImages?.length ?? 0) - 1
+                              ? "opacity-30 cursor-not-allowed text-slate-300"
+                              : "text-slate-600 hover:bg-slate-100"
+                          }`}
+                          title="تأخير لأسفل"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => setDeletingHwImageId(img.id)}
+                        className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
+                        title="حذف هذه الصورة"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 bg-white rounded-xl border border-dashed border-blue-200 text-xs text-slate-500 space-y-1">
+                  <div className="font-bold text-slate-700">لم يتم رفع صور الحل النموذجي للواجب بعد.</div>
+                  <div className="text-[11px] text-blue-700">
+                    اضغط على الزر الأزرق أدناه لاختيار ورفع صور الحل من هاتفك أو حاسوبك.
+                  </div>
+                </div>
+              )}
+
+              <label
+                className={`w-full py-3 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black cursor-pointer transition flex items-center justify-center gap-2 shadow-sm active:scale-95 ${
+                  uploading ? "opacity-70 pointer-events-none" : ""
+                }`}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>{uploading}</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 text-white" />
+                    <span>📝 اضغط هنا لاختيار ورفع صور حل الواجب (كاميرا أو صور)</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    uploadFiles(e.target.files, true);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
             </div>
           )}
 
-          <label
-            className={`btn-primary w-full py-3 text-xs cursor-pointer shadow-sm ${
-              uploading ? "opacity-70 pointer-events-none" : ""
-            }`}
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{uploading}</span>
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4" />
-                <span>📷 رفع صور جديدة (يمكن اختيار صورة أو عدة صور معاً)</span>
-              </>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={(e) => {
-                uploadFiles(e.target.files);
-                e.target.value = "";
-              }}
-            />
-          </label>
-
-          {/* قسم 2: الحل النموذجي للواجب المنزلي */}
-          <div className="pt-3 border-t border-slate-200/90 space-y-3">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-              <span className="flex items-center gap-1.5 text-blue-900 font-black">
-                <FileText className="w-4 h-4 text-blue-600" />
-                <span>الحل النموذجي للواجب المنزلي ({lesson.homeworkImages?.length || 0}):</span>
-              </span>
-              <span className="text-[11px] text-blue-600 font-medium">يُرفع بعد تصحيح الواجب في القسم</span>
-            </div>
-
-            {lesson.homeworkNotes && (
-              <div className="bg-blue-50/80 p-2.5 rounded-xl border border-blue-200 text-xs text-blue-900 space-y-1">
-                <span className="font-black text-[11px] flex items-center gap-1">
-                  <StickyNote className="w-3.5 h-3.5 text-blue-600" /> تفاصيل وتمارين الواجب:
-                </span>
-                <p className="whitespace-pre-line leading-relaxed font-medium">{lesson.homeworkNotes}</p>
+          {/* ================= 2. قسم صور السبورة للدرس ================= */}
+          {cardTab === "board" && (
+            <div className="space-y-3 bg-emerald-50/40 p-3 rounded-2xl border border-emerald-200/80">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span>صور السبورة لهذا الدرس ({lesson.images?.length || 0}):</span>
+                <span className="text-[11px] text-slate-400 font-normal">مرتبة بالتسلسل</span>
               </div>
-            )}
 
-            {lesson.homeworkImages && lesson.homeworkImages.length > 0 ? (
-              <div className="space-y-2">
-                {lesson.homeworkImages.map((img, idx) => (
-                  <div
-                    key={img.id}
-                    className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-blue-100 shadow-2xs"
-                  >
-                    <span className="w-7 h-7 shrink-0 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center">
-                      {idx + 1}
-                    </span>
-
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={img.url}
-                      alt=""
-                      onClick={() => setPreviewImg(img.url)}
-                      className="w-14 h-14 object-cover rounded-lg border border-slate-100 shrink-0 cursor-pointer hover:opacity-90 transition"
-                    />
-
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold text-slate-700 truncate">
-                        حل الواجب صفحة {idx + 1}
-                      </div>
-                      <button
-                        onClick={() => setPreviewImg(img.url)}
-                        className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
-                      >
-                        <Eye className="w-3 h-3" /> معاينة كاملة
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        disabled={idx === 0}
-                        onClick={() => moveHwImage(idx, "prev")}
-                        className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
-                          idx === 0
-                            ? "opacity-30 cursor-not-allowed text-slate-300"
-                            : "text-slate-600 hover:bg-slate-100"
-                        }`}
-                        title="تقديم لأعلى"
-                      >
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        disabled={idx === (lesson.homeworkImages?.length ?? 0) - 1}
-                        onClick={() => moveHwImage(idx, "next")}
-                        className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
-                          idx === (lesson.homeworkImages?.length ?? 0) - 1
-                            ? "opacity-30 cursor-not-allowed text-slate-300"
-                            : "text-slate-600 hover:bg-slate-100"
-                        }`}
-                        title="تأخير لأسفل"
-                      >
-                        <ArrowLeft className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => setDeletingHwImageId(img.id)}
-                      className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
-                      title="حذف هذه الصورة"
+              {lesson.images && lesson.images.length > 0 ? (
+                <div className="space-y-2">
+                  {lesson.images.map((img, idx) => (
+                    <div
+                      key={img.id}
+                      className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-slate-100 shadow-2xs"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-5 bg-white rounded-xl border border-dashed border-blue-200 text-xs text-slate-400">
-                لم يتم رفع صور الحل النموذجي للواجب بعد. ارفعها بعد تصحيح الحصة ليتفقدها التلاميذ في البيت.
-              </div>
-            )}
+                      <span className="w-7 h-7 shrink-0 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center">
+                        {idx + 1}
+                      </span>
 
-            <label
-              className={`w-full py-2.5 px-3 rounded-xl border border-blue-300 bg-blue-50/70 hover:bg-blue-100 text-blue-800 text-xs font-bold cursor-pointer transition flex items-center justify-center gap-1.5 shadow-2xs ${
-                uploading ? "opacity-70 pointer-events-none" : ""
-              }`}
-            >
-              <Upload className="w-4 h-4 text-blue-600" />
-              <span>📝 رفع صور الحل النموذجي للواجب (يمكن اختيار صورة أو عدة صور)</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={(e) => {
-                  uploadFiles(e.target.files, true);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-          </div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={img.url}
+                        alt=""
+                        onClick={() => setPreviewImg(img.url)}
+                        className="w-14 h-14 object-cover rounded-lg border border-slate-100 shrink-0 cursor-pointer hover:opacity-90 transition"
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold text-slate-700 truncate">
+                          صورة السبورة {idx + 1}
+                        </div>
+                        <button
+                          onClick={() => setPreviewImg(img.url)}
+                          className="text-[11px] text-emerald-600 hover:underline flex items-center gap-1 mt-0.5"
+                        >
+                          <Eye className="w-3 h-3" /> معاينة كاملة
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          disabled={idx === 0}
+                          onClick={() => moveImage(idx, "prev")}
+                          className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                            idx === 0
+                              ? "opacity-30 cursor-not-allowed text-slate-300"
+                              : "text-slate-600 hover:bg-slate-100"
+                          }`}
+                          title="تقديم لأعلى"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          disabled={idx === lesson.images.length - 1}
+                          onClick={() => moveImage(idx, "next")}
+                          className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                            idx === lesson.images.length - 1
+                              ? "opacity-30 cursor-not-allowed text-slate-300"
+                              : "text-slate-600 hover:bg-slate-100"
+                          }`}
+                          title="تأخير لأسفل"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => setDeletingImageId(img.id)}
+                        className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
+                        title="حذف هذه الصورة"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 bg-white rounded-xl border border-dashed border-slate-200 text-xs text-slate-400">
+                  لا توجد صور مرفوعة لهذا الدرس بعد. اضغط الزر أدناه لرفع صور السبورة.
+                </div>
+              )}
+
+              <label
+                className={`btn-primary w-full py-3 text-xs cursor-pointer shadow-sm ${
+                  uploading ? "opacity-70 pointer-events-none" : ""
+                }`}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>{uploading}</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>📷 رفع صور سبورة جديدة (يمكن اختيار صورة أو عدة صور معاً)</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    uploadFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+          )}
 
           <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60">
             <a

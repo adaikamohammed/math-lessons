@@ -14,7 +14,7 @@ const years = [
   {
     level: 1,
     title: "السنة الأولى متوسط",
-    subtitle: "كراس الدروس (192ص) • كراس الأعمال الموجهة (96ص)",
+    subtitle: "دروس مصورة • حلول الواجبات • الأنشطة والتمارين",
     tag: "1م",
     gradient: "from-emerald-600 to-teal-700",
     shadow: "shadow-emerald-600/15",
@@ -22,7 +22,7 @@ const years = [
   {
     level: 2,
     title: "السنة الثانية متوسط",
-    subtitle: "كراس الدروس (192ص) • كراس الأعمال الموجهة (96ص)",
+    subtitle: "دروس مصورة • حلول الواجبات • الأنشطة والتمارين",
     tag: "2م",
     gradient: "from-teal-600 to-cyan-700",
     shadow: "shadow-teal-600/15",
@@ -163,7 +163,7 @@ export default function Home() {
               <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.2 rounded">دليل</span>
             </div>
             <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-              أكاديمية ستار سكول (1م و 2م) • كراس 192ص (5 نقاط) • ميثاق التقويم
+              أكاديمية ستار سكول (1م و 2م) • الأدوات المدرسية • ساعة الاستقبال الأسبوعية
             </p>
           </div>
           <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />

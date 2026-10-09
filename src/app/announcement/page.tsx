@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 export default function AnnouncementPage() {
-  const [activeTab, setActiveTab] = useState<"all" | "support" | "supplies" | "charter" | "reception">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "support" | "supplies" | "reception">("all");
 
   return (
     <div className="pb-16 pt-3 fade-up space-y-5">
@@ -47,12 +47,11 @@ export default function AnnouncementPage() {
       </div>
 
       {/* شريط التبويبات السريعة للتنقل */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
+      <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold items-center">
         {[
           { id: "all", label: "📋 الدليل كاملاً" },
           { id: "support", label: "🏫 دروس الدعم" },
           { id: "supplies", label: "📚 الكراريس والأدوات" },
-          { id: "charter", label: "⚖️ ميثاق التقويم" },
           { id: "reception", label: "🤝 ساعة الاستقبال" },
         ].map((tab) => (
           <button
@@ -67,6 +66,13 @@ export default function AnnouncementPage() {
             {tab.label}
           </button>
         ))}
+        <Link
+          href="/assessment"
+          className="px-3.5 py-2 rounded-xl whitespace-nowrap bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition shrink-0 flex items-center gap-1.5 font-bold"
+        >
+          <span>⚖️ ميثاق التقويم (20/20)</span>
+          <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+        </Link>
       </div>
 
       {/* ==================== 1. قسم دروس الدعم ==================== */}
@@ -211,65 +217,31 @@ export default function AnnouncementPage() {
         </section>
       )}
 
-      {/* ==================== 3. قسم ميثاق التقويم والشفافية ==================== */}
-      {(activeTab === "all" || activeTab === "charter") && (
-        <section className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Scale className="w-4 h-4" />
+      {/* ==================== 3. بطاقة ميثاق التقويم (موجزة مع رابط مباشر للحاسبة) ==================== */}
+      <section className="bg-gradient-to-r from-teal-50 via-emerald-50 to-teal-50/50 rounded-3xl p-5 border border-teal-200/80 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Scale className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-black text-slate-800">ميثاق العمل والتقويم والعدل بين التلاميذ</h2>
-              <p className="text-[11px] text-slate-400">مبادئ ثابتة يلتزم بها الأستاذ في تدريس أبنائكم</p>
+              <h2 className="text-sm font-black text-slate-900">ميثاق ومعايير التقويم المستمر (20 / 20)</h2>
+              <p className="text-[11px] text-teal-800 font-bold">العدل والشفافية التامة — لا زيادة ولا إنقاص</p>
             </div>
           </div>
-
-          <div className="space-y-2.5 text-xs">
-            {/* بطاقة 1: العدل التام في العلامات */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-              <h3 className="font-extrabold text-slate-800 flex items-center gap-1.5 text-xs">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                التنقيط وفق نظام دقيق أدق من الشعرة
-              </h3>
-              <p className="text-slate-600 text-[11px] leading-relaxed">
-                التسجيل في دروس الدعم معي <strong>لا يعني مطلقاً إعطاء الفرض أو الامتحان أو أي زيادة في النقاط</strong>. هذا يتعارض مع مبادئنا وتربيتنا. العلامة هي تحصيل حاصل لمجهود التلميذ وفهمه، وأشهد الله أن كل ذي حق سيأخذ حقه بدقة متناهية ودون مجاملة.
-              </p>
-            </div>
-
-            {/* بطاقة 2: من يحتاج الدعم؟ */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-              <h3 className="font-extrabold text-slate-800 flex items-center gap-1.5 text-xs">
-                <HelpCircle className="w-4 h-4 text-sky-600 shrink-0" />
-                هل يحتاج كل تلميذ إلى دروس الدعم؟
-              </h3>
-              <p className="text-slate-600 text-[11px] leading-relaxed">
-                <strong>ليس كل التلاميذ بحاجة إليها!</strong> التلاميذ المتفوقون أنصحهم بالمراجعة الفردية بالبيت وحل الواجبات. إنما دروس الدعم وُجدت لمن يجد صعوبة في الانضباط والمراجعة بمفرده في البيت.
-              </p>
-            </div>
-
-            {/* بطاقة 3: الانضباط بدون ضرب */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-              <h3 className="font-extrabold text-slate-800 flex items-center gap-1.5 text-xs">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                طريقة التدريس وضبط القسم
-              </h3>
-              <p className="text-slate-600 text-[11px] leading-relaxed">
-                الضرب ممنوع قانونياً ولا أستعمله كوسيلة للضبط. ما عليّ هو تقديم الدرس على أكمل وجه؛ لا أجلس على الكرسي طيلة الحصة، بل أتنقل بين التلاميذ، أشرح، وأجيب عن الأسئلة، وأقدم واجباً منزلياً في كل حصة لترسيخ الفهم. ابنك لن يحتاج الدعم إن تابع واجتهد في القسم والبيت.
-              </p>
-            </div>
-
-            {/* بطاقة 4: شعار الأستاذ */}
-            <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-1 text-center py-3">
-              <p className="font-bold text-emerald-800 text-xs">
-                قال رسول الله ﷺ: «إن الله يحب إذا عمل أحدكم عملاً أن يتقنه»
-              </p>
-              <p className="text-emerald-700 text-[11px]">
-                شعارنا إتقان العمل وبذل أقصى مجهود لضمان فهم واستيعاب أبنائكم دون أي تقصير.
-              </p>
-            </div>
-          </div>
-        </section>
-      )}
+          <Link
+            href="/assessment"
+            className="shrink-0 px-3.5 py-2 rounded-xl bg-teal-600 text-white text-xs font-black hover:bg-teal-700 active:scale-95 transition flex items-center justify-center gap-1.5 shadow-xs"
+          >
+            <span>عرض الميثاق وحاسبة العلامة</span>
+            <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+          </Link>
+        </div>
+        <p className="text-xs text-slate-600 leading-relaxed font-medium">
+          توزيع دقيق للـ 20 نقطة: الكراريس (5ن) • الواجبات المنزلية (5ن) • السلوك والأدوات (5ن) • النشاط داخل القسم (5ن).
+          تم تخصيص صفحة مستقلة تفاعلية بحاسبة تقديرية تتيح لكل تلميذ وولي أمر معرفة تفاصيل التنقيط بكل وضوح دون أي إبهام.
+        </p>
+      </section>
 
       {/* ==================== 4. قسم استقبال الأولياء ==================== */}
       {(activeTab === "all" || activeTab === "reception") && (
