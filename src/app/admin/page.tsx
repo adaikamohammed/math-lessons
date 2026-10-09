@@ -924,6 +924,36 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <span>الإعلان والتوجيهات</span>
           </Link>
         </div>
+
+        {/* بطاقة التقييم الميداني السريع المستقل (مخصصة للهاتف أثناء الحصة) */}
+        <div className="pt-2 border-t border-slate-100">
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-3 rounded-2xl text-white shadow-sm flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg font-black shrink-0">
+                ⚡
+              </span>
+              <div>
+                <div className="text-xs font-black flex items-center gap-1.5">
+                  <span>دفتر التقييم الميداني السريع (صفحة مستقلة للهاتف)</span>
+                  <span className="bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded text-[10px] font-black">
+                    جديد 🚀
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-100 font-medium">
+                  تفقد الكراريس والواجبات الدورية (8 دروس + 8 واجبات + سلوك + نشاط) مع حساب المعدل التلقائي
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/eval"
+              className="py-1.5 px-3.5 rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-black shrink-0 flex items-center gap-1.5 shadow-sm transition active:scale-95"
+            >
+              <span>فتح دفتر التقييم السريع</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* التبويب الرئيسي: إدارة الدروس أو أولياء أود استقبالهم أو لوحة الشرف أو تقييم الحصة أو الخصومات */}
@@ -992,6 +1022,21 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       {/* ==================== 1. تبويب الدروس والكراريس ==================== */}
       {mainTab === "lessons" ? (
         <div className="space-y-4">
+          {/* إرشاد وتوضيح حول رفع حلول الواجبات وصور السبورة */}
+          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border border-blue-200/90 rounded-2xl p-3.5 flex items-start gap-3 shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 font-black text-sm mt-0.5 shadow-2xs">
+              💡
+            </div>
+            <div className="flex-1 min-w-0 text-xs">
+              <div className="font-black text-blue-950 mb-0.5">
+                أين أرفع حلول الواجبات المنزلية وصور السبورة؟
+              </div>
+              <p className="text-blue-800 text-[11px] leading-relaxed">
+                اضغط على أي درس في القائمة أدناه لفتحه، وستجد قسماً مخصصاً باللون الأزرق بعنوان <strong>"الحل النموذجي للواجب المنزلي"</strong> لرفع صور حل الواجب بعد تصحيحه في القسم. أو اضغط مباشرة على زر <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-black border border-blue-300">📝 رفع حل الواجب</span> الظاهر في رأس كل بطاقة درس!
+              </p>
+            </div>
+          </div>
+
           {/* اختيار المستوى */}
           <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
             {([1, 2] as const).map((lv) => (
@@ -2218,6 +2263,34 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       {/* ==================== 5. تبويب التقييم الميداني السريع (حصة الأعمال الموجهة) ==================== */}
       {mainTab === "evaluations" && (
         <div className="space-y-4">
+          {/* لافتة التبديل إلى دفتر التقييم الميداني المستقل الجديد */}
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl font-black shrink-0">
+                ⚡
+              </span>
+              <div>
+                <h3 className="text-xs font-black flex items-center gap-2">
+                  <span>دفتر التقييم الميداني السريع (جلسات المراقبة الدورية)</span>
+                  <span className="bg-amber-400 text-slate-900 text-[10px] px-2 py-0.5 rounded-full font-black">
+                    مستحسن للهاتف 📱
+                  </span>
+                </h3>
+                <p className="text-[11px] text-emerald-100 mt-0.5">
+                  تفقد الكراريس والواجبات الدورية بنظام الجلسات (مثال: الدروس 1-8 ثم 9-15) مع حساب المعدل العام التلقائي في صفحة مستقلة سريعة وفائقة الخفة!
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/eval"
+              className="py-2 px-4 rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-black shrink-0 flex items-center gap-1.5 shadow-sm transition active:scale-95"
+            >
+              <span>فتح الدفتر المستقل (/eval)</span>
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+          </div>
+
           {/* مقدمة وأدوات التحكم بالحصة */}
           <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-sm space-y-3.5">
             <div className="flex items-center justify-between pb-2 border-b border-emerald-100 flex-wrap gap-2">
@@ -3184,7 +3257,20 @@ function LessonCard({
           />
         </button>
 
-        <div className="flex items-center gap-1 shrink-0 mt-0.5">
+        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!open) onToggle();
+            }}
+            className="px-2 py-1 rounded-lg text-[11px] font-black bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition flex items-center gap-1 shrink-0 active:scale-95 shadow-2xs"
+            title="فتح الدرس لرفع صور الحل النموذجي للواجب"
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">رفع حل الواجب</span>
+            <span className="sm:hidden">حل الواجب</span>
+          </button>
           <button
             onClick={onEdit}
             className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition"

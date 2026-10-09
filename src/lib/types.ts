@@ -87,12 +87,46 @@ export type StudentEvaluation = {
   updatedAt: string;
 };
 
+export type InspectionRecord = {
+  studentName: string;
+  lessonsDone: number; // عدد الدروس المكتوبة (مثلاً 8 من 8)
+  homeworksDone: number; // عدد الواجبات المنجزة (مثلاً 8 من 8)
+  behaviorScore: number; // علامة السلوك والأدوات (من 5)
+  activityScore: number; // علامة حل النشاط والمشاركة (من 5)
+  score: number; // علامة هذه المراقبة من 20 (تحسب تلقائياً)
+  notes?: string; // ملاحظة سريعة للتلميذ
+};
+
+export type InspectionSession = {
+  id: string;
+  sessionNumber: number; // 1, 2, 3...
+  title?: string; // مثلاً: المراقبة الأولى (الدروس 1 إلى 8)
+  date: string; // اليوم والتاريخ : مثلاً "الأربعاء 09 أكتوبر 2026"
+  className: string; // القسم : "1 م 1" ، "1 م 2" ، "1 م 3" ، "2 م 3"
+  groupName: "فوج 1" | "فوج 2" | "القسم كامل"; // الفوج المعني
+  lessonRange: string; // مجال الدروس: مثلاً "الدروس من 1 إلى 8"
+  totalLessons: number; // عدد الدروس المقررة للمراقبة (مثلاً 8)
+  totalHomeworks: number; // عدد الواجبات المقررة للمراقبة (مثلاً 8)
+  records: Record<string, InspectionRecord>; // سجلات التلاميذ (مفتاحها اسم التلميذ)
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StudentRosterItem = {
+  id: string;
+  studentName: string;
+  className: string;
+  groupName: "فوج 1" | "فوج 2" | "القسم كامل";
+};
+
 export type LessonsData = {
   lessons: Lesson[];
   summons?: ParentSummons[];
   honors?: HonorStudent[];
   penalties?: Penalty[];
   evaluations?: StudentEvaluation[];
+  inspectionSessions?: InspectionSession[];
+  studentRoster?: StudentRosterItem[];
 };
 
 export const LEVELS = {
