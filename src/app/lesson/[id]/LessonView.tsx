@@ -12,11 +12,12 @@ import {
   BookOpen,
   ArrowRight,
   FileText,
+  ExternalLink,
   CheckCircle2,
   Clock,
 } from "lucide-react";
 import Link from "next/link";
-import { LEVELS, NOTEBOOKS, type Lesson, type LessonImage } from "@/lib/types";
+import { LEVELS, NOTEBOOKS, isPdfFile, type Lesson, type LessonImage } from "@/lib/types";
 import { Loading, Empty } from "@/components/ui";
 
 export function LessonView({ id }: { id: string }) {
@@ -283,82 +284,146 @@ export function LessonView({ id }: { id: string }) {
                 </span>
               </div>
 
-              {images.map((img, i) => (
-                <figure
-                  key={img.id}
-                  className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden fade-up"
-                >
-                  {/* شريط رقم الصورة */}
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                    <span className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                      <span
-                        className={`w-6 h-6 rounded-lg text-white flex items-center justify-center text-xs font-black ${
-                          viewMode === "homework" ? "bg-blue-600" : "bg-emerald-600"
-                        }`}
-                      >
-                        {i + 1}
-                      </span>
-                      <span>
-                        {viewMode === "homework"
-                          ? `حل الواجب • صورة رقم ${i + 1} من ${images.length}`
-                          : `صورة رقم ${i + 1} من ${images.length}`}
-                      </span>
-                    </span>
-                    <span className="text-[11px] text-slate-400">اضغط للتكبير</span>
-                  </div>
+              {images.map((img, i) => {
+                const isPdf = isPdfFile(img);
 
-                  {/* معاينة الصورة */}
-                  <button
-                    onClick={() => setSelectedIndex(i)}
-                    className="block w-full text-center bg-slate-900/5 relative group cursor-zoom-in"
+                if (isPdf) {
+                  return (
+                    <div
+                      key={img.id}
+                      className="bg-white rounded-2xl border border-red-200/90 shadow-sm overflow-hidden p-4 sm:p-5 space-y-3.5 fade-up"
+                    >
+                      {/* رأس بطاقة المستند */}
+                      <div className="flex items-start gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 to-rose-700 text-white flex flex-col items-center justify-center shrink-0 shadow-md shadow-red-600/20">
+                          <FileText className="w-6 h-6" />
+                          <span className="text-[8px] font-black tracking-wider uppercase">PDF</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-black bg-red-50 text-red-700 px-2.5 py-0.5 rounded-full border border-red-200/80">
+                              مستند PDF رسمي 📄
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-bold">
+                              {viewMode === "homework" ? "حل الواجب / السلسلة" : "ملف التحميل"}
+                            </span>
+                          </div>
+                          <h4 className="font-black text-sm text-slate-900 mt-1 break-words">
+                            {img.name || (viewMode === "homework" ? "حل الواجب المنزلي (PDF)" : "ملف السلسلة / الدرس (PDF)")}
+                          </h4>
+                        </div>
+                      </div>
+
+                      {/* أزرار الفتح والتحميل المباشرة */}
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <a
+                          href={img.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-black transition flex items-center justify-center gap-2 shadow-sm"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>فتح وقراءة مستند PDF في صفحة كاملة</span>
+                        </a>
+                        <a
+                          href={img.downloadUrl || img.url}
+                          download={img.name || `مستند-${lesson?.number ?? ""}.pdf`}
+                          className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 text-xs font-bold transition flex items-center justify-center gap-1.5"
+                        >
+                          <Download className="w-4 h-4 text-slate-600" />
+                          <span>تحميل الملف</span>
+                        </a>
+                      </div>
+
+                      {/* معاينة مدمجة للشاشات المتوسطة والكبيرة */}
+                      <div className="hidden sm:block pt-1">
+                        <iframe
+                          src={`${img.url}#toolbar=0`}
+                          title={img.name || "معاينة PDF"}
+                          className="w-full h-[500px] rounded-xl border border-slate-200 bg-slate-50"
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <figure
+                    key={img.id}
+                    className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden fade-up"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={img.url}
-                      alt={
-                        viewMode === "homework"
-                          ? `حل الواجب صورة رقم ${i + 1}`
-                          : `صورة السبورة رقم ${i + 1}`
-                      }
-                      loading="lazy"
-                      className="w-full h-auto max-h-[550px] object-contain mx-auto transition-transform group-hover:scale-[1.01]"
-                    />
-                  </button>
+                    {/* شريط رقم الصورة */}
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                      <span className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                        <span
+                          className={`w-6 h-6 rounded-lg text-white flex items-center justify-center text-xs font-black ${
+                            viewMode === "homework" ? "bg-blue-600" : "bg-emerald-600"
+                          }`}
+                        >
+                          {i + 1}
+                        </span>
+                        <span>
+                          {viewMode === "homework"
+                            ? `حل الواجب • صورة رقم ${i + 1} من ${images.length}`
+                            : `صورة رقم ${i + 1} من ${images.length}`}
+                        </span>
+                      </span>
+                      <span className="text-[11px] text-slate-400">اضغط للتكبير</span>
+                    </div>
 
-                  {/* أزرار الإجراءات السريعة */}
-                  <div className="flex gap-2 p-3 border-t border-slate-100 bg-white">
+                    {/* معاينة الصورة */}
                     <button
                       onClick={() => setSelectedIndex(i)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition"
+                      className="block w-full text-center bg-slate-900/5 relative group cursor-zoom-in"
                     >
-                      <Maximize2
-                        className={`w-4 h-4 ${
-                          viewMode === "homework" ? "text-blue-600" : "text-emerald-600"
-                        }`}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={img.url}
+                        alt={
+                          viewMode === "homework"
+                            ? `حل الواجب صورة رقم ${i + 1}`
+                            : `صورة السبورة رقم ${i + 1}`
+                        }
+                        loading="lazy"
+                        className="w-full h-auto max-h-[550px] object-contain mx-auto transition-transform group-hover:scale-[1.01]"
                       />
-                      <span>تكبير بملء الشاشة</span>
                     </button>
-                    <a
-                      href={img.downloadUrl || img.url}
-                      download={
-                        viewMode === "homework"
-                          ? `حل-واجب-درس-${lesson?.number ?? ""}-صورة-${i + 1}.jpg`
-                          : fileName(i)
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-white text-xs font-bold active:scale-95 transition shadow-sm ${
-                        viewMode === "homework"
-                          ? "bg-blue-600 hover:bg-blue-700"
-                          : "bg-emerald-600 hover:bg-emerald-700"
-                      }`}
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>تحميل الصورة على الهاتف</span>
-                    </a>
-                  </div>
-                </figure>
-              ))}
+
+                    {/* أزرار الإجراءات السريعة */}
+                    <div className="flex gap-2 p-3 border-t border-slate-100 bg-white">
+                      <button
+                        onClick={() => setSelectedIndex(i)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition"
+                      >
+                        <Maximize2
+                          className={`w-4 h-4 ${
+                            viewMode === "homework" ? "text-blue-600" : "text-emerald-600"
+                          }`}
+                        />
+                        <span>تكبير بملء الشاشة</span>
+                      </button>
+                      <a
+                        href={img.downloadUrl || img.url}
+                        download={
+                          viewMode === "homework"
+                            ? `حل-واجب-درس-${lesson?.number ?? ""}-صورة-${i + 1}.jpg`
+                            : fileName(i)
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-white text-xs font-bold active:scale-95 transition shadow-sm ${
+                          viewMode === "homework"
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-emerald-600 hover:bg-emerald-700"
+                        }`}
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>تحميل الصورة على الهاتف</span>
+                      </a>
+                    </div>
+                  </figure>
+                );
+              })}
             </div>
           )}
         </div>
@@ -376,8 +441,14 @@ export function LessonView({ id }: { id: string }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2">
-              <span className="text-white text-xs font-bold bg-white/20 px-3 py-1.5 rounded-lg">
-                {viewMode === "homework" ? "حل الواجب • " : ""}صورة {selectedIndex + 1} من {images.length}
+              <span className="text-white text-xs font-bold bg-white/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                {isPdfFile(activeImage) && <FileText className="w-3.5 h-3.5 text-red-400" />}
+                <span>
+                  {viewMode === "homework" ? "حل الواجب • " : ""}
+                  {isPdfFile(activeImage)
+                    ? `مستند PDF (${selectedIndex + 1}/${images.length})`
+                    : `صورة ${selectedIndex + 1} من ${images.length}`}
+                </span>
               </span>
               <a
                 href={activeImage.downloadUrl || activeImage.url}
@@ -389,6 +460,17 @@ export function LessonView({ id }: { id: string }) {
                 <Download className="w-3.5 h-3.5" />
                 <span>تحميل</span>
               </a>
+              {isPdfFile(activeImage) && (
+                <a
+                  href={activeImage.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold active:scale-95 transition"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>فتح كامل</span>
+                </a>
+              )}
             </div>
 
             <button
@@ -400,7 +482,7 @@ export function LessonView({ id }: { id: string }) {
             </button>
           </div>
 
-          {/* وسط الشاشة: الصورة مع أزرار التنقل يميناً ويساراً */}
+          {/* وسط الشاشة: الصورة أو مستند PDF مع أزرار التنقل */}
           <div className="flex-1 flex items-center justify-center relative p-2 min-h-0">
             {images.length > 1 && (
               <>
@@ -413,7 +495,7 @@ export function LessonView({ id }: { id: string }) {
                   className={`absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm border border-white/20 z-10 transition ${
                     selectedIndex === 0 ? "opacity-20 cursor-not-allowed" : "hover:bg-black/80"
                   }`}
-                  aria-label="الصورة السابقة"
+                  aria-label="السابق"
                 >
                   <ChevronRight className="w-6 h-6" />
                 </button>
@@ -427,42 +509,82 @@ export function LessonView({ id }: { id: string }) {
                   className={`absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm border border-white/20 z-10 transition ${
                     selectedIndex === images.length - 1 ? "opacity-20 cursor-not-allowed" : "hover:bg-black/80"
                   }`}
-                  aria-label="الصورة التالية"
+                  aria-label="التالي"
                 >
                   <ChevronLeft className="w-6 h-6" />
                 </button>
               </>
             )}
 
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={activeImage.url}
-              alt=""
-              className="max-h-full max-w-full object-contain pointer-events-auto"
-              onClick={(e) => e.stopPropagation()}
-            />
+            {isPdfFile(activeImage) ? (
+              <div
+                className="w-full max-w-4xl h-[80vh] bg-white rounded-2xl overflow-hidden flex flex-col shadow-2xl z-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-slate-900 text-white p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-red-400" />
+                    <span className="font-bold text-xs truncate max-w-[200px] sm:max-w-md">
+                      {activeImage.name || "مستند PDF"}
+                    </span>
+                  </div>
+                  <a
+                    href={activeImage.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>نافذة خارجية</span>
+                  </a>
+                </div>
+                <iframe
+                  src={activeImage.url}
+                  className="w-full flex-1 border-0"
+                  title="PDF Document"
+                />
+              </div>
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={activeImage.url}
+                alt=""
+                className="max-h-full max-w-full object-contain pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
           </div>
 
-          {/* شريط الصور المصغرة السفلي */}
+          {/* شريط الصور والملفات المصغرة السفلي */}
           {images.length > 1 && (
             <div
               className="p-3 bg-black/60 backdrop-blur-sm flex justify-center gap-2 overflow-x-auto z-10"
               onClick={(e) => e.stopPropagation()}
             >
-              {images.map((img, i) => (
-                <button
-                  key={img.id}
-                  onClick={() => setSelectedIndex(i)}
-                  className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition shrink-0 ${
-                    i === selectedIndex
-                      ? "border-emerald-500 scale-105"
-                      : "border-transparent opacity-50 hover:opacity-80"
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
+              {images.map((img, i) => {
+                const isPdf = isPdfFile(img);
+                return (
+                  <button
+                    key={img.id}
+                    onClick={() => setSelectedIndex(i)}
+                    className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition shrink-0 flex items-center justify-center ${
+                      i === selectedIndex
+                        ? "border-emerald-500 scale-105"
+                        : "border-transparent opacity-50 hover:opacity-80"
+                    } ${isPdf ? "bg-red-500/20 text-red-400" : "bg-black/40"}`}
+                  >
+                    {isPdf ? (
+                      <div className="flex flex-col items-center justify-center">
+                        <FileText className="w-5 h-5 text-red-400" />
+                        <span className="text-[8px] font-black text-white">PDF</span>
+                      </div>
+                    ) : (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={img.url} alt="" className="w-full h-full object-cover" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

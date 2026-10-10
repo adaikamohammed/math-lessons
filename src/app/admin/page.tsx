@@ -42,11 +42,13 @@ import {
   Check,
   Search,
   Scale,
+  Download,
 } from "lucide-react";
 import {
   LEVELS,
   COMMON_FIELDS,
   HONOR_CLASSES,
+  isPdfFile,
   type Lesson,
   type LessonImage,
   type NotebookType,
@@ -3250,23 +3252,38 @@ function LessonCard({
     const list = Array.from(files);
 
     for (let k = 0; k < list.length; k++) {
+      const file = list[k];
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
       setUploading(
-        isHomework
+        isPdf
+          ? `جاري رفع مستند PDF "${file.name}" (${k + 1} من ${list.length})...`
+          : isHomework
           ? `جاري ضغط ورفع حل الواجب ${k + 1} من ${list.length}...`
           : `جاري ضغط ورفع صورة السبورة ${k + 1} من ${list.length}...`
       );
       try {
-        const compressed = await imageCompression(list[k], {
-          maxSizeMB: 0.8,
-          maxWidthOrHeight: 2000,
-          useWebWorker: true,
-          fileType: "image/jpeg",
-        });
+        let fileToUpload: File | Blob = file;
+
+        // ضغط الصور فقط، أما ملفات PDF فترفع كما هي بجودتها الكاملة
+        if (!isPdf && (file.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(file.name))) {
+          try {
+            fileToUpload = await imageCompression(file, {
+              maxSizeMB: 0.8,
+              maxWidthOrHeight: 2000,
+              useWebWorker: true,
+              fileType: "image/jpeg",
+            });
+          } catch (compressErr) {
+            console.warn("Image compression skipped:", compressErr);
+            fileToUpload = file;
+          }
+        }
 
         const formData = new FormData();
         formData.append("lessonId", lesson.id);
         if (isHomework) formData.append("isHomework", "true");
-        formData.append("file", compressed, list[k].name);
+        formData.append("file", fileToUpload, file.name);
 
         const res = await fetch("/api/upload", {
           method: "POST",
@@ -3278,7 +3295,7 @@ function LessonCard({
           throw new Error(errData.error || "فشل الرفع");
         }
       } catch (e: any) {
-        showToast("error", "فشل رفع إحدى الصور: " + (e.message || "خطأ غير معروف"));
+        showToast("error", `فشل رفع "${file.name}": ` + (e.message || "خطأ غير معروف"));
       }
     }
 
@@ -3286,8 +3303,8 @@ function LessonCard({
     showToast(
       "success",
       isHomework
-        ? `✓ تم رفع صور الحل النموذجي للواجب بنجاح إلى "${lesson.title}" 📝`
-        : `✓ تم رفع صور السبورة بنجاح إلى "${lesson.title}" 📷`
+        ? `✓ تم رفع حل الواجب / السلسلة بنجاح إلى "${lesson.title}" 📝`
+        : `✓ تم رفع الملفات بنجاح إلى "${lesson.title}" 📁`
     );
 
     // جلب الدرس المحدث وتحديث الحالة محلياً مباشرة
@@ -3489,13 +3506,13 @@ function LessonCard({
                 setCardTab("homework");
               }}
               className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shrink-0 active:scale-95 shadow-sm cursor-pointer"
-              title="اضغط هنا فوراً لرفع صورة حل الواجب لهذا الدرس من الهاتف أو الحاسوب"
+              title="اضغط هنا فوراً لرفع صورة أو ملف PDF لحل الواجب لهذا الدرس من الهاتف أو الحاسوب"
             >
               <FileText className="w-3.5 h-3.5 text-white" />
-              <span>{isWorksheet ? "📝 رفع الحل" : "📝 رفع حل الواجب"}</span>
+              <span>{isWorksheet ? "📝 رفع الحل (صور/PDF)" : "📝 رفع حل الواجب (صور/PDF)"}</span>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf,.pdf"
                 multiple
                 hidden
                 onChange={(e) => {
@@ -3512,13 +3529,13 @@ function LessonCard({
                 setCardTab("board");
               }}
               className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-amber-600 hover:bg-amber-700 text-white transition flex items-center gap-1.5 shrink-0 active:scale-95 shadow-sm cursor-pointer"
-              title="اضغط هنا لرفع صور الملخص"
+              title="اضغط هنا لرفع صور أو ملفات PDF للملخص"
             >
               <Upload className="w-3.5 h-3.5 text-white" />
-              <span>📌 رفع صور الملخص</span>
+              <span>📌 رفع الملخص (صور/PDF)</span>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf,.pdf"
                 multiple
                 hidden
                 onChange={(e) => {
@@ -3535,13 +3552,13 @@ function LessonCard({
                 setCardTab("board");
               }}
               className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-sky-600 hover:bg-sky-700 text-white transition flex items-center gap-1.5 shrink-0 active:scale-95 shadow-sm cursor-pointer"
-              title="اضغط هنا لرفع صور الحصة"
+              title="اضغط هنا لرفع صور الحصة أو ملفات PDF"
             >
               <Upload className="w-3.5 h-3.5 text-white" />
-              <span>📷 رفع صور الحصة</span>
+              <span>📁 رفع صور أو PDF</span>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf,.pdf"
                 multiple
                 hidden
                 onChange={(e) => {
@@ -3580,7 +3597,7 @@ function LessonCard({
             </div>
           )}
 
-          {/* تبويبات بطاقة الدرس: حل الواجب مقابل صور السبورة */}
+          {/* تبويبات بطاقة الدرس: حل الواجب مقابل صور وملفات العنصر */}
           {!isSummary ? (
             <div className="grid grid-cols-2 gap-1.5 bg-slate-200/70 p-1 rounded-xl text-center">
               <button
@@ -3611,7 +3628,7 @@ function LessonCard({
                 <Upload className="w-3.5 h-3.5" />
                 <span>
                   {isWorksheet
-                    ? `📑 صور السلسلة (${lesson.images?.length || 0})`
+                    ? `📑 ملفات السلسلة (${lesson.images?.length || 0})`
                     : isDirectedWork
                     ? `📗 صور الحصة (${lesson.images?.length || 0})`
                     : `📷 صور السبورة (${lesson.images?.length || 0})`}
@@ -3621,20 +3638,24 @@ function LessonCard({
           ) : (
             <div className="bg-amber-100/70 p-2.5 rounded-xl text-center text-xs font-black text-amber-900 flex items-center justify-center gap-2">
               <Upload className="w-4 h-4 text-amber-700" />
-              <span>📌 صور الملخص أو المطوية ({lesson.images?.length || 0} صور):</span>
+              <span>📌 ملفات وصور الملخص ({lesson.images?.length || 0}):</span>
             </div>
           )}
 
-          {/* ================= 1. قسم الحل النموذجي للواجب المنزلي ================= */}
+          {/* ================= 1. قسم الحل النموذجي للواجب أو السلسلة ================= */}
           {cardTab === "homework" && (
             <div className="space-y-3 bg-blue-50/40 p-3 rounded-2xl border border-blue-200/80">
               <div className="flex items-center justify-between text-xs font-bold text-slate-700">
                 <span className="flex items-center gap-1.5 text-blue-900 font-black">
                   <FileText className="w-4 h-4 text-blue-600" />
-                  <span>صور الحل النموذجي للواجب المنزلي ({lesson.homeworkImages?.length || 0}):</span>
+                  <span>
+                    {isWorksheet
+                      ? `ملفات وحلول السلسلة (${lesson.homeworkImages?.length || 0}):`
+                      : `صور وملفات الحل النموذجي للواجب (${lesson.homeworkImages?.length || 0}):`}
+                  </span>
                 </span>
                 <span className="text-[11px] text-blue-700 font-bold bg-blue-100 px-2 py-0.5 rounded">
-                  يُرفع بعد تصحيح الواجب في القسم 📝
+                  {isWorksheet ? "الحل النموذجي 📝" : "يُرفع بعد تصحيح الواجب في القسم 📝"}
                 </span>
               </div>
 
@@ -3649,77 +3670,115 @@ function LessonCard({
 
               {lesson.homeworkImages && lesson.homeworkImages.length > 0 ? (
                 <div className="space-y-2">
-                  {lesson.homeworkImages.map((img, idx) => (
-                    <div
-                      key={img.id}
-                      className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-blue-100 shadow-2xs"
-                    >
-                      <span className="w-7 h-7 shrink-0 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center">
-                        {idx + 1}
-                      </span>
-
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={img.url}
-                        alt=""
-                        onClick={() => setPreviewImg(img.url)}
-                        className="w-14 h-14 object-cover rounded-lg border border-slate-100 shrink-0 cursor-pointer hover:opacity-90 transition"
-                      />
-
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold text-slate-700 truncate">
-                          حل الواجب صفحة {idx + 1}
-                        </div>
-                        <button
-                          onClick={() => setPreviewImg(img.url)}
-                          className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
-                        >
-                          <Eye className="w-3 h-3" /> معاينة كاملة
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          disabled={idx === 0}
-                          onClick={() => moveHwImage(idx, "prev")}
-                          className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
-                            idx === 0
-                              ? "opacity-30 cursor-not-allowed text-slate-300"
-                              : "text-slate-600 hover:bg-slate-100"
-                          }`}
-                          title="تقديم لأعلى"
-                        >
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          disabled={idx === (lesson.homeworkImages?.length ?? 0) - 1}
-                          onClick={() => moveHwImage(idx, "next")}
-                          className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
-                            idx === (lesson.homeworkImages?.length ?? 0) - 1
-                              ? "opacity-30 cursor-not-allowed text-slate-300"
-                              : "text-slate-600 hover:bg-slate-100"
-                          }`}
-                          title="تأخير لأسفل"
-                        >
-                          <ArrowLeft className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => setDeletingHwImageId(img.id)}
-                        className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
-                        title="حذف هذه الصورة"
+                  {lesson.homeworkImages.map((img, idx) => {
+                    const isPdf = isPdfFile(img);
+                    return (
+                      <div
+                        key={img.id}
+                        className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-blue-100 shadow-2xs"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                        <span className="w-7 h-7 shrink-0 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+
+                        {isPdf ? (
+                          <div
+                            onClick={() => window.open(img.url, "_blank")}
+                            className="w-14 h-14 rounded-lg bg-red-50 border border-red-200 text-red-600 flex flex-col items-center justify-center shrink-0 cursor-pointer hover:bg-red-100 transition"
+                            title="فتح ملف PDF في نافذة جديدة"
+                          >
+                            <FileText className="w-6 h-6 text-red-600" />
+                            <span className="text-[9px] font-black text-red-700 mt-0.5">PDF</span>
+                          </div>
+                        ) : (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={img.url}
+                            alt=""
+                            onClick={() => setPreviewImg(img.url)}
+                            className="w-14 h-14 object-cover rounded-lg border border-slate-100 shrink-0 cursor-pointer hover:opacity-90 transition"
+                          />
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-slate-700 truncate" title={img.name}>
+                            {img.name || (isPdf ? `حل الواجب (PDF) ${idx + 1}` : `حل الواجب صفحة ${idx + 1}`)}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {isPdf ? (
+                              <a
+                                href={img.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[11px] text-red-600 font-bold hover:underline flex items-center gap-1"
+                              >
+                                <Eye className="w-3 h-3" /> فتح PDF
+                              </a>
+                            ) : (
+                              <button
+                                onClick={() => setPreviewImg(img.url)}
+                                className="text-[11px] text-blue-600 hover:underline flex items-center gap-1"
+                              >
+                                <Eye className="w-3 h-3" /> معاينة كاملة
+                              </button>
+                            )}
+                            <a
+                              href={img.downloadUrl || img.url}
+                              download={img.name || (isPdf ? `حل-${idx + 1}.pdf` : `حل-${idx + 1}.jpg`)}
+                              className="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1"
+                            >
+                              <Download className="w-3 h-3" /> تحميل
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            disabled={idx === 0}
+                            onClick={() => moveHwImage(idx, "prev")}
+                            className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                              idx === 0
+                                ? "opacity-30 cursor-not-allowed text-slate-300"
+                                : "text-slate-600 hover:bg-slate-100"
+                            }`}
+                            title="تقديم لأعلى"
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            disabled={idx === (lesson.homeworkImages?.length ?? 0) - 1}
+                            onClick={() => moveHwImage(idx, "next")}
+                            className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                              idx === (lesson.homeworkImages?.length ?? 0) - 1
+                                ? "opacity-30 cursor-not-allowed text-slate-300"
+                                : "text-slate-600 hover:bg-slate-100"
+                            }`}
+                            title="تأخير لأسفل"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => setDeletingHwImageId(img.id)}
+                          className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
+                          title="حذف هذا الملف"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-6 bg-white rounded-xl border border-dashed border-blue-200 text-xs text-slate-500 space-y-1">
-                  <div className="font-bold text-slate-700">لم يتم رفع صور الحل النموذجي للواجب بعد.</div>
+                  <div className="font-bold text-slate-700">
+                    {isWorksheet
+                      ? "لم يتم رفع حل السلسلة بعد (يمكنك رفع ملف PDF أو صور)."
+                      : "لم يتم رفع الحل النموذجي للواجب بعد (يمكنك رفع ملف PDF أو صور)."}
+                  </div>
                   <div className="text-[11px] text-blue-700">
-                    اضغط على الزر الأزرق أدناه لاختيار ورفع صور الحل من هاتفك أو حاسوبك.
+                    اضغط على الزر الأزرق أدناه لاختيار ورفع ملف PDF أو صور الحل من هاتفك أو حاسوبك.
                   </div>
                 </div>
               )}
@@ -3737,12 +3796,16 @@ function LessonCard({
                 ) : (
                   <>
                     <Upload className="w-4 h-4 text-white" />
-                    <span>📝 اضغط هنا لاختيار ورفع صور حل الواجب (كاميرا أو صور)</span>
+                    <span>
+                      {isWorksheet
+                        ? "📝 اضغط هنا لاختيار ورفع حل السلسلة (ملف PDF أو صور)"
+                        : "📝 اضغط هنا لاختيار ورفع صور أو ملف PDF لحل الواجب"}
+                    </span>
                   </>
                 )}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,application/pdf,.pdf"
                   multiple
                   hidden
                   onChange={(e) => {
@@ -3754,85 +3817,129 @@ function LessonCard({
             </div>
           )}
 
-          {/* ================= 2. قسم صور السبورة للدرس ================= */}
+          {/* ================= 2. قسم ملفات وصور السبورة / السلسلة ================= */}
           {cardTab === "board" && (
             <div className="space-y-3 bg-emerald-50/40 p-3 rounded-2xl border border-emerald-200/80">
               <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                <span>صور السبورة لهذا الدرس ({lesson.images?.length || 0}):</span>
+                <span>
+                  {isWorksheet
+                    ? `ملفات ومستندات السلسلة (${lesson.images?.length || 0}):`
+                    : isSummary
+                    ? `ملفات ومستندات الملخص (${lesson.images?.length || 0}):`
+                    : `صور وملفات السبورة لهذا الدرس (${lesson.images?.length || 0}):`}
+                </span>
                 <span className="text-[11px] text-slate-400 font-normal">مرتبة بالتسلسل</span>
               </div>
 
               {lesson.images && lesson.images.length > 0 ? (
                 <div className="space-y-2">
-                  {lesson.images.map((img, idx) => (
-                    <div
-                      key={img.id}
-                      className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-slate-100 shadow-2xs"
-                    >
-                      <span className="w-7 h-7 shrink-0 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center">
-                        {idx + 1}
-                      </span>
-
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={img.url}
-                        alt=""
-                        onClick={() => setPreviewImg(img.url)}
-                        className="w-14 h-14 object-cover rounded-lg border border-slate-100 shrink-0 cursor-pointer hover:opacity-90 transition"
-                      />
-
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold text-slate-700 truncate">
-                          صورة السبورة {idx + 1}
-                        </div>
-                        <button
-                          onClick={() => setPreviewImg(img.url)}
-                          className="text-[11px] text-emerald-600 hover:underline flex items-center gap-1 mt-0.5"
-                        >
-                          <Eye className="w-3 h-3" /> معاينة كاملة
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          disabled={idx === 0}
-                          onClick={() => moveImage(idx, "prev")}
-                          className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
-                            idx === 0
-                              ? "opacity-30 cursor-not-allowed text-slate-300"
-                              : "text-slate-600 hover:bg-slate-100"
-                          }`}
-                          title="تقديم لأعلى"
-                        >
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          disabled={idx === lesson.images.length - 1}
-                          onClick={() => moveImage(idx, "next")}
-                          className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
-                            idx === lesson.images.length - 1
-                              ? "opacity-30 cursor-not-allowed text-slate-300"
-                              : "text-slate-600 hover:bg-slate-100"
-                          }`}
-                          title="تأخير لأسفل"
-                        >
-                          <ArrowLeft className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => setDeletingImageId(img.id)}
-                        className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
-                        title="حذف هذه الصورة"
+                  {lesson.images.map((img, idx) => {
+                    const isPdf = isPdfFile(img);
+                    return (
+                      <div
+                        key={img.id}
+                        className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-slate-100 shadow-2xs"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                        <span className="w-7 h-7 shrink-0 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+
+                        {isPdf ? (
+                          <div
+                            onClick={() => window.open(img.url, "_blank")}
+                            className="w-14 h-14 rounded-lg bg-red-50 border border-red-200 text-red-600 flex flex-col items-center justify-center shrink-0 cursor-pointer hover:bg-red-100 transition"
+                            title="فتح ملف PDF في نافذة جديدة"
+                          >
+                            <FileText className="w-6 h-6 text-red-600" />
+                            <span className="text-[9px] font-black text-red-700 mt-0.5">PDF</span>
+                          </div>
+                        ) : (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={img.url}
+                            alt=""
+                            onClick={() => setPreviewImg(img.url)}
+                            className="w-14 h-14 object-cover rounded-lg border border-slate-100 shrink-0 cursor-pointer hover:opacity-90 transition"
+                          />
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-slate-700 truncate" title={img.name}>
+                            {img.name || (isPdf ? `ملف PDF ${idx + 1}` : `صورة ${idx + 1}`)}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {isPdf ? (
+                              <a
+                                href={img.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[11px] text-red-600 font-bold hover:underline flex items-center gap-1"
+                              >
+                                <Eye className="w-3 h-3" /> فتح PDF
+                              </a>
+                            ) : (
+                              <button
+                                onClick={() => setPreviewImg(img.url)}
+                                className="text-[11px] text-emerald-600 hover:underline flex items-center gap-1"
+                              >
+                                <Eye className="w-3 h-3" /> معاينة كاملة
+                              </button>
+                            )}
+                            <a
+                              href={img.downloadUrl || img.url}
+                              download={img.name || (isPdf ? `ملف-${idx + 1}.pdf` : `صورة-${idx + 1}.jpg`)}
+                              className="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1"
+                            >
+                              <Download className="w-3 h-3" /> تحميل
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            disabled={idx === 0}
+                            onClick={() => moveImage(idx, "prev")}
+                            className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                              idx === 0
+                                ? "opacity-30 cursor-not-allowed text-slate-300"
+                                : "text-slate-600 hover:bg-slate-100"
+                            }`}
+                            title="تقديم لأعلى"
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            disabled={idx === lesson.images.length - 1}
+                            onClick={() => moveImage(idx, "next")}
+                            className={`w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center transition ${
+                              idx === lesson.images.length - 1
+                                ? "opacity-30 cursor-not-allowed text-slate-300"
+                                : "text-slate-600 hover:bg-slate-100"
+                            }`}
+                            title="تأخير لأسفل"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => setDeletingImageId(img.id)}
+                          className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
+                          title="حذف هذا الملف"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-6 bg-white rounded-xl border border-dashed border-slate-200 text-xs text-slate-400">
-                  لا توجد صور مرفوعة لهذا الدرس بعد. اضغط الزر أدناه لرفع صور السبورة.
+                  {isWorksheet
+                    ? "لا توجد ملفات مرفوعة لهذه السلسلة بعد. اضغط الزر أدناه لرفع ملف PDF أو صور التمارين."
+                    : isSummary
+                    ? "لا توجد ملفات مرفوعة لهذا الملخص بعد. اضغط الزر أدناه لرفع ملف PDF أو صور الملخص."
+                    : "لا توجد ملفات أو صور مرفوعة لهذا الدرس بعد. اضغط الزر أدناه للرفع."}
                 </div>
               )}
 
@@ -3849,12 +3956,18 @@ function LessonCard({
                 ) : (
                   <>
                     <Upload className="w-4 h-4" />
-                    <span>📷 رفع صور سبورة جديدة (يمكن اختيار صورة أو عدة صور معاً)</span>
+                    <span>
+                      {isWorksheet
+                        ? "📑 اضغط هنا لرفع السلسلة (ملف PDF أو صور)"
+                        : isSummary
+                        ? "📌 اضغط هنا لرفع الملخص (ملف PDF أو صور)"
+                        : "📁 رفع ملفات PDF أو صور سبورة جديدة"}
+                    </span>
                   </>
                 )}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,application/pdf,.pdf"
                   multiple
                   hidden
                   onChange={(e) => {
@@ -3954,18 +4067,39 @@ function LessonCard({
           className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-3"
           onClick={() => setPreviewImg(null)}
         >
-          <button
-            onClick={() => setPreviewImg(null)}
-            className="absolute top-4 left-4 w-9 h-9 rounded-xl bg-white/10 text-white flex items-center justify-center"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewImg}
-            alt=""
-            className="max-w-full max-h-[90vh] object-contain rounded-lg"
-          />
+          <div className="absolute top-4 left-4 flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
+            <a
+              href={previewImg}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold flex items-center gap-1.5 transition backdrop-blur-xs"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>فتح في نافذة كاملة</span>
+            </a>
+            <button
+              onClick={() => setPreviewImg(null)}
+              className="w-9 h-9 rounded-xl bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition backdrop-blur-xs"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {isPdfFile({ url: previewImg }) ? (
+            <div className="w-full max-w-4xl h-[85vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <iframe
+                src={`${previewImg}#toolbar=1`}
+                title="معاينة PDF"
+                className="w-full flex-1 border-0"
+              />
+            </div>
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={previewImg}
+              alt=""
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
+          )}
         </div>
       )}
     </div>

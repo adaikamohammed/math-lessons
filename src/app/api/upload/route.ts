@@ -25,17 +25,30 @@ export async function POST(req: NextRequest) {
     }
 
     const isHomework = formData.get("isHomework") === "true" || formData.get("type") === "homework";
+    const isPdf =
+      file.type === "application/pdf" ||
+      (file.name && file.name.toLowerCase().endsWith(".pdf"));
+
+    const fallbackFileName = isPdf
+      ? (isHomework ? "homework-solution.pdf" : "lesson-file.pdf")
+      : (isHomework ? "homework-solution.jpg" : "lesson-image.jpg");
 
     const { url, downloadUrl } = await uploadImageFile(
       file,
-      file.name || (isHomework ? "homework-solution.jpg" : "lesson-image.jpg"),
+      file.name || fallbackFileName,
       lessonId,
       lesson.level
     );
 
     const defaultName = isHomework
-      ? (lesson.type === "worksheets" ? "حل السلسلة" : "حل الواجب المنزلي")
-      : (lesson.type === "worksheets" ? "صورة السلسلة" : lesson.type === "summaries" ? "صورة الملخص" : "صورة الدرس");
+      ? (lesson.type === "worksheets"
+          ? (isPdf ? "ملف حل السلسلة (PDF)" : "حل السلسلة")
+          : (isPdf ? "ملف حل الواجب (PDF)" : "حل الواجب المنزلي"))
+      : (lesson.type === "worksheets"
+          ? (isPdf ? "ملف السلسلة (PDF)" : "صورة السلسلة")
+          : lesson.type === "summaries"
+          ? (isPdf ? "ملف الملخص (PDF)" : "صورة الملخص")
+          : (isPdf ? "ملف الدرس (PDF)" : "صورة الدرس"));
 
     const newImage: LessonImage = {
       id: `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -43,6 +56,7 @@ export async function POST(req: NextRequest) {
       downloadUrl,
       name: file.name || defaultName,
       createdAt: new Date().toISOString(),
+      fileType: isPdf ? "pdf" : "image",
     };
 
     if (isHomework) {

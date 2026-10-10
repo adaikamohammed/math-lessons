@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { ChevronLeft, Image as ImageIcon, BookOpen, Layers, StickyNote, Sparkles } from "lucide-react";
-import { LEVELS, NOTEBOOKS, type Lesson, type NotebookType } from "@/lib/types";
+import { ChevronLeft, Image as ImageIcon, BookOpen, Layers, StickyNote, Sparkles, FileText } from "lucide-react";
+import { LEVELS, NOTEBOOKS, isPdfFile, type Lesson, type NotebookType } from "@/lib/types";
 import { BackHeader, Loading, Empty } from "@/components/ui";
 
 export function YearLessons({ level }: { level: 1 | 2 }) {
@@ -263,6 +263,13 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
 
                               {/* الملاحظات وعدد الصور وحالة الواجب */}
                               <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
+                                  <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
+                                    <FileText className="w-3 h-3 text-red-500" />
+                                    <span>ملف PDF</span>
+                                  </span>
+                                )}
+
                                 <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">
                                   <ImageIcon className="w-3 h-3 text-slate-400" />
                                   <span>{count} {count === 1 ? "صورة" : "صور"}</span>
@@ -340,6 +347,13 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
 
                       {/* الملاحظات وعدد الصور */}
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
+                          <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
+                            <FileText className="w-3 h-3 text-red-500" />
+                            <span>ملف PDF</span>
+                          </span>
+                        )}
+
                         <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">
                           <ImageIcon className="w-3 h-3 text-slate-400" />
                           <span>{count} {count === 1 ? "صورة" : "صور"}</span>
@@ -399,9 +413,16 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                       </h3>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
+                          <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
+                            <FileText className="w-3 h-3 text-red-500" />
+                            <span>مستند PDF</span>
+                          </span>
+                        )}
+
                         <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">
                           <ImageIcon className="w-3 h-3 text-slate-400" />
-                          <span>{count} {count === 1 ? "صورة" : "صور"}</span>
+                          <span>{count} {count === 1 ? "ملف/صورة" : "ملفات وصور"}</span>
                         </span>
 
                         {(l.homeworkImages?.length || 0) > 0 && (
@@ -464,9 +485,16 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                       </h3>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
+                          <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
+                            <FileText className="w-3 h-3 text-red-500" />
+                            <span>مستند PDF</span>
+                          </span>
+                        )}
+
                         <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">
                           <ImageIcon className="w-3 h-3 text-slate-400" />
-                          <span>{count} {count === 1 ? "صورة" : "صور"}</span>
+                          <span>{count} {count === 1 ? "ملف/صورة" : "ملفات وصور"}</span>
                         </span>
 
                         {l.notes && (

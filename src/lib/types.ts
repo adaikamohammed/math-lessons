@@ -6,7 +6,17 @@ export type LessonImage = {
   downloadUrl?: string;
   name: string;
   createdAt: string;
+  fileType?: "image" | "pdf";
 };
+
+export function isPdfFile(item?: { url?: string; name?: string; fileType?: string } | null): boolean {
+  if (!item) return false;
+  if (item.fileType === "pdf") return true;
+  const name = (item.name || "").toLowerCase();
+  const url = (item.url || "").toLowerCase();
+  return name.endsWith(".pdf") || url.endsWith(".pdf") || url.includes(".pdf?") || url.includes("/pdf");
+}
+
 
 export type Lesson = {
   id: string;
