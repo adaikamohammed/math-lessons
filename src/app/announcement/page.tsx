@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 export default function AnnouncementPage() {
-  const [activeTab, setActiveTab] = useState<"all" | "support" | "supplies" | "reception">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "supplies" | "reception">("all");
 
   return (
     <div className="pb-16 pt-3 fade-up space-y-5">
@@ -34,11 +34,11 @@ export default function AnnouncementPage() {
           <ArrowRight className="w-5 h-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/60 mb-0.5">
-            <Sparkles className="w-3 h-3 text-amber-600" /> إعلان هام وتوجيهات رسمية
+          <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60 mb-0.5">
+            <Sparkles className="w-3 h-3 text-emerald-600" /> دليل وتوجيهات رسمية
           </span>
           <h1 className="text-base font-extrabold text-slate-900 truncate">
-            دروس الدعم والتوجيهات التربوية
+            دليل التوجيهات التربوية وتنظيم الكراريس
           </h1>
           <p className="text-[11px] text-slate-500">
             الأستاذ محمد عدايكة — متوسطة المجاهد باهي علي
@@ -50,7 +50,6 @@ export default function AnnouncementPage() {
       <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold items-center">
         {[
           { id: "all", label: "📋 الدليل كاملاً" },
-          { id: "support", label: "🏫 دروس الدعم" },
           { id: "supplies", label: "📚 الكراريس والأدوات" },
           { id: "reception", label: "🤝 ساعة الاستقبال" },
         ].map((tab) => (
@@ -74,74 +73,6 @@ export default function AnnouncementPage() {
           <ArrowRight className="w-3.5 h-3.5 rotate-180" />
         </Link>
       </div>
-
-      {/* ==================== 1. قسم دروس الدعم ==================== */}
-      {(activeTab === "all" || activeTab === "support") && (
-        <section className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-5 text-white shadow-md space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-base font-black">حصص الدعم المدرسي في مادة الرياضيات</h2>
-              <p className="text-xs text-emerald-100">تحت إشراف الأستاذ محمد عدايكة</p>
-            </div>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur rounded-2xl p-3.5 border border-white/20 text-xs space-y-2">
-            <div className="flex items-start gap-2">
-              <MapPin className="w-4 h-4 text-emerald-200 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold">المكان: </span>
-                <span>أكاديمية ستار سكول (مقابل صيدلية دو، وتحديداً فوق وكالة قميرة للسياحة والسفر).</span>
-              </div>
-            </div>
-          </div>
-
-          {/* مواعيد الأفواج */}
-          <div className="grid sm:grid-cols-2 gap-3">
-            {/* 1 متوسط */}
-            <div className="bg-white rounded-2xl p-4 text-slate-800 shadow-sm border border-emerald-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-extrabold text-xs">
-                  السنة الأولى متوسط (1م)
-                </span>
-                <span className="text-[11px] text-slate-400 font-bold">فوج الدعم</span>
-              </div>
-              <div className="text-xs space-y-1.5 pt-1">
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span><strong>الانطلاق:</strong> السبت 10 أكتوبر 2026</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span><strong>التوقيت:</strong> من 12:00 إلى 14:00 زوالاً</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 2 متوسط */}
-            <div className="bg-white rounded-2xl p-4 text-slate-800 shadow-sm border border-sky-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 font-extrabold text-xs">
-                  السنة الثانية متوسط (2م)
-                </span>
-                <span className="text-[11px] text-slate-400 font-bold">فوج الدعم</span>
-              </div>
-              <div className="text-xs space-y-1.5 pt-1">
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
-                  <span><strong>الانطلاق:</strong> السبت 10 أكتوبر 2026</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Clock className="w-4 h-4 text-sky-600 shrink-0" />
-                  <span><strong>التوقيت:</strong> من 08:00 إلى 10:00 صباحاً</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* ==================== 2. قسم الأدوات وتنظيم الكراريس ==================== */}
       {(activeTab === "all" || activeTab === "supplies") && (

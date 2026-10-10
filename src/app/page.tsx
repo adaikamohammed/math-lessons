@@ -149,7 +149,7 @@ export default function Home() {
           <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />
         </Link>
 
-        {/* بطاقة الإعلان الهام والتوجيهات (مختصرة ومتناسقة) */}
+        {/* بطاقة التوجيهات التربوية وتنظيم الكراريس */}
         <Link
           href="/announcement"
           className="flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs hover:border-slate-200 active:scale-[0.98] transition group"
@@ -159,11 +159,11 @@ export default function Home() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs text-slate-900">إعلان دروس الدعم وتنظيم الكراريس</span>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.2 rounded">دليل</span>
+              <span className="font-extrabold text-xs text-slate-900">دليل تنظيم الكراريس والتوجيهات التربوية</span>
+              <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.2 rounded">دليل 📚</span>
             </div>
             <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-              أكاديمية ستار سكول (1م و 2م) • الأدوات المدرسية • ساعة الاستقبال الأسبوعية
+              تنظيم كراس الدروس والأعمال الموجهة • الأدوات المدرسية • ساعة الاستقبال الأسبوعية
             </p>
           </div>
           <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />

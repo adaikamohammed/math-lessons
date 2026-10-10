@@ -6,11 +6,11 @@ import { Lesson, NotebookType } from "@/lib/types";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// جلب الدروس والأعمال الموجهة
+// جلب الدروس والأعمال الموجهة والسلاسل والملخصات
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const levelParam = searchParams.get("level");
-  const typeParam = searchParams.get("type"); // "lessons" | "directed_work"
+  const typeParam = searchParams.get("type"); // "lessons" | "directed_work" | "worksheets" | "summaries"
   const data = await getLessonsData();
 
   let lessons = data.lessons;
@@ -21,14 +21,18 @@ export async function GET(req: NextRequest) {
     lessons = lessons.filter((l) => l.level === levelNum);
   }
 
-  // فلترة حسب نوع الكراس (كراس الدروس أو كراس الأعمال الموجهة)
+  // فلترة حسب نوع القسم (كراس الدروس، الأعمال الموجهة، سلاسل التمارين، الملخصات)
   if (typeParam === "directed_work") {
     lessons = lessons.filter((l) => l.type === "directed_work");
+  } else if (typeParam === "worksheets") {
+    lessons = lessons.filter((l) => l.type === "worksheets");
+  } else if (typeParam === "summaries") {
+    lessons = lessons.filter((l) => l.type === "summaries");
   } else if (typeParam === "lessons") {
     lessons = lessons.filter((l) => !l.type || l.type === "lessons");
   }
 
-  // ترتيب الدروس تصاعدياً حسب رقم الدرس / الحصة
+  // ترتيب الدروس تصاعدياً حسب رقم الدرس / الحصة / السلسلة
   lessons.sort((a, b) => a.number - b.number);
 
   return NextResponse.json(
@@ -43,7 +47,7 @@ export async function GET(req: NextRequest) {
   );
 }
 
-// إضافة درس / حصة أعمال موجهة (للأستاذ فقط)
+// إضافة درس / حصة أعمال موجهة / سلسلة / ملخص (للأستاذ فقط)
 export async function POST(req: NextRequest) {
   const isAuth = await verifyAdminSession();
   if (!isAuth) {
@@ -52,17 +56,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    let { level, type, field, section, number, title, notes } = body;
+    let { level, type, field, section, number, title, notes, homeworkNotes } = body;
 
     if (!title || !level) {
-      return NextResponse.json({ error: "يرجى كتابة عنوان المورد / الحصة" }, { status: 400 });
+      return NextResponse.json({ error: "يرجى كتابة عنوان المورد / الحصة / السلسلة" }, { status: 400 });
     }
 
     title = String(title).trim();
-    const notebookType: NotebookType = type === "directed_work" ? "directed_work" : "lessons";
+    const validTypes: NotebookType[] = ["lessons", "directed_work", "worksheets", "summaries"];
+    const notebookType: NotebookType = validTypes.includes(type) ? type : "lessons";
 
     // استخراج الرقم تلقائياً إذا كان مكتوباً في العنوان ولم يُدخل يدوياً
-    const match = title.match(/^(?:(?:الدرس|المورد|الحصة|سلسلة)\s*)?0*(\d+)\s*[:\-–]\s*(.+)$/i);
+    const match = title.match(/^(?:(?:الدرس|المورد|الحصة|سلسلة|ملخص)\s*)?0*(\d+)\s*[:\-–]\s*(.+)$/i);
     let itemNum = Number(number);
     if (!itemNum && match) {
       itemNum = parseInt(match[1], 10);
@@ -70,7 +75,7 @@ export async function POST(req: NextRequest) {
 
     const data = await getLessonsData();
     const existingSame = data.lessons.filter(
-      (l) => l.level === Number(level) && (notebookType === "directed_work" ? l.type === "directed_work" : (!l.type || l.type === "lessons"))
+      (l) => l.level === Number(level) && (notebookType === "lessons" ? (!l.type || l.type === "lessons") : l.type === notebookType)
     );
 
     if (!itemNum) {
@@ -81,13 +86,15 @@ export async function POST(req: NextRequest) {
       id: `lesson_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       level: Number(level) as 1 | 2,
       type: notebookType,
-      field: notebookType === "lessons" ? (field ? String(field).trim() : "أنشطة عددية") : undefined,
-      section: notebookType === "lessons" ? (section ? String(section).trim() : "المقطع 1 : الأعداد الطبيعية والأعداد العشرية") : undefined,
+      field: notebookType === "lessons" ? (field ? String(field).trim() : "أنشطة عددية") : (field ? String(field).trim() : undefined),
+      section: section ? String(section).trim() : (notebookType === "lessons" ? "المقطع 1 : الأعداد الطبيعية والأعداد العشرية" : undefined),
       number: itemNum,
       title: title,
       notes: notes ? String(notes).trim() : undefined,
+      homeworkNotes: homeworkNotes ? String(homeworkNotes).trim() : undefined,
       createdAt: new Date().toISOString(),
       images: [],
+      homeworkImages: [],
     };
 
     data.lessons.push(newLesson);
@@ -100,7 +107,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// تعديل بيانات درس / حصة أعمال موجهة (للأستاذ فقط)
+// تعديل بيانات درس / حصة أعمال موجهة / سلسلة / ملخص (للأستاذ فقط)
 export async function PUT(req: NextRequest) {
   const isAuth = await verifyAdminSession();
   if (!isAuth) {
@@ -109,7 +116,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, title, number, field, section, notes, type } = body;
+    const { id, title, number, field, section, notes, homeworkNotes, type } = body;
 
     if (!id) {
       return NextResponse.json({ error: "معرّف العنصر مطلوب" }, { status: 400 });
@@ -126,7 +133,11 @@ export async function PUT(req: NextRequest) {
     if (field !== undefined) lesson.field = field ? String(field).trim() : undefined;
     if (section !== undefined) lesson.section = section ? String(section).trim() : undefined;
     if (notes !== undefined) lesson.notes = notes ? String(notes).trim() : undefined;
-    if (type !== undefined) lesson.type = type === "directed_work" ? "directed_work" : "lessons";
+    if (homeworkNotes !== undefined) lesson.homeworkNotes = homeworkNotes ? String(homeworkNotes).trim() : undefined;
+    if (type !== undefined) {
+      const validTypes: NotebookType[] = ["lessons", "directed_work", "worksheets", "summaries"];
+      if (validTypes.includes(type)) lesson.type = type;
+    }
 
     await saveLessonsData(data);
     return NextResponse.json({ success: true, lesson });

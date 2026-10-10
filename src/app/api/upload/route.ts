@@ -33,11 +33,15 @@ export async function POST(req: NextRequest) {
       lesson.level
     );
 
+    const defaultName = isHomework
+      ? (lesson.type === "worksheets" ? "حل السلسلة" : "حل الواجب المنزلي")
+      : (lesson.type === "worksheets" ? "صورة السلسلة" : lesson.type === "summaries" ? "صورة الملخص" : "صورة الدرس");
+
     const newImage: LessonImage = {
       id: `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       url,
       downloadUrl,
-      name: file.name || (isHomework ? "حل الواجب المنزلي" : "صورة الدرس"),
+      name: file.name || defaultName,
       createdAt: new Date().toISOString(),
     };
 

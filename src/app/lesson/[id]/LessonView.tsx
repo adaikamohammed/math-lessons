@@ -70,6 +70,9 @@ export function LessonView({ id }: { id: string }) {
     `درس-${lesson?.number ?? ""}-صورة-${i + 1}.jpg`;
 
   const isDirectedWork = lesson?.type === "directed_work";
+  const isWorksheet = lesson?.type === "worksheets";
+  const isSummary = lesson?.type === "summaries";
+  const hasHomeworkTab = !isSummary || (lesson?.homeworkImages && lesson.homeworkImages.length > 0);
 
   return (
     <div className="pb-16 pt-3 space-y-4 fade-up">
@@ -85,7 +88,7 @@ export function LessonView({ id }: { id: string }) {
         <div className="min-w-0 flex-1">
           {lesson ? (
             <div className="space-y-1">
-              {/* شارات التعريف بالكراس والمستوى */}
+              {/* شارات التعريف بالقسم والمستوى */}
               <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold">
                 <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md">
                   {LEVELS[lesson.level].label}
@@ -94,10 +97,20 @@ export function LessonView({ id }: { id: string }) {
                   className={`px-2 py-0.5 rounded-md ${
                     isDirectedWork
                       ? "bg-sky-50 text-sky-800"
+                      : isWorksheet
+                      ? "bg-indigo-50 text-indigo-800"
+                      : isSummary
+                      ? "bg-amber-50 text-amber-800"
                       : "bg-teal-50 text-teal-800"
                   }`}
                 >
-                  {isDirectedWork ? "📗 كراس الأعمال الموجهة" : "📘 كراس الدروس"}
+                  {isDirectedWork
+                    ? "📗 كراس الأعمال الموجهة"
+                    : isWorksheet
+                    ? "📑 سلسلة تمارين"
+                    : isSummary
+                    ? "📌 ملخص ومطوية"
+                    : "📘 كراس الدروس"}
                 </span>
               </div>
 
@@ -106,8 +119,8 @@ export function LessonView({ id }: { id: string }) {
                 {lesson.title}
               </h1>
 
-              {/* تفاصيل الميدان والمقطع للكراس العادي */}
-              {!isDirectedWork && (
+              {/* تفاصيل الميدان والمقطع للكراس العادي والسلاسل */}
+              {!isDirectedWork && !isSummary && (
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-bold pt-0.5">
                   {lesson.field && (
                     <span className="flex items-center gap-1">
@@ -125,7 +138,7 @@ export function LessonView({ id }: { id: string }) {
               )}
             </div>
           ) : (
-            <div className="text-sm font-bold text-slate-400">جاري تحميل بيانات الدرس...</div>
+            <div className="text-sm font-bold text-slate-400">جاري تحميل البيانات...</div>
           )}
         </div>
       </div>
@@ -133,61 +146,74 @@ export function LessonView({ id }: { id: string }) {
       {loading ? (
         <Loading />
       ) : !lesson ? (
-        <Empty text="الدرس غير موجود" />
+        <Empty text="العنصر غير موجود" />
       ) : (
         <div className="space-y-4">
           {/* شريط التبديل الواضح بين صور الدرس والحل النموذجي للواجب المنزلي */}
-          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-            <button
-              type="button"
-              onClick={() => {
-                setViewMode("lesson");
-                setSelectedIndex(null);
-              }}
-              className={`py-3 px-2 sm:px-4 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 sm:gap-2 ${
-                viewMode === "lesson"
-                  ? "bg-white text-emerald-850 shadow-xs border border-emerald-300/80 text-emerald-900"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <BookOpen className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>صور الدرس (السبورة)</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+          {hasHomeworkTab ? (
+            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode("lesson");
+                  setSelectedIndex(null);
+                }}
+                className={`py-3 px-2 sm:px-4 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 sm:gap-2 ${
                   viewMode === "lesson"
-                    ? "bg-emerald-50 text-emerald-800"
-                    : "bg-slate-200 text-slate-700"
+                    ? "bg-white text-emerald-900 shadow-xs border border-emerald-300/80"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                {lesson.images?.length || 0}
-              </span>
-            </button>
+                <BookOpen className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  {isWorksheet
+                    ? "صور السلسلة"
+                    : isDirectedWork
+                    ? "صور الحصة"
+                    : "صور الدرس (السبورة)"}
+                </span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    viewMode === "lesson"
+                      ? "bg-emerald-50 text-emerald-800"
+                      : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  {lesson.images?.length || 0}
+                </span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setViewMode("homework");
-                setSelectedIndex(null);
-              }}
-              className={`py-3 px-2 sm:px-4 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 sm:gap-2 ${
-                viewMode === "homework"
-                  ? "bg-white text-blue-900 shadow-xs border border-blue-300/80"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <FileText className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>حل الواجب المنزلي</span>
-              {lesson.homeworkImages && lesson.homeworkImages.length > 0 ? (
-                <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-black">
-                  {lesson.homeworkImages.length} صور
-                </span>
-              ) : (
-                <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full font-bold">
-                  قريباً ⏳
-                </span>
-              )}
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode("homework");
+                  setSelectedIndex(null);
+                }}
+                className={`py-3 px-2 sm:px-4 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 sm:gap-2 ${
+                  viewMode === "homework"
+                    ? "bg-white text-blue-900 shadow-xs border border-blue-300/80"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>{isWorksheet ? "الحل النموذجي للسلسلة" : "حل الواجب المنزلي"}</span>
+                {lesson.homeworkImages && lesson.homeworkImages.length > 0 ? (
+                  <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-black">
+                    {lesson.homeworkImages.length} صور
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full font-bold">
+                    قريباً ⏳
+                  </span>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-xs text-amber-900 font-bold flex items-center gap-2">
+              <span>📌</span>
+              <span>صور الملخص والمطوية ({lesson.images?.length || 0} صور):</span>
+            </div>
+          )}
 
           {/* صندوق ملاحظات وتوجيهات الأستاذ للدرس */}
           {viewMode === "lesson" && lesson.notes && (

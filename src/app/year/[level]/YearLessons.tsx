@@ -27,7 +27,7 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
       .finally(() => setLoading(false));
   }, [level]);
 
-  // تقسيم الدروس حسب نوع الكراس
+  // تقسيم الدروس حسب نوع الكراس والقسم
   const lessonsItems = useMemo(() => {
     if (!allLessons) return [];
     return allLessons.filter((l) => !l.type || l.type === "lessons");
@@ -36,6 +36,16 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
   const directedWorkItems = useMemo(() => {
     if (!allLessons) return [];
     return allLessons.filter((l) => l.type === "directed_work");
+  }, [allLessons]);
+
+  const worksheetsItems = useMemo(() => {
+    if (!allLessons) return [];
+    return allLessons.filter((l) => l.type === "worksheets");
+  }, [allLessons]);
+
+  const summariesItems = useMemo(() => {
+    if (!allLessons) return [];
+    return allLessons.filter((l) => l.type === "summaries");
   }, [allLessons]);
 
   // تجميع كراس الدروس حسب: الميدان -> المقطع المعرفي -> الموارد المعرفية
@@ -79,58 +89,108 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
 
   return (
     <div className="pb-12 space-y-4 fade-up">
-      <BackHeader href="/" title={LEVELS[level].label} subtitle="اختر الكراس لمشاهدة الدروس" />
+      <BackHeader href="/" title={LEVELS[level].label} subtitle="اختر القسم لمشاهدة الدروس أو السلاسل والملخصات" />
 
-      {/* أزرار اختيار الكراس (كراس الدروس 192ص أو كراس الأعمال الموجهة 96ص) */}
-      <div className="grid grid-cols-2 gap-2.5 bg-white p-2 rounded-2xl border border-slate-100 shadow-2xs">
-        {/* زر كراس الدروس */}
+      {/* أزرار اختيار الأقسام الـ 4 (الدروس، الأعمال الموجهة، سلاسل التمارين، الملخصات) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-2xs">
+        {/* 1. زر كراس الدروس */}
         <button
           onClick={() => setActiveTab("lessons")}
-          className={`p-3 rounded-xl text-right transition flex flex-col justify-between relative overflow-hidden border ${
+          className={`p-2.5 rounded-xl text-right transition flex flex-col justify-between relative overflow-hidden border ${
             activeTab === "lessons"
-              ? "bg-emerald-50/70 border-emerald-500 shadow-xs"
-              : "border-transparent hover:bg-slate-50"
+              ? "bg-emerald-50/70 border-emerald-500 shadow-xs ring-1 ring-emerald-500"
+              : "border-slate-100 hover:bg-slate-50"
           }`}
         >
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xl">📘</span>
+            <span className="text-lg">📘</span>
             <span
-              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+              className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${
                 activeTab === "lessons"
                   ? "bg-emerald-600 text-white"
-                  : "bg-slate-100 text-slate-500"
+                  : "bg-slate-100 text-slate-600"
               }`}
             >
               {lessonsItems.length} موارد
             </span>
           </div>
           <div className="font-black text-xs text-slate-800">كراس الدروس</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">192 صفحة • الميادين والمقاطع</div>
+          <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">192ص وحلول الواجبات</div>
         </button>
 
-        {/* زر كراس الأعمال الموجهة */}
+        {/* 2. زر كراس الأعمال الموجهة */}
         <button
           onClick={() => setActiveTab("directed_work")}
-          className={`p-3 rounded-xl text-right transition flex flex-col justify-between relative overflow-hidden border ${
+          className={`p-2.5 rounded-xl text-right transition flex flex-col justify-between relative overflow-hidden border ${
             activeTab === "directed_work"
-              ? "bg-sky-50/70 border-sky-500 shadow-xs"
-              : "border-transparent hover:bg-slate-50"
+              ? "bg-sky-50/70 border-sky-500 shadow-xs ring-1 ring-sky-500"
+              : "border-slate-100 hover:bg-slate-50"
           }`}
         >
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xl">📗</span>
+            <span className="text-lg">📗</span>
             <span
-              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+              className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${
                 activeTab === "directed_work"
                   ? "bg-sky-600 text-white"
-                  : "bg-slate-100 text-slate-500"
+                  : "bg-slate-100 text-slate-600"
               }`}
             >
               {directedWorkItems.length} حصص
             </span>
           </div>
           <div className="font-black text-xs text-slate-800">الأعمال الموجهة</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">96 صفحة • التفويج وسلاسل التمارين</div>
+          <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">96ص وحصص التفويج</div>
+        </button>
+
+        {/* 3. زر سلاسل التمارين */}
+        <button
+          onClick={() => setActiveTab("worksheets")}
+          className={`p-2.5 rounded-xl text-right transition flex flex-col justify-between relative overflow-hidden border ${
+            activeTab === "worksheets"
+              ? "bg-indigo-50/70 border-indigo-500 shadow-xs ring-1 ring-indigo-500"
+              : "border-slate-100 hover:bg-slate-50"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-lg">📑</span>
+            <span
+              className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${
+                activeTab === "worksheets"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {worksheetsItems.length} سلاسل
+            </span>
+          </div>
+          <div className="font-black text-xs text-slate-800">سلاسل التمارين</div>
+          <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">تمارين المقاطع وتطبيقاتها</div>
+        </button>
+
+        {/* 4. زر الملخصات والمطويات */}
+        <button
+          onClick={() => setActiveTab("summaries")}
+          className={`p-2.5 rounded-xl text-right transition flex flex-col justify-between relative overflow-hidden border ${
+            activeTab === "summaries"
+              ? "bg-amber-50/70 border-amber-500 shadow-xs ring-1 ring-amber-500"
+              : "border-slate-100 hover:bg-slate-50"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-lg">📌</span>
+            <span
+              className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${
+                activeTab === "summaries"
+                  ? "bg-amber-600 text-white"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {summariesItems.length} ملخصات
+            </span>
+          </div>
+          <div className="font-black text-xs text-slate-800">الملخصات والمطويات</div>
+          <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">قواعد ومراجعة الاختبارات</div>
         </button>
       </div>
 
@@ -201,12 +261,22 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                                 {l.title}
                               </h3>
 
-                              {/* الملاحظات وعدد الصور */}
+                              {/* الملاحظات وعدد الصور وحالة الواجب */}
                               <div className="flex flex-wrap items-center gap-1.5 mt-2">
                                 <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">
                                   <ImageIcon className="w-3 h-3 text-slate-400" />
                                   <span>{count} {count === 1 ? "صورة" : "صور"}</span>
                                 </span>
+
+                                {(l.homeworkImages?.length || 0) > 0 ? (
+                                  <span className="flex items-center gap-1 text-[10px] text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/80 font-black">
+                                    📝 حل الواجب متوفر ✓
+                                  </span>
+                                ) : l.homeworkNotes ? (
+                                  <span className="flex items-center gap-1 text-[10px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md font-bold">
+                                    📖 تمرين واجب
+                                  </span>
+                                ) : null}
 
                                 {l.notes && (
                                   <span className="flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 font-bold">
@@ -228,7 +298,7 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
             ))
           )}
         </div>
-      ) : (
+      ) : activeTab === "directed_work" ? (
         /* ==================== عرض كراس الأعمال الموجهة ==================== */
         <div className="space-y-3">
           {/* شريط تعريفي بالأعمال الموجهة */}
@@ -243,7 +313,7 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
           </div>
 
           {directedWorkItems.length === 0 ? (
-            <Empty text="لم تُضف حصص أعمال موجهة أو سلاسل تمارين بعد" />
+            <Empty text="لم تُضف حصص أعمال موجهة بعد" />
           ) : (
             <div className="space-y-2.5">
               {directedWorkItems.map((l) => {
@@ -259,7 +329,7 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                       {l.number}
                     </span>
 
-                    {/* تفاصيل الحصة - العنوان كامل دون اقتطاع */}
+                    {/* تفاصيل الحصة */}
                     <div className="flex-1 min-w-0">
                       <div className="text-[10px] text-sky-600 font-bold mb-0.5">
                         حصة الأعمال الموجهة {l.number}
@@ -269,6 +339,130 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                       </h3>
 
                       {/* الملاحظات وعدد الصور */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">
+                          <ImageIcon className="w-3 h-3 text-slate-400" />
+                          <span>{count} {count === 1 ? "صورة" : "صور"}</span>
+                        </span>
+
+                        {l.notes && (
+                          <span className="flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 font-bold">
+                            <StickyNote className="w-3 h-3 text-amber-600" />
+                            <span>ملاحظة الأستاذ</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <ChevronLeft className="w-4 h-4 text-slate-300 shrink-0 mt-2" />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : activeTab === "worksheets" ? (
+        /* ==================== عرض سلاسل التمارين ==================== */
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+              <span>📑</span>
+              <span>سلاسل التمارين والواجبات الورقية — {LEVELS[level].short}</span>
+            </span>
+            <span className="text-[11px] text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded-md">
+              تمارين المقاطع
+            </span>
+          </div>
+
+          {worksheetsItems.length === 0 ? (
+            <Empty text="لم تُضف سلاسل تمارين بعد لهذا المستوى" />
+          ) : (
+            <div className="space-y-2.5">
+              {worksheetsItems.map((l) => {
+                const count = l.images?.length || 0;
+                return (
+                  <Link
+                    key={l.id}
+                    href={`/lesson/${l.id}`}
+                    className="flex items-start gap-3 bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs active:scale-[0.99] transition hover:border-slate-200"
+                  >
+                    <span className="w-9 h-9 shrink-0 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-black text-xs mt-0.5">
+                      {l.number}
+                    </span>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] text-indigo-600 font-bold mb-0.5">
+                        سلسلة تمارين رقم {l.number}
+                      </div>
+                      <h3 className="font-bold text-xs text-slate-800 leading-snug break-words">
+                        {l.title}
+                      </h3>
+
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">
+                          <ImageIcon className="w-3 h-3 text-slate-400" />
+                          <span>{count} {count === 1 ? "صورة" : "صور"}</span>
+                        </span>
+
+                        {(l.homeworkImages?.length || 0) > 0 && (
+                          <span className="flex items-center gap-1 text-[10px] text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md font-bold">
+                            📝 الحل متوفر
+                          </span>
+                        )}
+
+                        {l.notes && (
+                          <span className="flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 font-bold">
+                            <StickyNote className="w-3 h-3 text-amber-600" />
+                            <span>ملاحظة الأستاذ</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <ChevronLeft className="w-4 h-4 text-slate-300 shrink-0 mt-2" />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ==================== عرض الملخصات والمطويات ==================== */
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+              <span>📌</span>
+              <span>الملخصات والمطويات وقوانين المقاطع — {LEVELS[level].short}</span>
+            </span>
+            <span className="text-[11px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-md">
+              مراجعة سريعة
+            </span>
+          </div>
+
+          {summariesItems.length === 0 ? (
+            <Empty text="لم تُضف ملخصات أو مطويات بعد لهذا المستوى" />
+          ) : (
+            <div className="space-y-2.5">
+              {summariesItems.map((l) => {
+                const count = l.images?.length || 0;
+                return (
+                  <Link
+                    key={l.id}
+                    href={`/lesson/${l.id}`}
+                    className="flex items-start gap-3 bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs active:scale-[0.99] transition hover:border-slate-200"
+                  >
+                    <span className="w-9 h-9 shrink-0 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-black text-xs mt-0.5">
+                      {l.number}
+                    </span>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] text-amber-600 font-bold mb-0.5">
+                        ملخص رقم {l.number}
+                      </div>
+                      <h3 className="font-bold text-xs text-slate-800 leading-snug break-words">
+                        {l.title}
+                      </h3>
+
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">
                           <ImageIcon className="w-3 h-3 text-slate-400" />
