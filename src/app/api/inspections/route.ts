@@ -63,11 +63,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (groupName && groupName !== "all" && groupName !== "القسم كامل") {
-    sessions = sessions.filter((s) => s.groupName === groupName || s.groupName === "القسم كامل");
-    // ملاحظة حاسمة: لا نفلتر قائمة التلاميذ (roster) بحسب الفوج على الخادم
-    // لكي يتوفر لدى المتصفح دائماً كافة تلاميذ القسم للتبديل بينهم أو تفويجهم بسلاسة
-  }
+  // جلسات المراقبة تخص القسم ككل وتبقى متاحة للمتابعة والتفقد
+  // سواء كان الأستاذ في حصة فوج 1، أو فوج 2، أو حصة القسم كاملاً
 
   // ترتيب الجلسات حسب تاريخ الإنشاء أو رقم الجلسة
   sessions.sort((a, b) => a.sessionNumber - b.sessionNumber);
@@ -219,19 +216,15 @@ export async function POST(req: NextRequest) {
     const tL = Math.max(1, Number(totalLessons) || 8);
     const tH = Math.max(1, Number(totalHomeworks) || 8);
 
-    // حساب رقم الجلسة التالية لهذا القسم والفوج
+    // حساب رقم الجلسة التالية لهذا القسم
     const existingForClass = data.inspectionSessions.filter(
-      (s) =>
-        s.className.replace(/\s+/g, "") === cls.replace(/\s+/g, "") &&
-        (grp === "القسم كامل" || s.groupName === grp)
+      (s) => s.className.replace(/\s+/g, "") === cls.replace(/\s+/g, "")
     );
     const nextSessionNum = existingForClass.length + 1;
 
-    // استخراج قائمة تلاميذ الفوج لتهيئة سجلاتهم تلقائياً
+    // استخراج كافة تلاميذ القسم لتهيئة سجلاتهم تلقائياً
     const targetStudents = data.studentRoster.filter(
-      (r) =>
-        r.className.replace(/\s+/g, "") === cls.replace(/\s+/g, "") &&
-        (grp === "القسم كامل" || r.groupName === grp || r.groupName === "القسم كامل")
+      (r) => r.className.replace(/\s+/g, "") === cls.replace(/\s+/g, "")
     );
 
     const initialRecords: Record<string, InspectionRecord> = {};

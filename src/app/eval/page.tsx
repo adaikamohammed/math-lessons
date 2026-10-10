@@ -209,17 +209,13 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
       const localData = localStorage.getItem(CACHE_KEY);
       if (localData) {
         const parsed = JSON.parse(localData);
-        setSessions(Array.isArray(parsed.sessions) ? parsed.sessions : []);
-        setRoster(Array.isArray(parsed.roster) ? parsed.roster : []);
-        if (parsed.sessions?.length > 0) {
+        if (Array.isArray(parsed.sessions) && parsed.sessions.length > 0) {
+          setSessions(parsed.sessions);
           setActiveSessionId(parsed.sessions[parsed.sessions.length - 1].id);
-        } else {
-          setActiveSessionId(null);
         }
-      } else {
-        setSessions([]);
-        setRoster([]);
-        setActiveSessionId(null);
+        if (Array.isArray(parsed.roster) && parsed.roster.length > 0) {
+          setRoster(parsed.roster);
+        }
       }
       const pendingData = localStorage.getItem(PENDING_KEY);
       if (pendingData) {
@@ -258,9 +254,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     try {
       setLoading(true);
       const res = await fetch(
-        `/api/inspections?class=${encodeURIComponent(selectedClass)}&group=${encodeURIComponent(
-          selectedGroup
-        )}&_t=${Date.now()}`,
+        `/api/inspections?class=${encodeURIComponent(selectedClass)}&_t=${Date.now()}`,
         { cache: "no-store" }
       );
       if (res.ok) {
@@ -284,7 +278,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedClass, selectedGroup]);
+  }, [selectedClass]);
 
   useEffect(() => {
     loadData();
@@ -457,7 +451,8 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
 
   // الجلسة الحالية المعروضة
   const currentSession = useMemo(() => {
-    return sessions.find((s) => s.id === activeSessionId) || null;
+    if (!sessions || sessions.length === 0) return null;
+    return sessions.find((s) => s.id === activeSessionId) || sessions[sessions.length - 1] || null;
   }, [sessions, activeSessionId]);
 
   // قائمة أسماء تلاميذ الفوج الحالي
@@ -467,11 +462,52 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
         (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "");
       if (!matchClass) return false;
       if (selectedGroup === "القسم كامل") return true;
-      return r.groupName === selectedGroup || r.groupName === "القسم كامل";
+      const grp = r.groupName || "فوج 1";
+      return grp === selectedGroup;
     });
     // ترتيب أبجدي
     return list.sort((a, b) => a.studentName.localeCompare(b.studentName, "ar"));
   }, [roster, selectedClass, selectedGroup]);
+
+  // بدء جلسة مراقبة سريعة بنقرة واحدة (بدون تعقيدات)
+  const handleQuickStartDefaultSession = async () => {
+    try {
+      const existingForClass = sessions.filter(
+        (s) => (s.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "")
+      );
+      const nextNum = existingForClass.length + 1;
+      const countL = 8;
+      const countH = 8;
+      const defaultRange = `من 1 إلى 8`;
+
+      const res = await fetch("/api/inspections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          className: selectedClass,
+          groupName: selectedGroup,
+          title: `المراقبة ${nextNum} (${defaultRange})`,
+          date: new Date().toLocaleDateString("ar-DZ", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }),
+          lessonRange: defaultRange,
+          totalLessons: countL,
+          totalHomeworks: countH,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      showToast("success", `✓ تم بدء المراقبة ${nextNum} بنجاح! جاهز للتفقد الميداني 📱`);
+      await loadData();
+      if (data.session) setActiveSessionId(data.session.id);
+    } catch (err: any) {
+      showToast("error", err.message || "فشل بدء الجلسة");
+    }
+  };
 
   // إنشاء جلسة مراقبة جديدة
   const handleCreateSession = async (e: React.FormEvent) => {
@@ -609,12 +645,16 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     studentName: string,
     updates: Partial<InspectionRecord>
   ) => {
-    if (!currentSession) return;
+    let targetSession = currentSession;
+    if (!targetSession) {
+      await handleQuickStartDefaultSession();
+      return;
+    }
 
-    const existing = currentSession.records?.[studentName] || {
+    const existing = targetSession.records?.[studentName] || {
       studentName,
-      lessonsDone: currentSession.totalLessons,
-      homeworksDone: currentSession.totalHomeworks,
+      lessonsDone: targetSession.totalLessons,
+      homeworksDone: targetSession.totalHomeworks,
       behaviorScore: 5,
       activityScore: 5,
       score: 20,
@@ -626,8 +666,8 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     };
 
     // إعادة حساب العلامة بدقة
-    const tL = currentSession.totalLessons > 0 ? currentSession.totalLessons : 1;
-    const tH = currentSession.totalHomeworks > 0 ? currentSession.totalHomeworks : 1;
+    const tL = targetSession.totalLessons > 0 ? targetSession.totalLessons : 1;
+    const tH = targetSession.totalHomeworks > 0 ? targetSession.totalHomeworks : 1;
     const nbPts = (updatedRec.lessonsDone / tL) * 5;
     const hwPts = (updatedRec.homeworksDone / tH) * 5;
     const total = nbPts + hwPts + updatedRec.behaviorScore + updatedRec.activityScore;
@@ -636,7 +676,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     // تحديث الواجهة فورياً بدون أي تأخير
     setSessions((prev) =>
       prev.map((s) => {
-        if (s.id !== currentSession.id) return s;
+        if (s.id !== targetSession.id) return s;
         return {
           ...s,
           records: {
@@ -659,7 +699,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sessionId: currentSession.id,
+          sessionId: targetSession.id,
           studentName,
           ...updates,
         }),
@@ -672,11 +712,15 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   // زر لمسة واحدة: تعيين كل شيء كامل (20/20)
-  const handleSetFullScore = (studentName: string) => {
-    if (!currentSession) return;
+  const handleSetFullScore = async (studentName: string) => {
+    let targetSession = currentSession;
+    if (!targetSession) {
+      await handleQuickStartDefaultSession();
+      return;
+    }
     handleUpdateRecord(studentName, {
-      lessonsDone: currentSession.totalLessons,
-      homeworksDone: currentSession.totalHomeworks,
+      lessonsDone: targetSession.totalLessons,
+      homeworksDone: targetSession.totalHomeworks,
       behaviorScore: 5,
       activityScore: 5,
     });
@@ -916,11 +960,21 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
 
             {/* أزرار التبديل بين الجلسات المسجلة */}
             {sessions.length === 0 ? (
-              <div className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-400 space-y-1">
-                <div>لا توجد جلسات مراقبة مسجلة لهذا الفوج حتى الآن.</div>
-                <div className="text-[11px] text-emerald-700 font-bold">
-                  اضغط على زر "بدء مراقبة جديدة" أعلاه لبدء تفقد كراريس وواجبات الفوج.
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-700 to-emerald-800 text-white shadow-sm flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-black">بدء المراقبة الأولى (الدروس 1 إلى 8) 🎯</div>
+                  <div className="text-[11px] text-emerald-100 mt-0.5">
+                    تفقد وتقييم فوري لكراريس وواجبات تلاميذ {selectedClass}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleQuickStartDefaultSession}
+                  className="px-3.5 py-2 rounded-xl bg-white text-emerald-800 font-black text-xs hover:bg-emerald-50 active:scale-95 transition shadow-sm shrink-0 flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4 text-emerald-600" />
+                  <span>بدء التفقد الآن 🚀</span>
+                </button>
               </div>
             ) : (
               <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
@@ -978,6 +1032,52 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
                     المقرر للتفقد: {currentSession.totalLessons} دروس و {currentSession.totalHomeworks} واجبات
                   </span>
                 </div>
+              </div>
+
+              {/* أزرار التبديل السريع بين أفواج التفقد أثناء الحصة الميدانية */}
+              <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl text-xs font-black">
+                <button
+                  type="button"
+                  onClick={() => setSelectedGroup("فوج 1")}
+                  className={`flex-1 py-1.5 px-1 rounded-lg transition text-center flex items-center justify-center gap-1 ${
+                    selectedGroup === "فوج 1"
+                      ? "bg-emerald-600 text-white shadow-2xs"
+                      : "text-slate-600 hover:bg-white/60"
+                  }`}
+                >
+                  <span>🟢 فوج 1</span>
+                  <span className="text-[10px] opacity-80">
+                    ({roster.filter((r) => (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "") && (r.groupName || "فوج 1") === "فوج 1").length})
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedGroup("فوج 2")}
+                  className={`flex-1 py-1.5 px-1 rounded-lg transition text-center flex items-center justify-center gap-1 ${
+                    selectedGroup === "فوج 2"
+                      ? "bg-blue-600 text-white shadow-2xs"
+                      : "text-slate-600 hover:bg-white/60"
+                  }`}
+                >
+                  <span>🔵 فوج 2</span>
+                  <span className="text-[10px] opacity-80">
+                    ({roster.filter((r) => (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "") && r.groupName === "فوج 2").length})
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedGroup("القسم كامل")}
+                  className={`flex-1 py-1.5 px-1 rounded-lg transition text-center flex items-center justify-center gap-1 ${
+                    selectedGroup === "القسم كامل"
+                      ? "bg-slate-900 text-white shadow-2xs"
+                      : "text-slate-600 hover:bg-white/60"
+                  }`}
+                >
+                  <span>👥 القسم كامل</span>
+                  <span className="text-[10px] opacity-80">
+                    ({roster.filter((r) => (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "")).length})
+                  </span>
+                </button>
               </div>
 
               {/* حقل البحث عن تلميذ في الجلسة */}
@@ -1043,11 +1143,25 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
                           key={student.studentName}
                           className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs space-y-2.5 hover:border-emerald-300 transition"
                         >
-                          {/* سطر الاسم والعلامة الإجمالية */}
+                          {/* سطر الاسم والعلامة الإجمالية وزر تبديل الفوج السريع */}
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-black text-sm text-slate-900 break-words">
-                              {student.studentName}
-                            </span>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-black text-sm text-slate-900 truncate">
+                                {student.studentName}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleStudentGroup(student)}
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-black shrink-0 transition border active:scale-95 ${
+                                  (student.groupName || "فوج 1") === "فوج 1"
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                                    : "bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100"
+                                }`}
+                                title="انقر لنقل التلميذ مباشرة بين فوج 1 وفوج 2"
+                              >
+                                {(student.groupName || "فوج 1") === "فوج 1" ? "🟢 فوج 1" : "🔵 فوج 2"}
+                              </button>
+                            </div>
 
                             {/* شارة العلامة */}
                             <div

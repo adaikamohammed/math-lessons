@@ -199,6 +199,25 @@ export async function getLessonsData(): Promise<LessonsData> {
 
 // ----------------- حفظ بيانات الدروس -----------------
 async function executeSave(data: LessonsData): Promise<void> {
+  // دمج وقائي صارم لمنع فقدان الدروس أو التلاميذ عند حدوث أي خطأ في الكاش
+  try {
+    const existing = await getLessonsData();
+    if ((!data.lessons || data.lessons.length === 0) && existing.lessons && existing.lessons.length > 0) {
+      data.lessons = existing.lessons;
+    }
+    if ((!data.studentRoster || data.studentRoster.length === 0) && existing.studentRoster && existing.studentRoster.length > 0) {
+      data.studentRoster = existing.studentRoster;
+    }
+    if ((!data.evaluations || data.evaluations.length === 0) && existing.evaluations && existing.evaluations.length > 0) {
+      data.evaluations = existing.evaluations;
+    }
+    if ((!data.inspectionSessions || data.inspectionSessions.length === 0) && existing.inspectionSessions && existing.inspectionSessions.length > 0) {
+      data.inspectionSessions = existing.inspectionSessions;
+    }
+  } catch (mergeErr) {
+    console.warn("Could not merge existing data before save:", mergeErr);
+  }
+
   synchronizeStudents(data);
   const token = getBlobToken();
 
