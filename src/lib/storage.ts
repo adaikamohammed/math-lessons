@@ -90,87 +90,45 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
   return data;
 }
 
+const FIXED_BLOB_DB_URL = "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons-db.json";
+
 // ----------------- قراءة بيانات الدروس -----------------
 export async function getLessonsData(): Promise<LessonsData> {
   const token = getBlobToken();
 
   if (token) {
     try {
-      // 1. أولاً: فحص النسخ ذات المعرف الفريد الزمني (db/v-)
-      // كل نسخة ذات اسم فريد تضمن تخطي كاش الـ Edge CDN بنسبة 100% لأن رابطها لم يسبق طلبه
-      const versionList = await list({ prefix: "db/v-", token });
-      if (versionList.blobs && versionList.blobs.length > 0) {
-        // ترتيب تنازلي حازم حسب الطابع الزمني المضمن في الاسم للحصول على أحدث نسخة مطلقاً
-        const sorted = versionList.blobs.sort(
-          (a, b) => getVersionTs(b.pathname, b.uploadedAt) - getVersionTs(a.pathname, a.uploadedAt)
-        );
-        const latest = sorted[0];
+      // قراءة مباشرة وفورية للملف الثابت lessons-db.json دون استهلاك أي Advanced Requests (list)
+      const res = await fetch(`${FIXED_BLOB_DB_URL}?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+      });
 
-        try {
-          const res = await fetch(latest.url, {
-            cache: "no-store",
-            headers: {
-              "Cache-Control": "no-cache, no-store, must-revalidate",
-              Pragma: "no-cache",
-            },
-          });
-          if (res.ok) {
-            const json = await res.json();
-            const rawResult: LessonsData = {
-              lessons: Array.isArray(json.lessons) ? json.lessons : [],
-              summons: Array.isArray(json.summons) ? json.summons : [],
-              honors: Array.isArray(json.honors) ? json.honors : [],
-              penalties: Array.isArray(json.penalties) ? json.penalties : [],
-              evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
-              inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
-              studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
-              announcements: Array.isArray(json.announcements) ? json.announcements : [],
-              anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
-            };
-            const result = synchronizeStudents(rawResult);
-            // حفظ نسخة محلية احتياطية
-            ensureLocalDirs()
-              .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
-              .catch(() => {});
-            return result;
-          }
-        } catch (fetchErr) {
-          console.warn("Error fetching versioned blob, trying fallback:", fetchErr);
-        }
+      if (res.ok) {
+        const json = await res.json();
+        const rawResult: LessonsData = {
+          lessons: Array.isArray(json.lessons) ? json.lessons : [],
+          summons: Array.isArray(json.summons) ? json.summons : [],
+          honors: Array.isArray(json.honors) ? json.honors : [],
+          penalties: Array.isArray(json.penalties) ? json.penalties : [],
+          evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
+          inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
+          studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
+          announcements: Array.isArray(json.announcements) ? json.announcements : [],
+          anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
+        };
+        const result = synchronizeStudents(rawResult);
+        // حفظ نسخة محلية احتياطية
+        ensureLocalDirs()
+          .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
+          .catch(() => {});
+        return result;
       }
-
-      // 2. ثانياً: في حال عدم العثور على db/v-، نلجأ إلى lessons-db.json كنسخة احتياطية
-      const listResult = await list({ prefix: "lessons-db.json", token });
-      const found = listResult.blobs.find((b) => b.pathname === "lessons-db.json");
-      if (found) {
-        try {
-          const blobRes = await get(found.url, { token, access: "public" });
-          if (blobRes && blobRes.statusCode === 200 && blobRes.stream) {
-            const chunks: Uint8Array[] = [];
-            // @ts-ignore
-            for await (const chunk of blobRes.stream) {
-              chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-            }
-            const text = Buffer.concat(chunks).toString("utf-8");
-            const json = JSON.parse(text);
-            return {
-              lessons: Array.isArray(json.lessons) ? json.lessons : [],
-              summons: Array.isArray(json.summons) ? json.summons : [],
-              honors: Array.isArray(json.honors) ? json.honors : [],
-              penalties: Array.isArray(json.penalties) ? json.penalties : [],
-              evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
-              inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
-              studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
-              announcements: Array.isArray(json.announcements) ? json.announcements : [],
-              anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
-            };
-          }
-        } catch (getErr) {
-          console.warn("Direct blob.get error on lessons-db.json:", getErr);
-        }
-      }
-    } catch (e) {
-      console.error("Error reading from Vercel Blob:", e);
+    } catch (fetchErr) {
+      console.warn("Direct blob fetch failed, falling back to local file:", fetchErr);
     }
   }
 
@@ -237,16 +195,8 @@ async function executeSave(data: LessonsData): Promise<void> {
 
   if (token) {
     const payload = JSON.stringify(data, null, 2);
-    const ts = Date.now();
-    const versionPath = `db/v-${ts}.json`;
 
-    // 1. كتابة النسخة الفريدة (db/v-) التي تضمن عدم الكاش إطلاقاً
-    await put(versionPath, payload, {
-      access: "public",
-      token,
-    });
-
-    // 2. تحديث lessons-db.json أيضاً للتوافق الاحتياطي
+    // تحديث مباشر للملف lessons-db.json دون استهلاك طلبات list أو del متقدمة
     try {
       await put("lessons-db.json", payload, {
         access: "public",
@@ -254,26 +204,11 @@ async function executeSave(data: LessonsData): Promise<void> {
         allowOverwrite: true,
         token,
       });
-    } catch (legacyErr) {
-      console.warn("Could not overwrite lessons-db.json fallback:", legacyErr);
+    } catch (saveErr) {
+      console.error("Vercel Blob put error on lessons-db.json:", saveErr);
     }
 
-    // 3. تنظيف النسخ القديمة جداً في الخلفية (الاحتفاظ بآخر 5 نسخ للأمان)
-    list({ prefix: "db/v-", token })
-      .then(async (res) => {
-        if (res.blobs && res.blobs.length > 5) {
-          const sorted = res.blobs.sort(
-            (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-          );
-          const toDelete = sorted.slice(5);
-          for (const b of toDelete) {
-            await del(b.url, { token }).catch(() => {});
-          }
-        }
-      })
-      .catch(() => {});
-
-    // 4. حفظ نسخة محلية أيضاً
+    // حفظ نسخة محلية أيضاً للأمان
     ensureLocalDirs()
       .then(() => fs.writeFile(LOCAL_DATA_FILE, payload, "utf-8"))
       .catch(() => {});
