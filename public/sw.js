@@ -1,5 +1,5 @@
 // Service Worker for Offline Classroom Support - Math Lessons Platform
-const CACHE_NAME = "math-lessons-v1";
+const CACHE_NAME = "math-lessons-v2";
 const OFFLINE_PAGES = [
   "/",
   "/eval",
