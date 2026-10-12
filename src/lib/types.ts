@@ -129,6 +129,30 @@ export type StudentRosterItem = {
   groupName: "فوج 1" | "فوج 2" | "القسم كامل";
 };
 
+export type AnnouncementCategory = "absence" | "lesson" | "update" | "general" | "urgent";
+
+export type Announcement = {
+  id: string;
+  title: string; // عنوان الإعلان (مثلاً: تنبيه غياب، رفع حل واجب، ملاحظة...)
+  content: string; // نص الإعلان والتفاصيل
+  category: AnnouncementCategory; // نوع الإعلان (absence: غياب، lesson: دروس/واجبات، update: تحديث، general: عام، urgent: عاجل)
+  date: string; // تاريخ الإعلان أو اليوم المعني
+  pinned?: boolean; // هل الإعلان مثبت في الأعلى
+  active?: boolean; // هل الإعلان ظاهر للزوار
+  createdAt: string;
+};
+
+export type MessageCategory = "question" | "suggestion" | "criticism" | "other";
+
+export type AnonymousMessage = {
+  id: string;
+  category: MessageCategory; // تصنيف الرسالة (سؤال ❓، اقتراح 💡، نقد بنّاء ⚖️، أخرى 💬)
+  targetLevel?: string; // اختياري: "1 متوسط" | "2 متوسط" | "ولي أمر" | "غير محدد"
+  content: string; // نص الرسالة بسرية تامة
+  createdAt: string;
+  read?: boolean; // هل تمت قراءتها من الأستاذ
+};
+
 export type LessonsData = {
   lessons: Lesson[];
   summons?: ParentSummons[];
@@ -137,6 +161,8 @@ export type LessonsData = {
   evaluations?: StudentEvaluation[];
   inspectionSessions?: InspectionSession[];
   studentRoster?: StudentRosterItem[];
+  announcements?: Announcement[];
+  anonymousMessages?: AnonymousMessage[];
 };
 
 export const LEVELS = {

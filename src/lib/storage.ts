@@ -124,6 +124,8 @@ export async function getLessonsData(): Promise<LessonsData> {
               evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
               inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
               studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
+              announcements: Array.isArray(json.announcements) ? json.announcements : [],
+              anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
             };
             const result = synchronizeStudents(rawResult);
             // حفظ نسخة محلية احتياطية
@@ -159,6 +161,8 @@ export async function getLessonsData(): Promise<LessonsData> {
               evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
               inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
               studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
+              announcements: Array.isArray(json.announcements) ? json.announcements : [],
+              anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
             };
           }
         } catch (getErr) {
@@ -183,6 +187,8 @@ export async function getLessonsData(): Promise<LessonsData> {
       evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
       inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
       studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
+      announcements: Array.isArray(json.announcements) ? json.announcements : [],
+      anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
     };
   } catch {
     return {
@@ -193,6 +199,8 @@ export async function getLessonsData(): Promise<LessonsData> {
       evaluations: [],
       inspectionSessions: [],
       studentRoster: [],
+      announcements: [],
+      anonymousMessages: [],
     };
   }
 }
@@ -213,6 +221,12 @@ async function executeSave(data: LessonsData): Promise<void> {
     }
     if ((!data.inspectionSessions || data.inspectionSessions.length === 0) && existing.inspectionSessions && existing.inspectionSessions.length > 0) {
       data.inspectionSessions = existing.inspectionSessions;
+    }
+    if (data.announcements === undefined && existing.announcements) {
+      data.announcements = existing.announcements;
+    }
+    if (data.anonymousMessages === undefined && existing.anonymousMessages) {
+      data.anonymousMessages = existing.anonymousMessages;
     }
   } catch (mergeErr) {
     console.warn("Could not merge existing data before save:", mergeErr);

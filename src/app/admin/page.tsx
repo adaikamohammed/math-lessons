@@ -43,6 +43,12 @@ import {
   Search,
   Scale,
   Download,
+  MessageSquare,
+  Bell,
+  Pin,
+  EyeOff,
+  Copy,
+  Mail,
 } from "lucide-react";
 import {
   LEVELS,
@@ -56,6 +62,10 @@ import {
   type HonorStudent,
   type Penalty,
   type StudentEvaluation,
+  type Announcement,
+  type AnnouncementCategory,
+  type AnonymousMessage,
+  type MessageCategory,
 } from "@/lib/types";
 
 export default function AdminPage() {
@@ -149,7 +159,9 @@ function Login({ onLogin }: { onLogin: () => void }) {
 
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
 function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [mainTab, setMainTab] = useState<"lessons" | "summons" | "honors" | "evaluations" | "penalties">("lessons");
+  const [mainTab, setMainTab] = useState<
+    "lessons" | "summons" | "honors" | "evaluations" | "penalties" | "announcements" | "messages"
+  >("lessons");
   const [level, setLevel] = useState<1 | 2>(1);
   const [notebookTab, setNotebookTab] = useState<NotebookType>("lessons");
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
@@ -237,6 +249,22 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [editingPenalty, setEditingPenalty] = useState<Penalty | null>(null);
   const [deletingPenalty, setDeletingPenalty] = useState<Penalty | null>(null);
 
+  // حالات لوحة الإعلانات
+  const [announcementsList, setAnnouncementsList] = useState<Announcement[]>([]);
+  const [annTitle, setAnnTitle] = useState("");
+  const [annContent, setAnnContent] = useState("");
+  const [annCategory, setAnnCategory] = useState<AnnouncementCategory>("general");
+  const [annDate, setAnnDate] = useState("");
+  const [annPinned, setAnnPinned] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null);
+
+  // حالات صندوق الرسائل المجهولة
+  const [messagesList, setMessagesList] = useState<AnonymousMessage[]>([]);
+  const [messageCategoryFilter, setMessageCategoryFilter] = useState<string>("all");
+  const [messageReadFilter, setMessageReadFilter] = useState<"all" | "unread" | "read">("all");
+  const [deletingMessage, setDeletingMessage] = useState<AnonymousMessage | null>(null);
+
   const loadLessons = useCallback(async () => {
     try {
       setLoading(true);
@@ -297,13 +325,195 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, []);
 
+  const loadAnnouncements = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/announcements?all=true&_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
+      const data = await res.json();
+      setAnnouncementsList(data.announcements || []);
+    } catch {
+      setAnnouncementsList([]);
+    }
+  }, []);
+
+  const loadMessages = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/messages?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
+      const data = await res.json();
+      setMessagesList(data.messages || []);
+    } catch {
+      setMessagesList([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadLessons();
     loadSummons();
     loadHonors();
     loadPenalties();
     loadEvaluations();
-  }, [loadLessons, loadSummons, loadHonors, loadPenalties, loadEvaluations]);
+    loadAnnouncements();
+    loadMessages();
+  }, [loadLessons, loadSummons, loadHonors, loadPenalties, loadEvaluations, loadAnnouncements, loadMessages]);
+
+  const unreadMessagesCount = useMemo(() => {
+    return messagesList.filter((m) => !m.read).length;
+  }, [messagesList]);
+
+  // حفظ أو تعديل إعلان
+  const handleSaveAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!annTitle.trim() || !annContent.trim()) {
+      showToast("error", "يرجى كتابة عنوان الإعلان وتفاصيله");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (editingAnnouncement) {
+        const res = await fetch("/api/announcements", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editingAnnouncement.id,
+            title: annTitle.trim(),
+            content: annContent.trim(),
+            category: annCategory,
+            date: annDate.trim() || undefined,
+            pinned: annPinned,
+          }),
+        });
+        if (res.ok) {
+          showToast("success", "تم تعديل الإعلان بنجاح");
+          setEditingAnnouncement(null);
+          setAnnTitle("");
+          setAnnContent("");
+          setAnnDate("");
+          setAnnPinned(false);
+          loadAnnouncements();
+        } else {
+          showToast("error", "فشل تعديل الإعلان");
+        }
+      } else {
+        const res = await fetch("/api/announcements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: annTitle.trim(),
+            content: annContent.trim(),
+            category: annCategory,
+            date: annDate.trim() || undefined,
+            pinned: annPinned,
+          }),
+        });
+        if (res.ok) {
+          showToast("success", "تم نشر الإعلان بنجاح في الموقع");
+          setAnnTitle("");
+          setAnnContent("");
+          setAnnDate("");
+          setAnnPinned(false);
+          loadAnnouncements();
+        } else {
+          showToast("error", "فشل نشر الإعلان");
+        }
+      }
+    } catch {
+      showToast("error", "حدث خطأ في الاتصال");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleTogglePinAnnouncement = async (item: Announcement) => {
+    try {
+      const res = await fetch("/api/announcements", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          pinned: !item.pinned,
+        }),
+      });
+      if (res.ok) {
+        showToast("success", item.pinned ? "تم إلغاء تثبيت الإعلان" : "تم تثبيت الإعلان في أعلى الموقع 📌");
+        loadAnnouncements();
+      }
+    } catch {
+      showToast("error", "حدث خطأ");
+    }
+  };
+
+  const handleToggleActiveAnnouncement = async (item: Announcement) => {
+    try {
+      const res = await fetch("/api/announcements", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          active: item.active === false ? true : false,
+        }),
+      });
+      if (res.ok) {
+        showToast("success", item.active === false ? "تم إظهار الإعلان للزوار" : "تم إخفاء الإعلان مؤقتاً");
+        loadAnnouncements();
+      }
+    } catch {
+      showToast("error", "حدث خطأ");
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    try {
+      const res = await fetch(`/api/announcements?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("success", "تم حذف الإعلان نهائياً");
+        setDeletingAnnouncement(null);
+        loadAnnouncements();
+      } else {
+        showToast("error", "فشل حذف الإعلان");
+      }
+    } catch {
+      showToast("error", "حدث خطأ");
+    }
+  };
+
+  const handleToggleMessageRead = async (item: AnonymousMessage) => {
+    try {
+      const res = await fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          read: !item.read,
+        }),
+      });
+      if (res.ok) {
+        loadMessages();
+      }
+    } catch {
+      showToast("error", "حدث خطأ");
+    }
+  };
+
+  const handleDeleteMessage = async (id: string) => {
+    try {
+      const res = await fetch(`/api/messages?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("success", "تم حذف الرسالة");
+        setDeletingMessage(null);
+        loadMessages();
+      } else {
+        showToast("error", "فشل حذف الرسالة");
+      }
+    } catch {
+      showToast("error", "حدث خطأ");
+    }
+  };
 
   const showToast = (type: "success" | "error", text: string) => {
     setToastMsg({ type, text });
@@ -978,8 +1188,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
-      {/* التبويب الرئيسي: إدارة الدروس أو أولياء أود استقبالهم أو لوحة الشرف أو تقييم الحصة أو الخصومات */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
+      {/* التبويب الرئيسي: إدارة الدروس أو تقييم الحصة أو الإعلانات أو الرسائل أو الاستدعاءات أو لوحة الشرف أو الخصومات */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
         <button
           onClick={() => setMainTab("lessons")}
           className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
@@ -1002,6 +1212,33 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         >
           <ClipboardCheck className="w-3.5 h-3.5" />
           <span>📱 تقييم الحصة ({evaluationsList.length})</span>
+        </button>
+
+        <button
+          onClick={() => setMainTab("announcements")}
+          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+            mainTab === "announcements"
+              ? "bg-teal-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <Megaphone className="w-3.5 h-3.5 text-teal-300" />
+          <span>📢 الإعلانات ({announcementsList.length})</span>
+        </button>
+
+        <button
+          onClick={() => setMainTab("messages")}
+          className={`relative py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+            mainTab === "messages"
+              ? "bg-purple-700 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <MessageSquare className="w-3.5 h-3.5 text-purple-300" />
+          <span>📬 الرسائل ({messagesList.length})</span>
+          {unreadMessagesCount > 0 && (
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 absolute top-1.5 left-1.5 ring-2 ring-white animate-pulse" />
+          )}
         </button>
 
         <button
@@ -1992,7 +2229,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             )}
           </div>
         </div>
-      ) : (
+      ) : mainTab === "penalties" ? (
         /* ==================== 4. تبويب الخصومات والعقوبات (خاص بالأستاذ) ==================== */
         <div className="space-y-4">
           {/* تنبيه الخصوصية: خاص بالأستاذ ومحجوب عن الجميع */}
@@ -2454,7 +2691,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             )}
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* ==================== 5. تبويب التقييم الميداني السريع (حصة الأعمال الموجهة) ==================== */}
       {mainTab === "evaluations" && (
@@ -3100,6 +3337,490 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       )}
 
+      {/* ==================== 6. تبويب لوحة الإعلانات والتنبيهات المباشرة ==================== */}
+      {mainTab === "announcements" && (
+        <div className="space-y-4">
+          {/* لافتة تعريفية */}
+          <div className="bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 text-white rounded-2xl p-4 shadow-sm flex items-start gap-3">
+            <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg shrink-0 mt-0.5">
+              📢
+            </span>
+            <div className="space-y-1 text-xs">
+              <h3 className="font-black text-sm">
+                لوحة الإعلانات والتنبيهات المباشرة في الموقع
+              </h3>
+              <p className="text-teal-100 text-[11px] leading-relaxed">
+                اكتب هنا أي إشعار غياب (مثلاً: سأغيب يوم الأحد)، تنبيه عن أدوات هندسية، إشعار برفع حل واجب، أو أي ملاحظة تريد أن تظهر فوراً لجميع التلاميذ والأولياء في أعلى الصفحة الرئيسية للموقع.
+              </p>
+            </div>
+          </div>
+
+          {/* نموذج إضافة أو تعديل إعلان */}
+          <form
+            onSubmit={handleSaveAnnouncement}
+            className="bg-white rounded-2xl p-4 border-2 border-teal-200/90 shadow-sm space-y-3.5"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-teal-100">
+              <span className="text-xs font-black text-teal-950 flex items-center gap-1.5">
+                <Megaphone className="w-4 h-4 text-teal-600" />
+                <span>
+                  {editingAnnouncement ? "تعديل الإعلان الحالي" : "نشر إعلان أو تنبيه جديد"}
+                </span>
+              </span>
+              {editingAnnouncement && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingAnnouncement(null);
+                    setAnnTitle("");
+                    setAnnContent("");
+                    setAnnDate("");
+                    setAnnPinned(false);
+                  }}
+                  className="text-[11px] font-bold text-red-600 hover:underline"
+                >
+                  إلغاء التعديل
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {/* 1. نوع وتصنيف الإعلان */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  نوع الإعلان: <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-xs">
+                  {[
+                    { id: "absence", label: "⚠️ تنبيه غياب" },
+                    { id: "urgent", label: "🚨 عاجل وهام" },
+                    { id: "lesson", label: "📚 دروس وواجبات" },
+                    { id: "update", label: "🔔 تحديث الموقع" },
+                    { id: "general", label: "📢 إعلان عام" },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setAnnCategory(cat.id as any)}
+                      className={`py-2 px-2 rounded-xl font-black transition border text-center ${
+                        annCategory === cat.id
+                          ? "bg-teal-700 text-white border-teal-700 shadow-xs"
+                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. عنوان الإعلان */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  عنوان الإعلان: <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: تنبيه غياب الأستاذ يوم الأحد / تم رفع حلول الواجب 3 / إحضار الأدوات الهندسية غداً"
+                  value={annTitle}
+                  onChange={(e) => setAnnTitle(e.target.value)}
+                  className="input text-xs font-bold"
+                  required
+                />
+              </div>
+
+              {/* 3. تاريخ الإعلان أو اليوم المعني */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  تاريخ اليوم المعني أو توقيت الإعلان (اختياري):
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: الأحد 18 أكتوبر 2026 (اتركه فارغاً ليُدرج تاريخ اليوم تلقائياً)"
+                  value={annDate}
+                  onChange={(e) => setAnnDate(e.target.value)}
+                  className="input text-xs"
+                />
+              </div>
+
+              {/* 4. تفاصيل ونَص الإعلان */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  نص الإعلان والتفاصيل: <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="اكتب هنا التفاصيل الكاملة للإعلان أو الملاحظة أو التوجيهات التي تود توجيهها للتلاميذ وأوليائهم..."
+                  value={annContent}
+                  onChange={(e) => setAnnContent(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition leading-relaxed"
+                  required
+                />
+              </div>
+
+              {/* 5. خيار التثبيت في الأعلى */}
+              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={annPinned}
+                  onChange={(e) => setAnnPinned(e.target.checked)}
+                  className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
+                />
+                <span className="text-xs font-black text-slate-800 flex items-center gap-1">
+                  <Pin className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />
+                  <span>تثبيت هذا الإعلان في أعلى الصفحة الرئيسية</span>
+                </span>
+              </label>
+
+              {/* زر النشر */}
+              <button
+                type="submit"
+                disabled={isSubmitting || !annTitle.trim() || !annContent.trim()}
+                className="w-full py-2.5 px-4 rounded-xl bg-teal-600 text-white font-black text-xs hover:bg-teal-700 transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Megaphone className="w-4 h-4" />
+                    <span>{editingAnnouncement ? "حفظ التعديلات" : "نشر الإعلان فوراً 📢"}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* قائمة الإعلانات الحالية */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                <span>سجل الإعلانات والتنبيهات ({announcementsList.length})</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-bold">
+                تظهر للزوار في الصفحة الرئيسية
+              </span>
+            </div>
+
+            {announcementsList.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-xs">
+                لا توجد إعلانات منشورة حالياً. استخدم النموذج أعلاه لنشر أول إعلان!
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {announcementsList.map((ann) => (
+                  <div
+                    key={ann.id}
+                    className={`p-3.5 rounded-2xl border transition ${
+                      ann.active === false
+                        ? "bg-slate-50/70 border-slate-200 opacity-60"
+                        : ann.pinned
+                        ? "bg-amber-50/40 border-amber-200"
+                        : "bg-white border-slate-200 shadow-2xs"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full border bg-slate-100 text-slate-800">
+                          {ann.category === "absence"
+                            ? "⚠️ تنبيه غياب"
+                            : ann.category === "urgent"
+                            ? "🚨 عاجل"
+                            : ann.category === "lesson"
+                            ? "📚 دروس"
+                            : ann.category === "update"
+                            ? "🔔 تحديث"
+                            : "📢 عام"}
+                        </span>
+                        {ann.pinned && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded-full">
+                            <Pin className="w-2.5 h-2.5 fill-amber-700 text-amber-700" /> مثبت
+                          </span>
+                        )}
+                        {ann.active === false && (
+                          <span className="text-[9px] font-bold bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">
+                            مخفي عن الزوار
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-bold">
+                          {ann.date}
+                        </span>
+                      </div>
+
+                      {/* أزرار الإجراءات السريعة */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleTogglePinAnnouncement(ann)}
+                          title={ann.pinned ? "إلغاء التثبيت" : "تثبيت في الأعلى"}
+                          className={`p-1.5 rounded-lg text-xs transition ${
+                            ann.pinned
+                              ? "bg-amber-100 text-amber-800"
+                              : "text-slate-400 hover:bg-slate-100"
+                          }`}
+                        >
+                          <Pin className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleActiveAnnouncement(ann)}
+                          title={ann.active === false ? "إظهار للزوار" : "إخفاء مؤقت"}
+                          className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition"
+                        >
+                          {ann.active === false ? (
+                            <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingAnnouncement(ann);
+                            setAnnTitle(ann.title);
+                            setAnnContent(ann.content);
+                            setAnnCategory(ann.category);
+                            setAnnDate(ann.date || "");
+                            setAnnPinned(Boolean(ann.pinned));
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                          title="تعديل الإعلان"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-teal-700 hover:bg-teal-50 transition"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingAnnouncement(ann)}
+                          title="حذف الإعلان"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <h4 className="text-xs font-black text-slate-900 mt-2">
+                      {ann.title}
+                    </h4>
+                    <p className="text-[11px] text-slate-700 mt-1 leading-relaxed whitespace-pre-line">
+                      {ann.content}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 7. تبويب صندوق الرسائل والملاحظات المجهولة ==================== */}
+      {mainTab === "messages" && (
+        <div className="space-y-4">
+          {/* لافتة تعريفية */}
+          <div className="bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white rounded-2xl p-4 shadow-sm flex items-start gap-3">
+            <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg shrink-0 mt-0.5">
+              📬
+            </span>
+            <div className="space-y-1 text-xs">
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-sm">صندوق الصراحة والشفافية (رسائل مجهولة)</h3>
+                {unreadMessagesCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
+                    {unreadMessagesCount} جديدة
+                  </span>
+                )}
+              </div>
+              <p className="text-purple-200 text-[11px] leading-relaxed">
+                🔒 جميع هذه الرسائل مجهولة الهوية بنسبة 100% ولا تظهر أي معلومة عن هوية المرسل لضمان الشفافية وحرية التعبير للطلاب والأولياء.
+              </p>
+            </div>
+          </div>
+
+          {/* فلاتر الرسائل */}
+          <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+              <span>تصفية الرسائل:</span>
+              <button
+                onClick={loadMessages}
+                className="text-[11px] text-purple-700 hover:underline flex items-center gap-1 font-bold"
+              >
+                <RefreshCw className="w-3 h-3" /> تحديث القائمة
+              </button>
+            </div>
+
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+              {[
+                { id: "all", label: `الكل (${messagesList.length})` },
+                { id: "unread", label: `غير مقروءة (${unreadMessagesCount})` },
+                { id: "read", label: `مقروءة (${messagesList.length - unreadMessagesCount})` },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setMessageReadFilter(f.id as any)}
+                  className={`py-1.5 px-3 rounded-xl font-bold whitespace-nowrap transition ${
+                    messageReadFilter === f.id
+                      ? "bg-purple-700 text-white shadow-xs"
+                      : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs border-t border-slate-100 pt-2">
+              {[
+                { id: "all", label: "جميع الموضوعات" },
+                { id: "question", label: "❓ أسئلة الدروس" },
+                { id: "suggestion", label: "💡 مقترحات" },
+                { id: "criticism", label: "⚖️ نقد وملاحظات" },
+                { id: "other", label: "💬 عام" },
+              ].map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setMessageCategoryFilter(c.id)}
+                  className={`py-1 px-2.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
+                    messageCategoryFilter === c.id
+                      ? "bg-slate-800 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* قائمة الرسائل */}
+          {(() => {
+            const filtered = messagesList.filter((m) => {
+              if (messageReadFilter === "unread" && m.read) return false;
+              if (messageReadFilter === "read" && !m.read) return false;
+              if (messageCategoryFilter !== "all" && m.category !== messageCategoryFilter) return false;
+              return true;
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto text-xl">
+                    📬
+                  </div>
+                  <h4 className="text-xs font-black text-slate-800">
+                    لا توجد رسائل مطابقة للفلتر
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    عندما يرسل تلميذ أو ولي أمر رسالة من صفحة "صندوق الصراحة"، ستظهر هنا فوراً.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-3">
+                {filtered.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`rounded-2xl p-4 border transition ${
+                      !msg.read
+                        ? "bg-white border-purple-300 shadow-xs ring-1 ring-purple-100"
+                        : "bg-slate-50/80 border-slate-200 shadow-2xs"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 flex-wrap pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                            msg.category === "question"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : msg.category === "suggestion"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : msg.category === "criticism"
+                              ? "bg-purple-50 text-purple-700 border-purple-200"
+                              : "bg-slate-100 text-slate-700 border-slate-200"
+                          }`}
+                        >
+                          {msg.category === "question"
+                            ? "❓ سؤال حول درس"
+                            : msg.category === "suggestion"
+                            ? "💡 اقتراح تطويري"
+                            : msg.category === "criticism"
+                            ? "⚖️ نقد بنّاء"
+                            : "💬 استفسار عام"}
+                        </span>
+
+                        {msg.targetLevel && (
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
+                            الصف: {msg.targetLevel}
+                          </span>
+                        )}
+
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {new Date(msg.createdAt).toLocaleDateString("ar-DZ", {
+                            weekday: "short",
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+
+                        {!msg.read ? (
+                          <span className="text-[9px] font-black bg-red-100 text-red-700 px-1.5 py-0.2 rounded-full border border-red-200">
+                            جديدة 🆕
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded-full">
+                            مقروءة ✓
+                          </span>
+                        )}
+                      </div>
+
+                      {/* أزرار الإجراءات */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleToggleMessageRead(msg)}
+                          title={msg.read ? "تحديد كغير مقروءة" : "تحديد كمقروءة"}
+                          className={`py-1 px-2 rounded-lg text-[10px] font-bold transition flex items-center gap-1 ${
+                            msg.read
+                              ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              : "bg-purple-100 text-purple-800 hover:bg-purple-200"
+                          }`}
+                        >
+                          <Check className="w-3 h-3" />
+                          <span>{msg.read ? "غير مقروءة" : "تمت القراءة"}</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(msg.content);
+                            showToast("success", "تم نسخ نص الرسالة إلى الحافظة 📋");
+                          }}
+                          title="نسخ نص الرسالة"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => setDeletingMessage(msg)}
+                          title="حذف الرسالة"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* نص الرسالة */}
+                    <div className="mt-3 text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line select-text bg-white p-3 rounded-xl border border-slate-100">
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* نافذة تعديل الدرس */}
       {editingLesson && (
         <EditLessonModal
@@ -3211,6 +3932,68 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             showToast("success", "✓ تم حذف العقوبة وإلغاء الخصم بنجاح!");
           }}
         />
+      )}
+
+      {/* نافذة تأكيد حذف إعلان */}
+      {deletingAnnouncement && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-slate-100 fade-up">
+            <div className="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center mx-auto text-xl">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-sm font-black text-slate-900">هل أنت متأكد من حذف هذا الإعلان؟</h3>
+              <p className="text-xs text-slate-500 line-clamp-2">"{deletingAnnouncement.title}"</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeletingAnnouncement(null)}
+                className="py-2.5 px-3 rounded-xl bg-slate-100 text-slate-700 text-xs font-black hover:bg-slate-200 transition"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteAnnouncement(deletingAnnouncement.id)}
+                className="py-2.5 px-3 rounded-xl bg-red-600 text-white text-xs font-black hover:bg-red-700 transition"
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تأكيد حذف رسالة */}
+      {deletingMessage && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-slate-100 fade-up">
+            <div className="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center mx-auto text-xl">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-sm font-black text-slate-900">هل أنت متأكد من حذف هذه الرسالة؟</h3>
+              <p className="text-xs text-slate-500 line-clamp-2">"{deletingMessage.content}"</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeletingMessage(null)}
+                className="py-2.5 px-3 rounded-xl bg-slate-100 text-slate-700 text-xs font-black hover:bg-slate-200 transition"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteMessage(deletingMessage.id)}
+                className="py-2.5 px-3 rounded-xl bg-red-600 text-white text-xs font-black hover:bg-red-700 transition"
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

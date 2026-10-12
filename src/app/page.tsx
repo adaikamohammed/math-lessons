@@ -8,7 +8,14 @@ import {
   BookOpen,
   Trophy,
   Scale,
+  MessageSquare,
+  Lock,
 } from "lucide-react";
+import { getLessonsData } from "@/lib/storage";
+import HomeAnnouncements from "@/components/HomeAnnouncements";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const years = [
   {
@@ -29,7 +36,10 @@ const years = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const data = await getLessonsData();
+  const announcements = data.announcements || [];
+
   return (
     <div className="pt-5 pb-12 fade-up space-y-4">
       {/* رأس الصفحة */}
@@ -44,6 +54,9 @@ export default function Home() {
           الأستاذ محمد عدايكة — متوسطة المجاهد باهي علي
         </p>
       </div>
+
+      {/* خانة الإعلانات والتنبيهات المباشرة (غياب، تحديثات، دروس جديدة...) */}
+      <HomeAnnouncements announcements={announcements} />
 
       {/* 1. الأساس: الدروس المصورة للسبورة (أول ما يراه التلميذ) */}
       <div className="space-y-2.5 pt-1">
@@ -125,7 +138,31 @@ export default function Home() {
         </Link>
       </div>
 
-      {/* 4. قسم التوجيهات والإعلانات الهامة */}
+      {/* 4. صندوق الصراحة والشفافية (رسائل سرية ومجهولة للأستاذ) */}
+      <div>
+        <Link
+          href="/messages"
+          className="flex items-center gap-3.5 bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-pink-500/10 rounded-2xl p-3.5 border border-purple-200/80 shadow-2xs hover:border-purple-300 hover:shadow-xs active:scale-[0.98] transition group"
+        >
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white flex items-center justify-center shrink-0 shadow-sm shadow-purple-600/20 group-hover:scale-105 transition-transform">
+            <MessageSquare className="w-5 h-5 text-purple-100" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-xs text-slate-900">صندوق الصراحة والشفافية</span>
+              <span className="text-[10px] bg-purple-100 text-purple-800 font-black px-1.5 py-0.2 rounded border border-purple-200">
+                سري 100% 🔒
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 font-medium">
+              اطرح سؤالاً عن درس، قدّم اقتراحاً، أو اكتب ملاحظة صريحة للأستاذ دون كشف هويتك
+            </p>
+          </div>
+          <ChevronLeft className="w-4 h-4 text-purple-600 group-hover:text-purple-800 transition shrink-0" />
+        </Link>
+      </div>
+
+      {/* 5. قسم التوجيهات والإعلانات الهامة */}
       <div className="pt-2 space-y-2">
         <div className="text-xs font-bold text-slate-600 px-1">توجيهات وإعلانات هامة:</div>
 
