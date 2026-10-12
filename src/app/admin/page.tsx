@@ -4214,8 +4214,12 @@ function LessonCard({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-2xs overflow-hidden transition">
-      <div className="p-3 flex items-start justify-between gap-2">
-        <button onClick={onToggle} className="flex-1 flex items-start gap-2.5 text-right min-w-0">
+      <div className="p-3 flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-full sm:flex-1 flex items-start gap-2.5 text-right min-w-0 group cursor-pointer"
+        >
           <span
             className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-xs mt-0.5 ${
               isDirectedWork
@@ -4230,12 +4234,12 @@ function LessonCard({
             {lesson.number}
           </span>
           <div className="flex-1 min-w-0">
-            <div className="font-bold text-xs text-slate-900 leading-snug break-words">
+            <div className="font-bold text-xs sm:text-sm text-slate-900 leading-snug break-words">
               {lesson.title}
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-slate-400">
-              <span>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[10px] text-slate-400">
+              <span className="font-semibold text-slate-600">
                 {isDirectedWork
                   ? "حصة أعمال موجهة"
                   : isWorksheet
@@ -4275,11 +4279,11 @@ function LessonCard({
             </div>
           </div>
           <ChevronDown
-            className={`w-4 h-4 text-slate-400 transition-transform shrink-0 mt-1 ${open ? "rotate-180" : ""}`}
+            className={`w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-transform shrink-0 mt-1 ${open ? "rotate-180" : ""}`}
           />
         </button>
 
-        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+        <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0 w-full sm:w-auto">
           {/* زر مباشر لاختيار ورفع صورة حل الواجب أو صور المحتوى */}
           {(isLesson || isWorksheet) ? (
             <label
@@ -4288,7 +4292,7 @@ function LessonCard({
                 if (!open) onToggle();
                 setCardTab("homework");
               }}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shrink-0 active:scale-95 shadow-sm cursor-pointer"
+              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white transition flex items-center justify-center gap-1.5 shrink-0 active:scale-95 shadow-2xs cursor-pointer"
               title="اضغط هنا فوراً لرفع صورة أو ملف PDF لحل الواجب لهذا الدرس من الهاتف أو الحاسوب"
             >
               <FileText className="w-3.5 h-3.5 text-white" />
@@ -4311,7 +4315,7 @@ function LessonCard({
                 if (!open) onToggle();
                 setCardTab("board");
               }}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-amber-600 hover:bg-amber-700 text-white transition flex items-center gap-1.5 shrink-0 active:scale-95 shadow-sm cursor-pointer"
+              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black bg-amber-600 hover:bg-amber-700 text-white transition flex items-center justify-center gap-1.5 shrink-0 active:scale-95 shadow-2xs cursor-pointer"
               title="اضغط هنا لرفع صور أو ملفات PDF للملخص"
             >
               <Upload className="w-3.5 h-3.5 text-white" />
@@ -4334,7 +4338,7 @@ function LessonCard({
                 if (!open) onToggle();
                 setCardTab("board");
               }}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-sky-600 hover:bg-sky-700 text-white transition flex items-center gap-1.5 shrink-0 active:scale-95 shadow-sm cursor-pointer"
+              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black bg-sky-600 hover:bg-sky-700 text-white transition flex items-center justify-center gap-1.5 shrink-0 active:scale-95 shadow-2xs cursor-pointer"
               title="اضغط هنا لرفع صور الحصة أو ملفات PDF"
             >
               <Upload className="w-3.5 h-3.5 text-white" />
@@ -4352,20 +4356,24 @@ function LessonCard({
             </label>
           )}
 
-          <button
-            onClick={onEdit}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition"
-            title="تعديل البيانات"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
-            title="حذف العنصر كاملاً"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition border border-slate-200/80 sm:border-0"
+              title="تعديل البيانات"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition border border-slate-200/80 sm:border-0"
+              title="حذف العنصر كاملاً"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -4515,7 +4523,7 @@ function LessonCard({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                           <button
                             disabled={idx === 0}
                             onClick={() => moveHwImage(idx, "prev")}
@@ -4544,7 +4552,7 @@ function LessonCard({
 
                         <button
                           onClick={() => setDeletingHwImageId(img.id)}
-                          className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
+                          className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition shrink-0"
                           title="حذف هذا الملف"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -4678,7 +4686,7 @@ function LessonCard({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                           <button
                             disabled={idx === 0}
                             onClick={() => moveImage(idx, "prev")}
@@ -4707,7 +4715,7 @@ function LessonCard({
 
                         <button
                           onClick={() => setDeletingImageId(img.id)}
-                          className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"
+                          className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition shrink-0"
                           title="حذف هذا الملف"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
