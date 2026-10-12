@@ -16,6 +16,8 @@ import {
   Lock,
   ArrowRight,
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
   CheckCircle2,
   AlertCircle,
   Eye,
@@ -4034,66 +4036,75 @@ function LessonCard({
     if (!files?.length) return;
     const list = Array.from(files);
 
+    const preparedFiles: { file: File | Blob; name: string }[] = [];
+
     for (let k = 0; k < list.length; k++) {
       const file = list[k];
       const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 
       setUploading(
         isPdf
-          ? `جاري رفع مستند PDF "${file.name}" (${k + 1} من ${list.length})...`
-          : isHomework
-          ? `جاري ضغط ورفع حل الواجب ${k + 1} من ${list.length}...`
-          : `جاري ضغط ورفع صورة السبورة ${k + 1} من ${list.length}...`
+          ? `جاري تجهيز مستند PDF "${file.name}" (${k + 1} من ${list.length})...`
+          : `جاري ضغط وتحسين الصورة ${k + 1} من ${list.length}...`
       );
-      try {
-        let fileToUpload: File | Blob = file;
 
-        // ضغط الصور فقط، أما ملفات PDF فترفع كما هي بجودتها الكاملة
-        if (!isPdf && (file.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(file.name))) {
-          try {
-            fileToUpload = await imageCompression(file, {
-              maxSizeMB: 0.8,
-              maxWidthOrHeight: 2000,
-              useWebWorker: true,
-              fileType: "image/jpeg",
-            });
-          } catch (compressErr) {
-            console.warn("Image compression skipped:", compressErr);
-            fileToUpload = file;
-          }
+      let fileToUpload: File | Blob = file;
+
+      // ضغط الصور فقط، أما ملفات PDF فترفع كما هي بجودتها الكاملة
+      if (!isPdf && (file.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(file.name))) {
+        try {
+          fileToUpload = await imageCompression(file, {
+            maxSizeMB: 0.8,
+            maxWidthOrHeight: 2000,
+            useWebWorker: true,
+            fileType: "image/jpeg",
+          });
+        } catch (compressErr) {
+          console.warn("Image compression skipped:", compressErr);
+          fileToUpload = file;
         }
-
-        const formData = new FormData();
-        formData.append("lessonId", lesson.id);
-        if (isHomework) formData.append("isHomework", "true");
-        formData.append("file", fileToUpload, file.name);
-
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || "فشل الرفع");
-        }
-      } catch (e: any) {
-        showToast("error", `فشل رفع "${file.name}": ` + (e.message || "خطأ غير معروف"));
       }
+
+      preparedFiles.push({ file: fileToUpload, name: file.name });
     }
 
-    setUploading("");
-    showToast(
-      "success",
-      isHomework
-        ? `✓ تم رفع حل الواجب / السلسلة بنجاح إلى "${lesson.title}" 📝`
-        : `✓ تم رفع الملفات بنجاح إلى "${lesson.title}" 📁`
-    );
+    setUploading(`جاري رفع وحفظ ${preparedFiles.length} ملفات دفعة واحدة بالترتيب المحدد...`);
 
-    // جلب الدرس المحدث وتحديث الحالة محلياً مباشرة
-    const res = await fetch(`/api/lessons/${lesson.id}?_t=${Date.now()}`, { cache: "no-store" });
-    const data = await res.json();
-    if (data.lesson) onLessonUpdated(data.lesson);
+    try {
+      const formData = new FormData();
+      formData.append("lessonId", lesson.id);
+      if (isHomework) formData.append("isHomework", "true");
+
+      for (const item of preparedFiles) {
+        formData.append("files", item.file, item.name);
+      }
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "فشل الرفع");
+      }
+
+      showToast(
+        "success",
+        isHomework
+          ? `✓ تم رفع وحفظ ${preparedFiles.length} ملفات بنجاح إلى حل الواجب 📝`
+          : `✓ تم رفع وحفظ ${preparedFiles.length} ملفات بنجاح إلى "${lesson.title}" 📁`
+      );
+
+      // جلب الدرس المحدث وتحديث الحالة محلياً مباشرة
+      const lRes = await fetch(`/api/lessons/${lesson.id}?_t=${Date.now()}`, { cache: "no-store" });
+      const data = await lRes.json();
+      if (data.lesson) onLessonUpdated(data.lesson);
+    } catch (e: any) {
+      showToast("error", "فشل رفع الملفات: " + (e.message || "خطأ غير معروف"));
+    } finally {
+      setUploading("");
+    }
   };
 
   const confirmDeleteImage = async () => {
@@ -4532,9 +4543,9 @@ function LessonCard({
                                 ? "opacity-30 cursor-not-allowed text-slate-300"
                                 : "text-slate-600 hover:bg-slate-100"
                             }`}
-                            title="تقديم لأعلى"
+                            title="نقل لأعلى (تقديم الترتيب)"
                           >
-                            <ArrowRight className="w-3.5 h-3.5" />
+                            <ArrowUp className="w-3.5 h-3.5" />
                           </button>
                           <button
                             disabled={idx === (lesson.homeworkImages?.length ?? 0) - 1}
@@ -4544,9 +4555,9 @@ function LessonCard({
                                 ? "opacity-30 cursor-not-allowed text-slate-300"
                                 : "text-slate-600 hover:bg-slate-100"
                             }`}
-                            title="تأخير لأسفل"
+                            title="نقل لأسفل (تأخير الترتيب)"
                           >
-                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <ArrowDown className="w-3.5 h-3.5" />
                           </button>
                         </div>
 
@@ -4695,9 +4706,9 @@ function LessonCard({
                                 ? "opacity-30 cursor-not-allowed text-slate-300"
                                 : "text-slate-600 hover:bg-slate-100"
                             }`}
-                            title="تقديم لأعلى"
+                            title="نقل لأعلى (الترتيب)"
                           >
-                            <ArrowRight className="w-3.5 h-3.5" />
+                            <ArrowUp className="w-3.5 h-3.5" />
                           </button>
                           <button
                             disabled={idx === lesson.images.length - 1}
@@ -4707,9 +4718,9 @@ function LessonCard({
                                 ? "opacity-30 cursor-not-allowed text-slate-300"
                                 : "text-slate-600 hover:bg-slate-100"
                             }`}
-                            title="تأخير لأسفل"
+                            title="نقل لأسفل (الترتيب)"
                           >
-                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <ArrowDown className="w-3.5 h-3.5" />
                           </button>
                         </div>
 
