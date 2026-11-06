@@ -119,6 +119,7 @@ export async function getLessonsData(): Promise<LessonsData> {
           studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
           announcements: Array.isArray(json.announcements) ? json.announcements : [],
           anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
+          siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
         };
         const result = synchronizeStudents(rawResult);
         // حفظ نسخة محلية احتياطية
@@ -147,6 +148,7 @@ export async function getLessonsData(): Promise<LessonsData> {
       studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
       announcements: Array.isArray(json.announcements) ? json.announcements : [],
       anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
+      siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
     };
   } catch {
     return {
@@ -159,6 +161,7 @@ export async function getLessonsData(): Promise<LessonsData> {
       studentRoster: [],
       announcements: [],
       anonymousMessages: [],
+      siteAnalytics: { totalVisits: 0 },
     };
   }
 }
@@ -185,6 +188,9 @@ async function executeSave(data: LessonsData): Promise<void> {
     }
     if (data.anonymousMessages === undefined && existing.anonymousMessages) {
       data.anonymousMessages = existing.anonymousMessages;
+    }
+    if (data.siteAnalytics === undefined && existing.siteAnalytics) {
+      data.siteAnalytics = existing.siteAnalytics;
     }
   } catch (mergeErr) {
     console.warn("Could not merge existing data before save:", mergeErr);

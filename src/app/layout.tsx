@@ -3,6 +3,7 @@ import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { TeacherAccess } from "@/components/TeacherAccess";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
+import VisitorTracker from "@/components/VisitorTracker";
 
 export const metadata: Metadata = {
   title: "دروس الرياضيات | الأستاذ محمد عدايكة",
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
       <body>
+        <VisitorTracker />
         <ServiceWorkerRegister />
         <TeacherAccess />
         <PWAInstallBanner />

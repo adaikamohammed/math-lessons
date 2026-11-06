@@ -31,6 +31,7 @@ export type Lesson = {
   images: LessonImage[];
   homeworkImages?: LessonImage[]; // صور الحل النموذجي للواجب المنزلي
   homeworkNotes?: string; // ملاحظات أو رقم تمارين الواجب المنزلي
+  views?: number; // عدد مشاهدات الدرس من طرف التلاميذ والأولياء
 };
 
 export type ParentSummons = {
@@ -144,13 +145,27 @@ export type Announcement = {
 
 export type MessageCategory = "question" | "suggestion" | "criticism" | "other";
 
+export type MessageReply = {
+  content: string; // نص رد الأستاذ
+  repliedAt: string; // تاريخ ووقت الرد
+  isPublic?: boolean; // هل يُعرض في الإجابات العامة لتعم الفائدة
+};
+
 export type AnonymousMessage = {
   id: string;
   category: MessageCategory; // تصنيف الرسالة (سؤال ❓، اقتراح 💡، نقد بنّاء ⚖️، أخرى 💬)
   targetLevel?: string; // اختياري: "1 متوسط" | "2 متوسط" | "ولي أمر" | "غير محدد"
-  content: string; // نص الرسالة بسرية تامة
+  content: string; // نص الرسالة
   createdAt: string;
   read?: boolean; // هل تمت قراءتها من الأستاذ
+
+  // معلومات اختيارية للمرسل والتلميذ
+  studentName?: string; // اسم التلميذ (اختياري)
+  senderName?: string; // اسم الولي أو المرسل (اختياري)
+  senderPhone?: string; // رقم هاتف / واتساب للتواصل والرد (اختياري)
+  className?: string; // القسم أو الفوج (اختياري، مثلاً 1م1، 1م2، 1م3، 2م3)
+  trackingCode?: string; // رمز تتبع فريد وسهل (مثل M-4821) للمتابعة والردود
+  reply?: MessageReply; // رد الأستاذ
 };
 
 export type LessonsData = {
@@ -163,6 +178,12 @@ export type LessonsData = {
   studentRoster?: StudentRosterItem[];
   announcements?: Announcement[];
   anonymousMessages?: AnonymousMessage[];
+  siteAnalytics?: {
+    totalVisits: number;
+    lastVisit?: string;
+    todayVisits?: number;
+    todayDate?: string;
+  };
 };
 
 export const LEVELS = {

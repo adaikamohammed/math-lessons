@@ -35,6 +35,21 @@ export function LessonView({ id }: { id: string }) {
         }
       })
       .finally(() => setLoading(false));
+
+    // تسجيل مشاهدة الدرس مرة واحدة في الجلسة لمنع التكرار
+    try {
+      const sessionKey = `dz_math_viewed_lesson_${id}`;
+      if (!sessionStorage.getItem(sessionKey)) {
+        sessionStorage.setItem(sessionKey, "1");
+        fetch("/api/analytics/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "lesson_view", lessonId: id }),
+        }).catch(() => {});
+      }
+    } catch {
+      // ignore
+    }
   }, [id]);
 
   const images = viewMode === "homework" ? lesson?.homeworkImages || [] : lesson?.images || [];

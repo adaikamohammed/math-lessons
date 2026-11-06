@@ -51,6 +51,8 @@ import {
   EyeOff,
   Copy,
   Mail,
+  Phone,
+  Send,
 } from "lucide-react";
 import {
   LEVELS,
@@ -261,11 +263,28 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null);
 
-  // حالات صندوق الرسائل المجهولة
+  // حالات صندوق الرسائل والتواصل مع الأولياء
   const [messagesList, setMessagesList] = useState<AnonymousMessage[]>([]);
   const [messageCategoryFilter, setMessageCategoryFilter] = useState<string>("all");
-  const [messageReadFilter, setMessageReadFilter] = useState<"all" | "unread" | "read">("all");
+  const [messageReadFilter, setMessageReadFilter] = useState<"all" | "unread" | "read" | "replied" | "unreplied">("all");
   const [deletingMessage, setDeletingMessage] = useState<AnonymousMessage | null>(null);
+  const [replyingMessage, setReplyingMessage] = useState<AnonymousMessage | null>(null);
+  const [replyContent, setReplyContent] = useState<string>("");
+  const [replyIsPublic, setReplyIsPublic] = useState<boolean>(false);
+  const [savingReply, setSavingReply] = useState<boolean>(false);
+
+  // حالات الإحصائيات ومعرفة مشاهدات الدروس والزوار
+  const [analyticsData, setAnalyticsData] = useState<{
+    siteAnalytics?: { totalVisits: number; todayVisits?: number; lastVisit?: string };
+    totalLessonViews?: number;
+    totalLessonsCount?: number;
+    topLessons?: { id: string; title: string; level: number; type: string; views: number }[];
+  } | null>(null);
+
+  // حالات رفع الملفات المباشرة في خطوة واحدة أثناء إنشاء الدرس
+  const [newLessonFiles, setNewLessonFiles] = useState<File[]>([]);
+  const [newHwFiles, setNewHwFiles] = useState<File[]>([]);
+  const [uploadStatusMessage, setUploadStatusMessage] = useState<string>("");
 
   const loadLessons = useCallback(async () => {
     try {
@@ -353,6 +372,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, []);
 
+  const loadAnalytics = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/analytics/track?_t=${Date.now()}`, { cache: "no-store" });
+      const data = await res.json();
+      setAnalyticsData(data);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     loadLessons();
     loadSummons();
@@ -361,7 +390,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     loadEvaluations();
     loadAnnouncements();
     loadMessages();
-  }, [loadLessons, loadSummons, loadHonors, loadPenalties, loadEvaluations, loadAnnouncements, loadMessages]);
+    loadAnalytics();
+  }, [
+    loadLessons,
+    loadSummons,
+    loadHonors,
+    loadPenalties,
+    loadEvaluations,
+    loadAnnouncements,
+    loadMessages,
+    loadAnalytics,
+  ]);
 
   const unreadMessagesCount = useMemo(() => {
     return messagesList.filter((m) => !m.read).length;
@@ -517,6 +556,47 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
+  const handleOpenReplyModal = (msg: AnonymousMessage) => {
+    setReplyingMessage(msg);
+    setReplyContent(msg.reply?.content || "");
+    setReplyIsPublic(Boolean(msg.reply?.isPublic));
+  };
+
+  const handleSaveReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyingMessage) return;
+
+    try {
+      setSavingReply(true);
+      const res = await fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: replyingMessage.id,
+          replyContent,
+          isPublic: replyIsPublic,
+        }),
+      });
+
+      if (res.ok) {
+        showToast(
+          "success",
+          replyContent.trim()
+            ? "✓ تم حفظ الرد وتوصيله للمرسل بنجاح!"
+            : "✓ تم حذف الرد بنجاح"
+        );
+        setReplyingMessage(null);
+        loadMessages();
+      } else {
+        showToast("error", "فشل حفظ الرد، يرجى المحاولة لاحقاً");
+      }
+    } catch {
+      showToast("error", "حدث خطأ أثناء الاتصال بالخادم");
+    } finally {
+      setSavingReply(false);
+    }
+  };
+
   const showToast = (type: "success" | "error", text: string) => {
     setToastMsg({ type, text });
     setTimeout(() => {
@@ -541,6 +621,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       items = items.filter((l) => !l.homeworkImages || l.homeworkImages.length === 0);
     }
 
+    items.sort((a, b) => a.number - b.number);
     return items;
   }, [allLessons, notebookTab, filterMissingHw]);
 
@@ -556,7 +637,32 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const nextNumber = currentItems.length ? Math.max(...currentItems.map((l) => l.number)) + 1 : 1;
 
-  // 1. إضافة مورد معرفي أو حصة أعمال موجهة أو سلسلة أو ملخص مع تحديث فوري مباشر
+  // إعادة ترتيب وتصعيد/تنزيل الدروس بأسهم ⬆️ ⬇️
+  const handleMoveLesson = async (lessonId: string, direction: "up" | "down") => {
+    try {
+      const res = await fetch("/api/lessons/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lessonId,
+          direction,
+          level,
+          type: notebookTab,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast("success", data.message || "✓ تم تغيير ترتيب الدرس بنجاح ↕️");
+        loadLessons();
+      } else {
+        showToast("error", data.error || "فشل تغيير الترتيب");
+      }
+    } catch {
+      showToast("error", "حدث خطأ أثناء تعديل الترتيب");
+    }
+  };
+
+  // 1. إضافة مورد معرفي أو حصة أعمال موجهة أو سلسلة أو ملخص مع رفع الملفات مباشرة
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
@@ -565,6 +671,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
 
     setIsSubmitting(true);
+    setUploadStatusMessage("جاري حفظ الدرس...");
 
     try {
       const res = await fetch("/api/lessons", {
@@ -584,14 +691,45 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "فشل الحفظ");
 
+      let updatedLesson = data.lesson;
+
+      // رفع صور الدرس/السبورة المرفقة مباشرة في نفس الخطوة
+      if (newLessonFiles.length > 0) {
+        setUploadStatusMessage(`جاري رفع ${newLessonFiles.length} صور للدرس...`);
+        const form = new FormData();
+        form.append("lessonId", data.lesson.id);
+        for (const f of newLessonFiles) {
+          form.append("files", f, f.name);
+        }
+        const upRes = await fetch("/api/upload", { method: "POST", body: form });
+        const upData = await upRes.json();
+        if (upData.lesson) updatedLesson = upData.lesson;
+      }
+
+      // رفع صور حل الواجب المرفقة مباشرة إن وجدت
+      if (newHwFiles.length > 0) {
+        setUploadStatusMessage(`جاري رفع صور حل الواجب...`);
+        const formHw = new FormData();
+        formHw.append("lessonId", data.lesson.id);
+        formHw.append("isHomework", "true");
+        for (const f of newHwFiles) {
+          formHw.append("files", f, f.name);
+        }
+        const upHwRes = await fetch("/api/upload", { method: "POST", body: formHw });
+        const upHwData = await upHwRes.json();
+        if (upHwData.lesson) updatedLesson = upHwData.lesson;
+      }
+
       setTitle("");
       setNumber("");
       setNotes("");
       setLessonHomeworkNotes("");
+      setNewLessonFiles([]);
+      setNewHwFiles([]);
 
       // تحديث فوري للواجهة بدون الحاجة لانتظار أو تحديث المتصفح
-      setAllLessons((prev) => [...prev, data.lesson]);
-      setOpenId(data.lesson.id);
+      setAllLessons((prev) => [...prev, updatedLesson]);
+      setOpenId(updatedLesson.id);
 
       const tabLabel =
         notebookTab === "lessons"
@@ -604,12 +742,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
       showToast(
         "success",
-        `✓ تم إضافة "${data.lesson.title}" مباشرة إلى ${tabLabel}!`
+        newLessonFiles.length > 0 || newHwFiles.length > 0
+          ? `✓ تم إضافة "${data.lesson.title}" ورفع كافة صوره بنجاح في خطوة واحدة! 🚀`
+          : `✓ تم إضافة "${data.lesson.title}" مباشرة إلى ${tabLabel}!`
       );
+      loadAnalytics();
     } catch (e: any) {
       showToast("error", "خطأ: " + (e.message || "تعذر الإضافة"));
     } finally {
       setIsSubmitting(false);
+      setUploadStatusMessage("");
     }
   };
 
@@ -1283,6 +1425,102 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       {/* ==================== 1. تبويب الدروس والكراريس ==================== */}
       {mainTab === "lessons" ? (
         <div className="space-y-4">
+          {/* إحصائيات الزوار ومشاهدات الدروس في الموقع */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black">
+                  📊
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-slate-900">
+                    إحصائيات تفاعل التلاميذ والزوار مع الموقع
+                  </h3>
+                  <p className="text-[10px] text-slate-500">
+                    تتبع دقيق ومباشر لعدد الزيارات ومشاهدات كل درس لمعرفة مدى استفادة التلاميذ
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={loadAnalytics}
+                className="text-[11px] text-slate-500 hover:text-emerald-700 flex items-center gap-1 font-bold bg-slate-50 hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 transition"
+                title="تحديث الإحصائيات"
+              >
+                <RefreshCw className="w-3 h-3" />
+                <span>تحديث الأرقام</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {/* إجمالي الزيارات */}
+              <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-3 rounded-xl border border-slate-200/80">
+                <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
+                  <span>إجمالي زيارات الموقع</span>
+                  <Globe className="w-3.5 h-3.5 text-emerald-600" />
+                </div>
+                <div className="text-xl font-black text-slate-900">
+                  {analyticsData?.siteAnalytics?.totalVisits ?? 0}
+                  <span className="text-[10px] font-normal text-slate-500 mr-1">زيارة</span>
+                </div>
+              </div>
+
+              {/* زيارات اليوم */}
+              <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 p-3 rounded-xl border border-slate-200/80">
+                <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
+                  <span>زيارات اليوم 📅</span>
+                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                </div>
+                <div className="text-xl font-black text-blue-900">
+                  {analyticsData?.siteAnalytics?.todayVisits ?? 0}
+                  <span className="text-[10px] font-normal text-slate-500 mr-1">زيارة</span>
+                </div>
+              </div>
+
+              {/* إجمالي مشاهدات الدروس */}
+              <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-slate-50 to-purple-50/30 p-3 rounded-xl border border-slate-200/80">
+                <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
+                  <span>إجمالي مشاهدات الدروس</span>
+                  <Eye className="w-3.5 h-3.5 text-purple-600" />
+                </div>
+                <div className="text-xl font-black text-purple-900">
+                  {analyticsData?.totalLessonViews ?? 0}
+                  <span className="text-[10px] font-normal text-slate-500 mr-1">مشاهدة</span>
+                </div>
+              </div>
+            </div>
+
+            {/* أكثر الدروس مشاهدة */}
+            {analyticsData?.topLessons && analyticsData.topLessons.length > 0 && (
+              <div className="pt-1">
+                <div className="text-[11px] font-extrabold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                  <span>الدروس والمحاور الأكثر مشاهدة من طرف التلاميذ:</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                  {analyticsData.topLessons.slice(0, 3).map((item, i) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-800 font-black text-[10px] flex items-center justify-center shrink-0">
+                          {i + 1}
+                        </span>
+                        <span className="font-bold text-slate-800 truncate text-[11px]" title={item.title}>
+                          {item.title}
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                        {item.views} 👁️
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* إرشاد وتوضيح حول رفع حلول الواجبات وصور السبورة */}
           <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border border-blue-200/90 rounded-2xl p-3.5 flex items-start gap-3 shadow-2xs">
             <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 font-black text-sm mt-0.5 shadow-2xs">
@@ -1662,17 +1900,161 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               </div>
             )}
 
+            {/* قسم إرفاق الملفات والصور مباشرة أثناء إنشاء الدرس */}
+            <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span className="flex items-center gap-1.5 text-emerald-800 font-black">
+                  <Upload className="w-4 h-4 text-emerald-600" />
+                  <span>
+                    {notebookTab === "lessons"
+                      ? "📸 صور السبورة أو مستندات الدرس (مباشرة الآن - اختياري):"
+                      : notebookTab === "directed_work"
+                      ? "📸 صور أو مستندات حصة الأعمال الموجهة (اختياري):"
+                      : notebookTab === "worksheets"
+                      ? "📑 ملفات ومستندات السلسلة (صور أو PDF - اختياري):"
+                      : "📌 صور أو ملفات الملخص (صور أو PDF - اختياري):"}
+                  </span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-normal">يمكنك أيضاً رفعها لاحقاً</span>
+              </div>
+
+              {/* اختيار صور الدرس */}
+              <div>
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl p-3 cursor-pointer bg-white transition hover:bg-emerald-50/30 group">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
+                    <Plus className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+                    <span>اضغط هنا لاختيار صور السبورة أو ملفات الدرس من الهاتف أو الحاسوب</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-0.5">يمكنك اختيار عدة صور دفعة واحدة</span>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf,.pdf"
+                    multiple
+                    hidden
+                    disabled={isSubmitting}
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        const incoming = Array.from(e.target.files);
+                        setNewLessonFiles((prev) => [...prev, ...incoming]);
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+
+                {newLessonFiles.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    <div className="text-[11px] font-bold text-slate-600">
+                      الملفات المختارة للرفع ({newLessonFiles.length}):
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-white rounded-lg border border-slate-200">
+                      {newLessonFiles.map((file, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-1 rounded-md text-[10px] font-bold"
+                        >
+                          <span className="truncate max-w-[120px]" title={file.name}>
+                            {file.name}
+                          </span>
+                          <span className="text-[9px] text-emerald-600 font-normal">
+                            ({Math.round(file.size / 1024)} KB)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setNewLessonFiles((prev) => prev.filter((_, i) => i !== idx))
+                            }
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-0.5"
+                            title="إلغاء اختيار هذا الملف"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* اختيار صور حل الواجب المنزلي (خاص بكراس الدروس فقط) */}
+              {notebookTab === "lessons" && (
+                <div className="pt-2 border-t border-slate-200/70">
+                  <div className="flex items-center justify-between text-xs font-bold text-blue-900 mb-1.5">
+                    <span className="flex items-center gap-1">
+                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <span>📝 صور أو ملف PDF للحل النموذجي للواجب (اختياري):</span>
+                    </span>
+                  </div>
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-blue-300 hover:border-blue-500 rounded-xl p-2.5 cursor-pointer bg-white transition hover:bg-blue-50/30 group">
+                    <div className="flex items-center gap-2 text-xs font-bold text-blue-800">
+                      <Plus className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform" />
+                      <span>اضغط هنا لاختيار صور حل الواجب المنزلي (أو ملف PDF)</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf,.pdf"
+                      multiple
+                      hidden
+                      disabled={isSubmitting}
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          const incoming = Array.from(e.target.files);
+                          setNewHwFiles((prev) => [...prev, ...incoming]);
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+
+                  {newHwFiles.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="text-[11px] font-bold text-blue-700">
+                        ملفات حل الواجب المختارة ({newHwFiles.length}):
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-white rounded-lg border border-blue-200">
+                        {newHwFiles.map((file, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 px-2 py-1 rounded-md text-[10px] font-bold"
+                          >
+                            <span className="truncate max-w-[120px]" title={file.name}>
+                              {file.name}
+                            </span>
+                            <span className="text-[9px] text-blue-600 font-normal">
+                              ({Math.round(file.size / 1024)} KB)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewHwFiles((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-0.5"
+                              title="إلغاء اختيار هذا الملف"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button disabled={isSubmitting} className="btn-primary w-full py-3 text-sm">
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>جاري الحفظ...</span>
+                  <span>{uploadStatusMessage || "جاري الحفظ والرفع..."}</span>
                 </>
               ) : (
                 <>
                   <Plus className="w-4 h-4" />
                   <span>
-                    {notebookTab === "lessons"
+                    {newLessonFiles.length > 0 || newHwFiles.length > 0
+                      ? "حفظ ونشر الدرس ورفع كافة الملفات فوراً 🚀"
+                      : notebookTab === "lessons"
                       ? "إضافة المورد والبدء برفع الصور"
                       : notebookTab === "directed_work"
                       ? "إضافة حصة الأعمال الموجهة والبدء برفع الصور"
@@ -1741,20 +2123,29 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                         </div>
 
                         <div className="space-y-2">
-                          {sec.items.map((item) => (
-                            <LessonCard
-                              key={item.id}
-                              lesson={item}
-                              open={openId === item.id}
-                              onToggle={() => setOpenId(openId === item.id ? null : item.id)}
-                              onLessonUpdated={(updated) => {
-                                setAllLessons((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-                              }}
-                              onEdit={() => setEditingLesson(item)}
-                              onDelete={() => setDeletingLesson(item)}
-                              showToast={showToast}
-                            />
-                          ))}
+                          {sec.items.map((item) => {
+                            const globalIdx = currentItems.findIndex((c) => c.id === item.id);
+                            const canUp = globalIdx > 0;
+                            const canDown = globalIdx !== -1 && globalIdx < currentItems.length - 1;
+                            return (
+                              <LessonCard
+                                key={item.id}
+                                lesson={item}
+                                open={openId === item.id}
+                                onToggle={() => setOpenId(openId === item.id ? null : item.id)}
+                                onLessonUpdated={(updated) => {
+                                  setAllLessons((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+                                }}
+                                onEdit={() => setEditingLesson(item)}
+                                onDelete={() => setDeletingLesson(item)}
+                                onMoveUp={() => handleMoveLesson(item.id, "up")}
+                                onMoveDown={() => handleMoveLesson(item.id, "down")}
+                                canMoveUp={canUp}
+                                canMoveDown={canDown}
+                                showToast={showToast}
+                              />
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
@@ -1763,7 +2154,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               </div>
             ) : (
               <div className="space-y-2.5">
-                {currentItems.map((item) => (
+                {currentItems.map((item, idx) => (
                   <LessonCard
                     key={item.id}
                     lesson={item}
@@ -1774,6 +2165,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     }}
                     onEdit={() => setEditingLesson(item)}
                     onDelete={() => setDeletingLesson(item)}
+                    onMoveUp={() => handleMoveLesson(item.id, "up")}
+                    onMoveDown={() => handleMoveLesson(item.id, "down")}
+                    canMoveUp={idx > 0}
+                    canMoveDown={idx < currentItems.length - 1}
                     showToast={showToast}
                   />
                 ))}
@@ -3611,51 +4006,65 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       )}
 
-      {/* ==================== 7. تبويب صندوق الرسائل والملاحظات المجهولة ==================== */}
+      {/* ==================== 7. تبويب صندوق الرسائل والتواصل مع الأولياء ==================== */}
       {mainTab === "messages" && (
         <div className="space-y-4">
-          {/* لافتة تعريفية */}
+          {/* لافتة تعريفية وتنبيهية */}
           <div className="bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white rounded-2xl p-4 shadow-sm flex items-start gap-3">
             <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg shrink-0 mt-0.5">
               📬
             </span>
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-sm">صندوق الصراحة والشفافية (رسائل مجهولة)</h3>
+            <div className="space-y-1 text-xs flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-black text-sm">صندوق التواصل والصراحة مع الأولياء والتلاميذ</h3>
                 {unreadMessagesCount > 0 && (
                   <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
                     {unreadMessagesCount} جديدة
                   </span>
                 )}
+                {messagesList.filter((m) => !m.reply?.content).length > 0 && (
+                  <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {messagesList.filter((m) => !m.reply?.content).length} بانتظار ردك ⏳
+                  </span>
+                )}
               </div>
               <p className="text-purple-200 text-[11px] leading-relaxed">
-                🔒 جميع هذه الرسائل مجهولة الهوية بنسبة 100% ولا تظهر أي معلومة عن هوية المرسل لضمان الشفافية وحرية التعبير للطلاب والأولياء.
+                🔒 يدعم النظام استقبال الرسائل مجهولة الهوية بنسبة 100%، أو مع معلومات التلميذ والولي اختيارياً. يمكنك كتابة رد ليصل للمرسل عبر كود المتابعة، أو الرد السريع عبر واتساب.
               </p>
             </div>
           </div>
 
-          {/* فلاتر الرسائل */}
+          {/* فلاتر الرسائل المتقدمة */}
           <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs space-y-2.5">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700">
               <span>تصفية الرسائل:</span>
               <button
                 onClick={loadMessages}
-                className="text-[11px] text-purple-700 hover:underline flex items-center gap-1 font-bold"
+                className="text-[11px] text-purple-700 hover:underline flex items-center gap-1 font-bold cursor-pointer"
               >
                 <RefreshCw className="w-3 h-3" /> تحديث القائمة
               </button>
             </div>
 
+            {/* فلتر حالة القراءة والرد */}
             <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
               {[
                 { id: "all", label: `الكل (${messagesList.length})` },
+                {
+                  id: "unreplied",
+                  label: `⏳ بانتظار الرد (${messagesList.filter((m) => !m.reply?.content).length})`,
+                },
+                {
+                  id: "replied",
+                  label: `✓ تم الرد عليها (${messagesList.filter((m) => m.reply?.content).length})`,
+                },
                 { id: "unread", label: `غير مقروءة (${unreadMessagesCount})` },
                 { id: "read", label: `مقروءة (${messagesList.length - unreadMessagesCount})` },
               ].map((f) => (
                 <button
                   key={f.id}
                   onClick={() => setMessageReadFilter(f.id as any)}
-                  className={`py-1.5 px-3 rounded-xl font-bold whitespace-nowrap transition ${
+                  className={`py-1.5 px-3 rounded-xl font-bold whitespace-nowrap transition cursor-pointer ${
                     messageReadFilter === f.id
                       ? "bg-purple-700 text-white shadow-xs"
                       : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
@@ -3666,6 +4075,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               ))}
             </div>
 
+            {/* فلتر تصنيف الموضوع */}
             <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs border-t border-slate-100 pt-2">
               {[
                 { id: "all", label: "جميع الموضوعات" },
@@ -3677,7 +4087,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <button
                   key={c.id}
                   onClick={() => setMessageCategoryFilter(c.id)}
-                  className={`py-1 px-2.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
+                  className={`py-1 px-2.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
                     messageCategoryFilter === c.id
                       ? "bg-slate-800 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -3694,6 +4104,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             const filtered = messagesList.filter((m) => {
               if (messageReadFilter === "unread" && m.read) return false;
               if (messageReadFilter === "read" && !m.read) return false;
+              if (messageReadFilter === "unreplied" && m.reply?.content) return false;
+              if (messageReadFilter === "replied" && !m.reply?.content) return false;
               if (messageCategoryFilter !== "all" && m.category !== messageCategoryFilter) return false;
               return true;
             });
@@ -3708,7 +4120,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     لا توجد رسائل مطابقة للفلتر
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    عندما يرسل تلميذ أو ولي أمر رسالة من صفحة "صندوق الصراحة"، ستظهر هنا فوراً.
+                    عندما يرسل تلميذ أو ولي أمر رسالة من صفحة "صندوق التواصل"، ستظهر هنا فوراً.
                   </p>
                 </div>
               );
@@ -3716,107 +4128,247 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
             return (
               <div className="space-y-3">
-                {filtered.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`rounded-2xl p-4 border transition ${
-                      !msg.read
-                        ? "bg-white border-purple-300 shadow-xs ring-1 ring-purple-100"
-                        : "bg-slate-50/80 border-slate-200 shadow-2xs"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 flex-wrap pb-2 border-b border-slate-100">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                            msg.category === "question"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                {filtered.map((msg) => {
+                  // تنظيف رقم الهاتف لتحضير رابط واتساب
+                  const rawPhone = (msg.senderPhone || "").replace(/[^0-9]/g, "");
+                  let waNumber = "";
+                  if (rawPhone.startsWith("0")) {
+                    waNumber = "213" + rawPhone.slice(1);
+                  } else if (rawPhone.startsWith("213")) {
+                    waNumber = rawPhone;
+                  }
+                  const waText = encodeURIComponent(
+                    `السلام عليكم ورحمة الله، معكم الأستاذ محمد عدايكة أستاذ مادة الرياضيات بمتوسطة المجاهد باهي علي.\nبخصوص رسالتكم الكريمة${
+                      msg.studentName ? ` حول التلميذ(ة) ${msg.studentName}` : ""
+                    }:\n`
+                  );
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`rounded-2xl p-4 border transition ${
+                        !msg.read
+                          ? "bg-white border-purple-300 shadow-xs ring-1 ring-purple-100"
+                          : "bg-slate-50/80 border-slate-200 shadow-2xs"
+                      }`}
+                    >
+                      {/* رأس بطاقة الرسالة */}
+                      <div className="flex items-start justify-between gap-2 flex-wrap pb-2 border-b border-slate-100">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* تصنيف الرسالة */}
+                          <span
+                            className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                              msg.category === "question"
+                                ? "bg-blue-50 text-blue-700 border-blue-200"
+                                : msg.category === "suggestion"
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : msg.category === "criticism"
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : "bg-slate-100 text-slate-700 border-slate-200"
+                            }`}
+                          >
+                            {msg.category === "question"
+                              ? "❓ سؤال حول درس"
                               : msg.category === "suggestion"
-                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              ? "💡 اقتراح تطويري"
                               : msg.category === "criticism"
-                              ? "bg-purple-50 text-purple-700 border-purple-200"
-                              : "bg-slate-100 text-slate-700 border-slate-200"
-                          }`}
-                        >
-                          {msg.category === "question"
-                            ? "❓ سؤال حول درس"
-                            : msg.category === "suggestion"
-                            ? "💡 اقتراح تطويري"
-                            : msg.category === "criticism"
-                            ? "⚖️ نقد بنّاء"
-                            : "💬 استفسار عام"}
-                        </span>
-
-                        {msg.targetLevel && (
-                          <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
-                            الصف: {msg.targetLevel}
+                              ? "⚖️ نقد بنّاء"
+                              : "💬 استفسار عام"}
                           </span>
-                        )}
 
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          {new Date(msg.createdAt).toLocaleDateString("ar-DZ", {
-                            weekday: "short",
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
+                          {/* الصف المستهدف */}
+                          {msg.targetLevel && (
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
+                              الصف: {msg.targetLevel}
+                            </span>
+                          )}
 
-                        {!msg.read ? (
-                          <span className="text-[9px] font-black bg-red-100 text-red-700 px-1.5 py-0.2 rounded-full border border-red-200">
-                            جديدة 🆕
+                          {/* رمز التتبع */}
+                          {msg.trackingCode && (
+                            <span className="text-[10px] font-mono font-black bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md border border-purple-200">
+                              رمز: {msg.trackingCode}
+                            </span>
+                          )}
+
+                          {/* اسم التلميذ إن وجد */}
+                          {msg.studentName && (
+                            <span className="text-[10px] font-black bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-md border border-blue-200 flex items-center gap-1">
+                              <span>👤 التلميذ:</span>
+                              <span>{msg.studentName}</span>
+                            </span>
+                          )}
+
+                          {/* القسم / الفوج إن وجد */}
+                          {msg.className && (
+                            <span className="text-[10px] font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200">
+                              القسم: {msg.className}
+                            </span>
+                          )}
+
+                          {/* اسم الولي إن وجد */}
+                          {msg.senderName && (
+                            <span className="text-[10px] font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
+                              الولي: {msg.senderName}
+                            </span>
+                          )}
+
+                          {/* تاريخ الإرسال */}
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {new Date(msg.createdAt).toLocaleDateString("ar-DZ", {
+                              weekday: "short",
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </span>
-                        ) : (
-                          <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded-full">
-                            مقروءة ✓
-                          </span>
-                        )}
+
+                          {/* شارة القراءة */}
+                          {!msg.read ? (
+                            <span className="text-[9px] font-black bg-red-100 text-red-700 px-1.5 py-0.2 rounded-full border border-red-200">
+                              جديدة 🆕
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded-full">
+                              مقروءة ✓
+                            </span>
+                          )}
+
+                          {/* شارة حالة الرد */}
+                          {msg.reply?.content ? (
+                            <span className="text-[9px] font-black bg-teal-100 text-teal-800 px-1.5 py-0.2 rounded-full border border-teal-200">
+                              تم الرد عليها بنجاح ✓
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full border border-amber-200">
+                              بانتظار ردك ⏳
+                            </span>
+                          )}
+                        </div>
+
+                        {/* أزرار الإجراءات السريعة */}
+                        <div className="flex items-center gap-1.5">
+                          {/* زر الرد السريع عبر واتساب إن وُجد رقم هاتف */}
+                          {waNumber && (
+                            <a
+                              href={`https://wa.me/${waNumber}?text=${waText}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="py-1 px-2.5 rounded-lg text-[10px] font-black bg-emerald-600 text-white hover:bg-emerald-700 transition flex items-center gap-1 shadow-xs cursor-pointer"
+                              title={`فتح محادثة واتساب مع الولي (${msg.senderPhone})`}
+                            >
+                              <Phone className="w-3 h-3" />
+                              <span>واتساب 📲</span>
+                            </a>
+                          )}
+
+                          {/* زر إضافة أو تعديل رد الأستاذ */}
+                          <button
+                            onClick={() => handleOpenReplyModal(msg)}
+                            className={`py-1 px-2.5 rounded-lg text-[10px] font-black transition flex items-center gap-1 cursor-pointer ${
+                              msg.reply?.content
+                                ? "bg-teal-600 text-white hover:bg-teal-700"
+                                : "bg-purple-600 text-white hover:bg-purple-700 shadow-xs"
+                            }`}
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            <span>{msg.reply?.content ? "تعديل الرد" : "كتابة رد"}</span>
+                          </button>
+
+                          {/* زر تحديد القراءة */}
+                          <button
+                            onClick={() => handleToggleMessageRead(msg)}
+                            title={msg.read ? "تحديد كغير مقروءة" : "تحديد كمقروءة"}
+                            className={`py-1 px-2 rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                              msg.read
+                                ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                : "bg-purple-100 text-purple-800 hover:bg-purple-200"
+                            }`}
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>{msg.read ? "غير مقروءة" : "مقروءة"}</span>
+                          </button>
+
+                          {/* نسخ النص */}
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(msg.content);
+                              showToast("success", "تم نسخ نص الرسالة إلى الحافظة 📋");
+                            }}
+                            title="نسخ نص الرسالة"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* حذف الرسالة */}
+                          <button
+                            onClick={() => setDeletingMessage(msg)}
+                            title="حذف الرسالة"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
-                      {/* أزرار الإجراءات */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleToggleMessageRead(msg)}
-                          title={msg.read ? "تحديد كغير مقروءة" : "تحديد كمقروءة"}
-                          className={`py-1 px-2 rounded-lg text-[10px] font-bold transition flex items-center gap-1 ${
-                            msg.read
-                              ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                              : "bg-purple-100 text-purple-800 hover:bg-purple-200"
-                          }`}
-                        >
-                          <Check className="w-3 h-3" />
-                          <span>{msg.read ? "غير مقروءة" : "تمت القراءة"}</span>
-                        </button>
+                      {/* إذا كان هناك رقم هاتف معروض */}
+                      {msg.senderPhone && (
+                        <div className="mt-2 text-[11px] text-slate-500 font-mono font-bold flex items-center gap-1.5">
+                          <Phone className="w-3 h-3 text-emerald-600" />
+                          <span>رقم هاتف الولي:</span>
+                          <span className="text-slate-800">{msg.senderPhone}</span>
+                        </div>
+                      )}
 
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(msg.content);
-                            showToast("success", "تم نسخ نص الرسالة إلى الحافظة 📋");
-                          }}
-                          title="نسخ نص الرسالة"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          onClick={() => setDeletingMessage(msg)}
-                          title="حذف الرسالة"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      {/* نص رسالة التلميذ أو الولي */}
+                      <div className="mt-2.5 text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line select-text bg-white p-3 rounded-xl border border-slate-100">
+                        {msg.content}
                       </div>
-                    </div>
 
-                    {/* نص الرسالة */}
-                    <div className="mt-3 text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line select-text bg-white p-3 rounded-xl border border-slate-100">
-                      {msg.content}
+                      {/* صندوق رد الأستاذ إن وُجد */}
+                      {msg.reply?.content && (
+                        <div className="mt-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3.5 space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 text-emerald-900 font-black text-xs">
+                              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>رد الأستاذ محمد عدايكة الرسمي:</span>
+                              {msg.reply.isPublic && (
+                                <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold border border-blue-200">
+                                  معلن في الإجابات العامة 🌐
+                                </span>
+                              )}
+                            </div>
+                            {msg.reply.repliedAt && (
+                              <span className="text-[10px] text-emerald-700 font-bold">
+                                {new Date(msg.reply.repliedAt).toLocaleDateString("ar-DZ", {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-emerald-950 font-medium leading-relaxed whitespace-pre-line bg-white/70 p-2.5 rounded-lg border border-emerald-100">
+                            {msg.reply.content}
+                          </p>
+
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              onClick={() => handleOpenReplyModal(msg)}
+                              className="text-[10px] font-bold text-emerald-700 hover:underline cursor-pointer"
+                            >
+                              تعديل الرد ✏️
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })()}
@@ -3997,6 +4549,133 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
       )}
+
+      {/* نافذة كتابة أو تعديل رد الأستاذ على رسالة */}
+      {replyingMessage && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-xl border border-slate-100 fade-up"
+            dir="rtl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">
+                    {replyingMessage.reply?.content ? "تعديل رد الأستاذ" : "كتابة رد للأولياء / التلميذ"}
+                  </h3>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {replyingMessage.trackingCode ? `رمز المتابعة: ${replyingMessage.trackingCode}` : "سيصل الرد مباشرة للمرسل"}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyingMessage(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* ملخص الرسالة الأصلية */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-1.5 text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                {replyingMessage.studentName && (
+                  <span className="text-[10px] font-black bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
+                    👤 التلميذ: {replyingMessage.studentName}
+                  </span>
+                )}
+                {replyingMessage.className && (
+                  <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md">
+                    {replyingMessage.className}
+                  </span>
+                )}
+                {replyingMessage.senderName && (
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    المرسل: {replyingMessage.senderName}
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-800 line-clamp-3 leading-relaxed whitespace-pre-line font-medium text-[11px]">
+                "{replyingMessage.content}"
+              </p>
+            </div>
+
+            {/* نموذج كتابة الرد */}
+            <form onSubmit={handleSaveReply} className="space-y-3.5">
+              <div>
+                <label className="text-xs font-black text-slate-800 block mb-1.5">
+                  نص رد وتوجيه الأستاذ: <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  placeholder="اكتب ردك وتوجيهك هنا... مثلاً: تم الاطلاع على سؤالكم، طريقة الحل هي كذا وكذا... أو شكراً على ملاحظتكم وسيتم أخذها بعين الاعتبار إن شاء الله."
+                  rows={4}
+                  className="w-full rounded-2xl border border-slate-200 p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition leading-relaxed"
+                  required
+                />
+              </div>
+
+              {/* خيار النشر العام */}
+              <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-blue-50/60 border border-blue-100 cursor-pointer hover:bg-blue-50 transition">
+                <input
+                  type="checkbox"
+                  checked={replyIsPublic}
+                  onChange={(e) => setReplyIsPublic(e.target.checked)}
+                  className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <div className="text-right">
+                  <span className="text-xs font-black text-blue-950 block">
+                    نشر هذا التوضيح في قسم "الإجابات العامة" (FAQ) 💡
+                  </span>
+                  <span className="text-[10px] text-blue-700 leading-snug block mt-0.5">
+                    يُنصح به للأسئلة الرياضية المفيدة للجميع، مع إخفاء الأسماء وأي معلومات خاصة تلقائياً.
+                  </span>
+                </div>
+              </label>
+
+              {/* أزرار الإجراء */}
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setReplyingMessage(null)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 text-slate-700 text-xs font-black hover:bg-slate-200 transition cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                {replyingMessage.reply?.content && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReplyContent("");
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold hover:bg-red-100 transition cursor-pointer"
+                    title="حذف الرد الحالي"
+                  >
+                    مسح الرد
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={savingReply}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-purple-700 text-white text-xs font-black hover:bg-purple-800 transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {savingReply ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  <span>حفظ وإرسال الرد ✓</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -4009,6 +4688,10 @@ function LessonCard({
   onLessonUpdated,
   onEdit,
   onDelete,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
   showToast,
 }: {
   lesson: Lesson;
@@ -4017,6 +4700,10 @@ function LessonCard({
   onLessonUpdated: (updated: Lesson) => void;
   onEdit: () => void;
   onDelete: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
   showToast: (type: "success" | "error", text: string) => void;
 }) {
   const [uploading, setUploading] = useState("");
@@ -4315,6 +5002,11 @@ function LessonCard({
                 {lesson.number}
               </span>
               <span>•</span>
+              <span className="text-emerald-800 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[10px] inline-flex items-center gap-1">
+                <Eye className="w-3 h-3 text-emerald-600" />
+                <span>{lesson.views || 0} مشاهدة</span>
+              </span>
+              <span>•</span>
               <span className="font-bold text-slate-500">
                 {lesson.images?.length || 0} {isLesson ? "صور سبورة" : "صور"}
               </span>
@@ -4467,6 +5159,42 @@ function LessonCard({
           )}
 
           <div className="flex items-center gap-1 shrink-0">
+            {onMoveUp && (
+              <button
+                type="button"
+                disabled={!canMoveUp}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveUp();
+                }}
+                className={`p-1.5 rounded-lg border transition ${
+                  !canMoveUp
+                    ? "opacity-25 cursor-not-allowed text-slate-300 border-slate-100"
+                    : "text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 border-slate-200/80 active:scale-95"
+                }`}
+                title="تصعيد الدرس للأعلى ⬆️"
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {onMoveDown && (
+              <button
+                type="button"
+                disabled={!canMoveDown}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveDown();
+                }}
+                className={`p-1.5 rounded-lg border transition ${
+                  !canMoveDown
+                    ? "opacity-25 cursor-not-allowed text-slate-300 border-slate-100"
+                    : "text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 border-slate-200/80 active:scale-95"
+                }`}
+                title="تنزيل الدرس للأسفل ⬇️"
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button
               type="button"
               onClick={onEdit}

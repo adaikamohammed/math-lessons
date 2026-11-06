@@ -149,13 +149,13 @@ export default async function Home() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs text-slate-900">صندوق الصراحة والشفافية</span>
+              <span className="font-extrabold text-xs text-slate-900">صندوق الصراحة والتواصل مع الأستاذ</span>
               <span className="text-[10px] bg-purple-100 text-purple-800 font-black px-1.5 py-0.2 rounded border border-purple-200">
-                سري 100% 🔒
+                ردود مباشرة 💬
               </span>
             </div>
             <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 font-medium">
-              اطرح سؤالاً عن درس، قدّم اقتراحاً، أو اكتب ملاحظة صريحة للأستاذ دون كشف هويتك
+              اطرح سؤالاً، قدّم اقتراحاً أو استفساراً، وتابع رد الأستاذ محمد عدايكة بسرية تامة
             </p>
           </div>
           <ChevronLeft className="w-4 h-4 text-purple-600 group-hover:text-purple-800 transition shrink-0" />
