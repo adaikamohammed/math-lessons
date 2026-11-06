@@ -92,11 +92,11 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
       <BackHeader href="/" title={LEVELS[level].label} subtitle="اختر القسم لمشاهدة الدروس أو السلاسل والملخصات" />
 
       {/* أزرار اختيار الأقسام الـ 4 (الدروس، الأعمال الموجهة، سلاسل التمارين، الملخصات) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-2xs">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-100 shadow-2xs">
         {/* 1. زر كراس الدروس */}
         <button
           onClick={() => setActiveTab("lessons")}
-          className={`p-2.5 rounded-xl text-right transition flex flex-col justify-between relative overflow-hidden border ${
+          className={`p-3 sm:p-3.5 rounded-xl text-right transition flex flex-col justify-between relative overflow-hidden border ${
             activeTab === "lessons"
               ? "bg-emerald-50/70 border-emerald-500 shadow-xs ring-1 ring-emerald-500"
               : "border-slate-100 hover:bg-slate-50"
@@ -238,7 +238,7 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                     </div>
 
                     {/* 3. الموارد المعرفية التابعة لهذا المقطع */}
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                       {sec.items.map((l) => {
                         const count = l.images?.length || 0;
                         return (
@@ -322,7 +322,7 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
           {directedWorkItems.length === 0 ? (
             <Empty text="لم تُضف حصص أعمال موجهة بعد" />
           ) : (
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {directedWorkItems.map((l) => {
                 const count = l.images?.length || 0;
                 return (
@@ -391,7 +391,7 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
           {worksheetsItems.length === 0 ? (
             <Empty text="لم تُضف سلاسل تمارين بعد لهذا المستوى" />
           ) : (
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {worksheetsItems.map((l) => {
                 const count = l.images?.length || 0;
                 return (
@@ -463,7 +463,7 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
           {summariesItems.length === 0 ? (
             <Empty text="لم تُضف ملخصات أو مطويات بعد لهذا المستوى" />
           ) : (
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {summariesItems.map((l) => {
                 const count = l.images?.length || 0;
                 return (

@@ -1648,62 +1648,65 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
             {notebookTab === "lessons" ? (
               <div className="space-y-3">
-                {/* الميدان */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">📐 الميدان:</label>
-                  <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                    {COMMON_FIELDS.map((f) => (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setField(f)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shrink-0 ${
-                          field === f
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                            : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                        }`}
-                      >
-                        {f}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    className="input text-xs font-semibold"
-                    placeholder="مثال: أنشطة عددية"
-                    value={field}
-                    onChange={(e) => setField(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* المقطع المعرفي */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">📑 المقطع المعرفي:</label>
-                  {knownSections.length > 0 && (
+                {/* الميدان والمقطع المعرفي */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* الميدان */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">📐 الميدان:</label>
                     <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                      {knownSections.map((s) => (
+                      {COMMON_FIELDS.map((f) => (
                         <button
-                          key={s}
+                          key={f}
                           type="button"
-                          onClick={() => setSection(s)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition shrink-0 ${
-                            section === s
+                          onClick={() => setField(f)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shrink-0 ${
+                            field === f
                               ? "bg-emerald-50 text-emerald-800 border-emerald-300"
                               : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                           }`}
                         >
-                          {s}
+                          {f}
                         </button>
                       ))}
                     </div>
-                  )}
-                  <input
-                    className="input text-xs font-semibold"
-                    placeholder="مثال: المقطع 1 : الأعداد الطبيعية والأعداد العشرية"
-                    value={section}
-                    onChange={(e) => setSection(e.target.value)}
-                    required
-                  />
+                    <input
+                      className="input text-xs font-semibold"
+                      placeholder="مثال: أنشطة عددية"
+                      value={field}
+                      onChange={(e) => setField(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {/* المقطع المعرفي */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">📑 المقطع المعرفي:</label>
+                    {knownSections.length > 0 && (
+                      <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                        {knownSections.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setSection(s)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition shrink-0 ${
+                              section === s
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                                : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <input
+                      className="input text-xs font-semibold"
+                      placeholder="مثال: المقطع 1 : الأعداد الطبيعية والأعداد العشرية"
+                      value={section}
+                      onChange={(e) => setSection(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
 
                 {/* رقم المورد وعنوانه */}
@@ -1730,35 +1733,40 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 </div>
 
-                {/* ملاحظات وتوجيهات الأستاذ */}
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
-                    <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                    <span>ملاحظات وتوجيهات الأستاذ لهذا الدرس (اختياري):</span>
-                  </label>
-                  <textarea
-                    className="input text-xs min-h-[50px] resize-y"
-                    placeholder="مثال: كراس منظم، التركيز على جدول المراتب..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
+                {/* ملاحظات وتوجيهات الأستاذ والواجب المنزلي */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* ملاحظات وتوجيهات الأستاذ */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
+                      <StickyNote className="w-3.5 h-3.5 text-amber-600" />
+                      <span>ملاحظات وتوجيهات الأستاذ لهذا الدرس (اختياري):</span>
+                    </label>
+                    <textarea
+                      className="input text-xs min-h-[70px] resize-y"
+                      placeholder="مثال: كراس منظم، التركيز على جدول المراتب..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
 
-                {/* خانة الواجب المنزلي البارزة */}
-                <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200/80 space-y-1.5">
-                  <label className="text-xs font-black text-blue-900 block flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                    <span>📝 نص وتفاصيل الواجب المنزلي (تحديد التمارين والصفحات بكراس المحاولات):</span>
-                  </label>
-                  <textarea
-                    className="input text-xs min-h-[55px] resize-y bg-white border-blue-200 font-medium"
-                    placeholder="مثال: حل التمرين 12 و 13 صفحة 20 من الكتاب المدرسي على كراس المحاولات..."
-                    value={lessonHomeworkNotes}
-                    onChange={(e) => setLessonHomeworkNotes(e.target.value)}
-                  />
-                  <p className="text-[10px] text-blue-700 font-semibold">
-                    💡 ملاحظة: بعد إضافة المورد ستتمكن فوراً من رفع صور الحل النموذجي له بنقرة واحدة!
-                  </p>
+                  {/* خانة الواجب المنزلي البارزة */}
+                  <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200/80 space-y-1.5 flex flex-col justify-between">
+                    <div>
+                      <label className="text-xs font-black text-blue-900 block flex items-center gap-1.5 mb-1">
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        <span>📝 نص وتفاصيل الواجب المنزلي:</span>
+                      </label>
+                      <textarea
+                        className="input text-xs min-h-[55px] resize-y bg-white border-blue-200 font-medium"
+                        placeholder="مثال: حل التمرين 12 و 13 صفحة 20 من الكتاب المدرسي على كراس المحاولات..."
+                        value={lessonHomeworkNotes}
+                        onChange={(e) => setLessonHomeworkNotes(e.target.value)}
+                      />
+                    </div>
+                    <p className="text-[10px] text-blue-700 font-semibold">
+                      💡 ملاحظة: بعد إضافة المورد ستتمكن فوراً من رفع صور الحل النموذجي له بنقرة واحدة!
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : notebookTab === "directed_work" ? (
@@ -1918,78 +1926,21 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <span className="text-[10px] text-slate-400 font-normal">يمكنك أيضاً رفعها لاحقاً</span>
               </div>
 
-              {/* اختيار صور الدرس */}
-              <div>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl p-3 cursor-pointer bg-white transition hover:bg-emerald-50/30 group">
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
-                    <Plus className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
-                    <span>اضغط هنا لاختيار صور السبورة أو ملفات الدرس من الهاتف أو الحاسوب</span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 mt-0.5">يمكنك اختيار عدة صور دفعة واحدة</span>
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf,.pdf"
-                    multiple
-                    hidden
-                    disabled={isSubmitting}
-                    onChange={(e) => {
-                      if (e.target.files) {
-                        const incoming = Array.from(e.target.files);
-                        setNewLessonFiles((prev) => [...prev, ...incoming]);
-                      }
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-
-                {newLessonFiles.length > 0 && (
-                  <div className="mt-2 space-y-1.5">
-                    <div className="text-[11px] font-bold text-slate-600">
-                      الملفات المختارة للرفع ({newLessonFiles.length}):
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-white rounded-lg border border-slate-200">
-                      {newLessonFiles.map((file, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-1 rounded-md text-[10px] font-bold"
-                        >
-                          <span className="truncate max-w-[120px]" title={file.name}>
-                            {file.name}
-                          </span>
-                          <span className="text-[9px] text-emerald-600 font-normal">
-                            ({Math.round(file.size / 1024)} KB)
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setNewLessonFiles((prev) => prev.filter((_, i) => i !== idx))
-                            }
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-0.5"
-                            title="إلغاء اختيار هذا الملف"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* اختيار صور حل الواجب المنزلي (خاص بكراس الدروس فقط) */}
-              {notebookTab === "lessons" && (
-                <div className="pt-2 border-t border-slate-200/70">
-                  <div className="flex items-center justify-between text-xs font-bold text-blue-900 mb-1.5">
+              <div className={`grid grid-cols-1 ${notebookTab === "lessons" ? "md:grid-cols-2" : ""} gap-3 items-start`}>
+                {/* اختيار صور الدرس */}
+                <div>
+                  <div className="flex items-center justify-between text-xs font-bold text-emerald-900 mb-1.5">
                     <span className="flex items-center gap-1">
-                      <FileText className="w-3.5 h-3.5 text-blue-600" />
-                      <span>📝 صور أو ملف PDF للحل النموذجي للواجب (اختياري):</span>
+                      <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>📸 صور السبورة أو مستندات الدرس:</span>
                     </span>
                   </div>
-                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-blue-300 hover:border-blue-500 rounded-xl p-2.5 cursor-pointer bg-white transition hover:bg-blue-50/30 group">
-                    <div className="flex items-center gap-2 text-xs font-bold text-blue-800">
-                      <Plus className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform" />
-                      <span>اضغط هنا لاختيار صور حل الواجب المنزلي (أو ملف PDF)</span>
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl p-3 cursor-pointer bg-white transition hover:bg-emerald-50/30 group">
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 text-center">
+                      <Plus className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
+                      <span>اختر صور السبورة أو ملفات الدرس من جهازك</span>
                     </div>
+                    <span className="text-[10px] text-slate-400 mt-0.5">يمكنك اختيار عدة صور دفعة واحدة</span>
                     <input
                       type="file"
                       accept="image/*,application/pdf,.pdf"
@@ -1999,34 +1950,34 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       onChange={(e) => {
                         if (e.target.files) {
                           const incoming = Array.from(e.target.files);
-                          setNewHwFiles((prev) => [...prev, ...incoming]);
+                          setNewLessonFiles((prev) => [...prev, ...incoming]);
                         }
                         e.target.value = "";
                       }}
                     />
                   </label>
 
-                  {newHwFiles.length > 0 && (
+                  {newLessonFiles.length > 0 && (
                     <div className="mt-2 space-y-1.5">
-                      <div className="text-[11px] font-bold text-blue-700">
-                        ملفات حل الواجب المختارة ({newHwFiles.length}):
+                      <div className="text-[11px] font-bold text-slate-600">
+                        الملفات المختارة للرفع ({newLessonFiles.length}):
                       </div>
-                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-white rounded-lg border border-blue-200">
-                        {newHwFiles.map((file, idx) => (
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-white rounded-lg border border-slate-200">
+                        {newLessonFiles.map((file, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 px-2 py-1 rounded-md text-[10px] font-bold"
+                            className="flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-1 rounded-md text-[10px] font-bold"
                           >
                             <span className="truncate max-w-[120px]" title={file.name}>
                               {file.name}
                             </span>
-                            <span className="text-[9px] text-blue-600 font-normal">
+                            <span className="text-[9px] text-emerald-600 font-normal">
                               ({Math.round(file.size / 1024)} KB)
                             </span>
                             <button
                               type="button"
                               onClick={() =>
-                                setNewHwFiles((prev) => prev.filter((_, i) => i !== idx))
+                                setNewLessonFiles((prev) => prev.filter((_, i) => i !== idx))
                               }
                               className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-0.5"
                               title="إلغاء اختيار هذا الملف"
@@ -2039,7 +1990,73 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     </div>
                   )}
                 </div>
-              )}
+
+                {/* اختيار صور حل الواجب المنزلي (خاص بكراس الدروس فقط) */}
+                {notebookTab === "lessons" && (
+                  <div>
+                    <div className="flex items-center justify-between text-xs font-bold text-blue-900 mb-1.5">
+                      <span className="flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5 text-blue-600" />
+                        <span>📝 صور أو ملف PDF للحل النموذجي للواجب:</span>
+                      </span>
+                    </div>
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-blue-300 hover:border-blue-500 rounded-xl p-3 cursor-pointer bg-white transition hover:bg-blue-50/30 group">
+                      <div className="flex items-center gap-2 text-xs font-bold text-blue-800 text-center">
+                        <Plus className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform shrink-0" />
+                        <span>اختر صور حل الواجب المنزلي (أو PDF)</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 mt-0.5">اختياري - يمكنك رفعها بعد التصحيح</span>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf,.pdf"
+                        multiple
+                        hidden
+                        disabled={isSubmitting}
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            const incoming = Array.from(e.target.files);
+                            setNewHwFiles((prev) => [...prev, ...incoming]);
+                          }
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+
+                    {newHwFiles.length > 0 && (
+                      <div className="mt-2 space-y-1.5">
+                        <div className="text-[11px] font-bold text-blue-700">
+                          ملفات حل الواجب المختارة ({newHwFiles.length}):
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-white rounded-lg border border-blue-200">
+                          {newHwFiles.map((file, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 px-2 py-1 rounded-md text-[10px] font-bold"
+                            >
+                              <span className="truncate max-w-[120px]" title={file.name}>
+                                {file.name}
+                              </span>
+                              <span className="text-[9px] text-blue-600 font-normal">
+                                ({Math.round(file.size / 1024)} KB)
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setNewHwFiles((prev) => prev.filter((_, i) => i !== idx))
+                                }
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded p-0.5"
+                                title="إلغاء اختيار هذا الملف"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <button disabled={isSubmitting} className="btn-primary w-full py-3 text-sm">
@@ -2122,7 +2139,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                           <span>{sec.section}</span>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                           {sec.items.map((item) => {
                             const globalIdx = currentItems.findIndex((c) => c.id === item.id);
                             const canUp = globalIdx > 0;
@@ -2153,7 +2170,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 ))}
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                 {currentItems.map((item, idx) => (
                   <LessonCard
                     key={item.id}
@@ -2345,7 +2362,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <div className="text-[10px] text-slate-400">ساعة الاستقبال مفتوحة كل أربعاء للجميع.</div>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {summonsList.map((item) => (
                   <div
                     key={item.id}
@@ -2565,7 +2582,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <div className="text-[11px] text-slate-400">أضف أفضل تلاميذك وسيتألقون مباشرة أمام زملائهم وأوليائهم!</div>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {honorsList
                   .filter(
                     (h) =>
@@ -3022,7 +3039,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <div className="text-[11px] text-slate-400">جميع الأقسام منضبطة والحمد لله!</div>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {penaltiesList
                   .filter(
                     (p) =>
@@ -3903,7 +3920,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 لا توجد إعلانات منشورة حالياً. استخدم النموذج أعلاه لنشر أول إعلان!
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {announcementsList.map((ann) => (
                   <div
                     key={ann.id}
@@ -4127,7 +4144,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             }
 
             return (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {filtered.map((msg) => {
                   // تنظيف رقم الهاتف لتحضير رابط واتساب
                   const rawPhone = (msg.senderPhone || "").replace(/[^0-9]/g, "");

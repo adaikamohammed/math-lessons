@@ -113,7 +113,8 @@ export default function AssessmentPage() {
           <span>المعايير الدقيقة لكل محور من محاور التقويم (20 نقطة):</span>
         </div>
 
-        {/* 1. الكراريس */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* 1. الكراريس */}
         <div className="bg-white rounded-3xl p-4 border border-slate-100 shadow-2xs space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -256,6 +257,7 @@ export default function AssessmentPage() {
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       {/* حاسبة تقديرية تفاعلية لنقطة التقويم المستمر */}
@@ -276,7 +278,7 @@ export default function AssessmentPage() {
           حرّك المؤشرات التالية وفقاً لمستواك في كل محور لتعرف علامتك وتقديرك الشفاف:
         </p>
 
-        <div className="space-y-3.5 text-xs font-bold text-slate-700">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold text-slate-700">
           {/* محور 1 */}
           <div className="space-y-1">
             <div className="flex justify-between">

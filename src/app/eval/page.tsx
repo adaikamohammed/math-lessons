@@ -727,7 +727,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   return (
-    <div className="pb-16 pt-3 px-3 max-w-xl mx-auto space-y-3.5 fade-up">
+    <div className="pb-16 pt-3 px-3 max-w-5xl xl:max-w-6xl mx-auto space-y-3.5 fade-up">
       {/* إشعار عائم */}
       {toastMsg && (
         <div
@@ -1116,7 +1116,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
                 }
 
                 return (
-                  <div className="space-y-2.5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {studentsToDisplay.map((student) => {
                       const rec: InspectionRecord = currentSession.records?.[student.studentName] || {
                         studentName: student.studentName,

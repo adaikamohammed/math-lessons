@@ -68,7 +68,7 @@ export default async function Home() {
           <span className="text-[11px] text-slate-400 font-bold">1 متوسط • 2 متوسط</span>
         </div>
 
-        <div className="space-y-2.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           {years.map((y) => (
             <Link
               key={y.level}
@@ -92,8 +92,9 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* 2. خانة: أولياء أود استقبالهم (ظاهرة وسهلة الوصول - لصالح أبنائكم) */}
-      <div className="pt-1">
+      {/* 2. أقسام التواصل والتميز (أولياء أود استقبالهم، لوحة الشرف، صندوق الصراحة) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
+        {/* خانة: أولياء أود استقبالهم */}
         <Link
           href="/parents"
           className="flex items-center gap-3.5 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-emerald-500/10 rounded-2xl p-4 border-2 border-sky-300/80 shadow-xs hover:border-sky-400 hover:shadow-sm active:scale-[0.98] transition group"
@@ -114,97 +115,95 @@ export default async function Home() {
           </div>
           <ChevronLeft className="w-5 h-5 text-sky-600 group-hover:text-sky-800 transition shrink-0" />
         </Link>
-      </div>
 
-      {/* 3. لوحة الشرف (تحفيزية وتنافسية شريفة للتلاميذ والأولياء) */}
-      <div>
+        {/* لوحة الشرف */}
         <Link
           href="/honor"
-          className="flex items-center gap-3.5 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-emerald-500/10 rounded-2xl p-3.5 border border-amber-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs active:scale-[0.98] transition group"
+          className="flex items-center gap-3.5 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-emerald-500/10 rounded-2xl p-4 border border-amber-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs active:scale-[0.98] transition group"
         >
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/20 group-hover:scale-105 transition-transform">
-            <Trophy className="w-5 h-5 text-amber-100" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/20 group-hover:scale-105 transition-transform">
+            <Trophy className="w-6 h-6 text-amber-100" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs text-slate-900">لوحة الشرف | نجوم الرياضيات</span>
+              <span className="font-extrabold text-sm text-slate-900">لوحة الشرف | نجوم الرياضيات</span>
               <span className="text-[10px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.2 rounded">تميز 🏆</span>
             </div>
-            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 font-medium">
+            <p className="text-xs text-slate-600 mt-1 line-clamp-1 font-medium">
               أفضل التلاميذ انضباطاً وإتقاناً في أقسامنا (1م1، 1م2، 1م3، 2م3)
             </p>
           </div>
           <ChevronLeft className="w-4 h-4 text-amber-600 group-hover:text-amber-800 transition shrink-0" />
         </Link>
-      </div>
 
-      {/* 4. صندوق الصراحة والشفافية (رسائل سرية ومجهولة للأستاذ) */}
-      <div>
+        {/* صندوق الصراحة والشفافية */}
         <Link
           href="/messages"
-          className="flex items-center gap-3.5 bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-pink-500/10 rounded-2xl p-3.5 border border-purple-200/80 shadow-2xs hover:border-purple-300 hover:shadow-xs active:scale-[0.98] transition group"
+          className="flex items-center gap-3.5 bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-pink-500/10 rounded-2xl p-4 border border-purple-200/80 shadow-2xs hover:border-purple-300 hover:shadow-xs active:scale-[0.98] transition group"
         >
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white flex items-center justify-center shrink-0 shadow-sm shadow-purple-600/20 group-hover:scale-105 transition-transform">
-            <MessageSquare className="w-5 h-5 text-purple-100" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white flex items-center justify-center shrink-0 shadow-sm shadow-purple-600/20 group-hover:scale-105 transition-transform">
+            <MessageSquare className="w-6 h-6 text-purple-100" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs text-slate-900">صندوق الصراحة والتواصل مع الأستاذ</span>
+              <span className="font-extrabold text-sm text-slate-900">صندوق الصراحة والتواصل</span>
               <span className="text-[10px] bg-purple-100 text-purple-800 font-black px-1.5 py-0.2 rounded border border-purple-200">
                 ردود مباشرة 💬
               </span>
             </div>
-            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 font-medium">
-              اطرح سؤالاً، قدّم اقتراحاً أو استفساراً، وتابع رد الأستاذ محمد عدايكة بسرية تامة
+            <p className="text-xs text-slate-600 mt-1 line-clamp-1 font-medium">
+              اطرح سؤالاً أو استفساراً، وتابع رد الأستاذ محمد عدايكة بسرية تامة
             </p>
           </div>
           <ChevronLeft className="w-4 h-4 text-purple-600 group-hover:text-purple-800 transition shrink-0" />
         </Link>
       </div>
 
-      {/* 5. قسم التوجيهات والإعلانات الهامة */}
+      {/* 3. قسم التوجيهات والإعلانات الهامة */}
       <div className="pt-2 space-y-2">
         <div className="text-xs font-bold text-slate-600 px-1">توجيهات وإعلانات هامة:</div>
 
-        {/* بطاقة ميثاق التقويم المستمر (20/20) */}
-        <Link
-          href="/assessment"
-          className="flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs hover:border-emerald-200 active:scale-[0.98] transition group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
-            <Scale className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs text-slate-900">ميثاق ومعايير التقويم المستمر (20/20)</span>
-              <span className="text-[10px] bg-teal-50 text-teal-800 font-bold px-1.5 py-0.2 rounded">شفافية ⚖️</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* بطاقة ميثاق التقويم المستمر (20/20) */}
+          <Link
+            href="/assessment"
+            className="flex items-center gap-3.5 bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs hover:border-emerald-200 active:scale-[0.98] transition group"
+          >
+            <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
+              <Scale className="w-5 h-5" />
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-              توزيع الـ 20 نقطة: الكراريس 5ن • الواجبات 5ن • السلوك 5ن • النشاط 5ن + حاسبة العلامة
-            </p>
-          </div>
-          <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />
-        </Link>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-xs text-slate-900">ميثاق ومعايير التقويم المستمر (20/20)</span>
+                <span className="text-[10px] bg-teal-50 text-teal-800 font-bold px-1.5 py-0.2 rounded">شفافية ⚖️</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                توزيع الـ 20 نقطة: الكراريس 5ن • الواجبات 5ن • السلوك 5ن • النشاط 5ن + حاسبة العلامة
+              </p>
+            </div>
+            <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />
+          </Link>
 
-        {/* بطاقة التوجيهات التربوية وتنظيم الكراريس */}
-        <Link
-          href="/announcement"
-          className="flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-slate-100 shadow-2xs hover:border-slate-200 active:scale-[0.98] transition group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-            <Megaphone className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs text-slate-900">دليل تنظيم الكراريس والتوجيهات التربوية</span>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.2 rounded">دليل 📚</span>
+          {/* بطاقة التوجيهات التربوية وتنظيم الكراريس */}
+          <Link
+            href="/announcement"
+            className="flex items-center gap-3.5 bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs hover:border-slate-200 active:scale-[0.98] transition group"
+          >
+            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+              <Megaphone className="w-5 h-5" />
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-              تنظيم كراس الدروس والأعمال الموجهة • الأدوات المدرسية • ساعة الاستقبال الأسبوعية
-            </p>
-          </div>
-          <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />
-        </Link>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-xs text-slate-900">دليل تنظيم الكراريس والتوجيهات التربوية</span>
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.2 rounded">دليل 📚</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                تنظيم كراس الدروس والأعمال الموجهة • الأدوات المدرسية • ساعة الاستقبال الأسبوعية
+              </p>
+            </div>
+            <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />
+          </Link>
+        </div>
       </div>
     </div>
   );

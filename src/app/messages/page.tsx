@@ -778,7 +778,7 @@ export default function MessagesPage() {
                 </span>
               </div>
 
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {myStoredCodes.map((item) => (
                   <button
                     key={item.code}
@@ -853,7 +853,7 @@ export default function MessagesPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {publicMessages.map((msg) => (
                 <div
                   key={msg.id}

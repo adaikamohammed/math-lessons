@@ -87,7 +87,7 @@ export default function AnnouncementPage() {
             </div>
           </div>
 
-          <div className="space-y-3 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
             {/* كراس الدروس */}
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
               <div className="flex items-center justify-between">

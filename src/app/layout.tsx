@@ -47,9 +47,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ServiceWorkerRegister />
         <TeacherAccess />
         <PWAInstallBanner />
-        <div className="mx-auto max-w-xl min-h-screen flex flex-col">
-          <main className="flex-1 px-3 sm:px-4 pb-10">{children}</main>
-          <footer className="text-center text-xs text-slate-400 py-4">
+        <div className="mx-auto w-full max-w-6xl xl:max-w-7xl min-h-screen flex flex-col px-3 sm:px-6 lg:px-8">
+          <main className="flex-1 pb-10">{children}</main>
+          <footer className="text-center text-xs text-slate-400 py-6 border-t border-slate-200/60 mt-auto">
             الأستاذ محمد عدايكة — متوسطة باهي علي
           </footer>
         </div>
