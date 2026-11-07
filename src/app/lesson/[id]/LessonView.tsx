@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { LEVELS, NOTEBOOKS, isPdfFile, type Lesson, type LessonImage } from "@/lib/types";
 import { Loading, Empty } from "@/components/ui";
+import { trackAnalyticsEvent } from "@/lib/analyticsClient";
 
 export function LessonView({ id }: { id: string }) {
   const [lesson, setLesson] = useState<Lesson | null>(null);
@@ -32,24 +33,25 @@ export function LessonView({ id }: { id: string }) {
       .then((data) => {
         if (data.lesson) {
           setLesson(data.lesson);
+          // تسجيل مشاهدة الدرس مرة واحدة في الجلسة لمنع التكرار
+          try {
+            const sessionKey = `dz_math_viewed_lesson_${id}`;
+            if (!sessionStorage.getItem(sessionKey)) {
+              sessionStorage.setItem(sessionKey, "1");
+              trackAnalyticsEvent({
+                type: "lesson_view",
+                lessonId: id,
+                lessonTitle: data.lesson.title,
+                level: data.lesson.level,
+                path: typeof window !== "undefined" ? window.location.pathname : `/lesson/${id}`,
+              });
+            }
+          } catch {
+            // ignore
+          }
         }
       })
       .finally(() => setLoading(false));
-
-    // تسجيل مشاهدة الدرس مرة واحدة في الجلسة لمنع التكرار
-    try {
-      const sessionKey = `dz_math_viewed_lesson_${id}`;
-      if (!sessionStorage.getItem(sessionKey)) {
-        sessionStorage.setItem(sessionKey, "1");
-        fetch("/api/analytics/track", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "lesson_view", lessonId: id }),
-        }).catch(() => {});
-      }
-    } catch {
-      // ignore
-    }
   }, [id]);
 
   const images = viewMode === "homework" ? lesson?.homeworkImages || [] : lesson?.images || [];

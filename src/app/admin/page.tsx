@@ -71,6 +71,7 @@ import {
   type AnonymousMessage,
   type MessageCategory,
 } from "@/lib/types";
+import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -274,12 +275,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [savingReply, setSavingReply] = useState<boolean>(false);
 
   // حالات الإحصائيات ومعرفة مشاهدات الدروس والزوار
-  const [analyticsData, setAnalyticsData] = useState<{
-    siteAnalytics?: { totalVisits: number; todayVisits?: number; lastVisit?: string };
-    totalLessonViews?: number;
-    totalLessonsCount?: number;
-    topLessons?: { id: string; title: string; level: number; type: string; views: number }[];
-  } | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<any | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // حالات رفع الملفات المباشرة في خطوة واحدة أثناء إنشاء الدرس
   const [newLessonFiles, setNewLessonFiles] = useState<File[]>([]);
@@ -374,11 +371,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const loadAnalytics = useCallback(async () => {
     try {
+      setLoadingAnalytics(true);
       const res = await fetch(`/api/analytics/track?_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       setAnalyticsData(data);
     } catch {
       // ignore
+    } finally {
+      setLoadingAnalytics(false);
     }
   }, []);
 
@@ -1425,101 +1425,12 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       {/* ==================== 1. تبويب الدروس والكراريس ==================== */}
       {mainTab === "lessons" ? (
         <div className="space-y-4">
-          {/* إحصائيات الزوار ومشاهدات الدروس في الموقع */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black">
-                  📊
-                </div>
-                <div>
-                  <h3 className="text-xs font-black text-slate-900">
-                    إحصائيات تفاعل التلاميذ والزوار مع الموقع
-                  </h3>
-                  <p className="text-[10px] text-slate-500">
-                    تتبع دقيق ومباشر لعدد الزيارات ومشاهدات كل درس لمعرفة مدى استفادة التلاميذ
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={loadAnalytics}
-                className="text-[11px] text-slate-500 hover:text-emerald-700 flex items-center gap-1 font-bold bg-slate-50 hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 transition"
-                title="تحديث الإحصائيات"
-              >
-                <RefreshCw className="w-3 h-3" />
-                <span>تحديث الأرقام</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {/* إجمالي الزيارات */}
-              <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-3 rounded-xl border border-slate-200/80">
-                <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
-                  <span>إجمالي زيارات الموقع</span>
-                  <Globe className="w-3.5 h-3.5 text-emerald-600" />
-                </div>
-                <div className="text-xl font-black text-slate-900">
-                  {analyticsData?.siteAnalytics?.totalVisits ?? 0}
-                  <span className="text-[10px] font-normal text-slate-500 mr-1">زيارة</span>
-                </div>
-              </div>
-
-              {/* زيارات اليوم */}
-              <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 p-3 rounded-xl border border-slate-200/80">
-                <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
-                  <span>زيارات اليوم 📅</span>
-                  <Clock className="w-3.5 h-3.5 text-blue-600" />
-                </div>
-                <div className="text-xl font-black text-blue-900">
-                  {analyticsData?.siteAnalytics?.todayVisits ?? 0}
-                  <span className="text-[10px] font-normal text-slate-500 mr-1">زيارة</span>
-                </div>
-              </div>
-
-              {/* إجمالي مشاهدات الدروس */}
-              <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-slate-50 to-purple-50/30 p-3 rounded-xl border border-slate-200/80">
-                <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
-                  <span>إجمالي مشاهدات الدروس</span>
-                  <Eye className="w-3.5 h-3.5 text-purple-600" />
-                </div>
-                <div className="text-xl font-black text-purple-900">
-                  {analyticsData?.totalLessonViews ?? 0}
-                  <span className="text-[10px] font-normal text-slate-500 mr-1">مشاهدة</span>
-                </div>
-              </div>
-            </div>
-
-            {/* أكثر الدروس مشاهدة */}
-            {analyticsData?.topLessons && analyticsData.topLessons.length > 0 && (
-              <div className="pt-1">
-                <div className="text-[11px] font-extrabold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                  <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                  <span>الدروس والمحاور الأكثر مشاهدة من طرف التلاميذ:</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                  {analyticsData.topLessons.slice(0, 3).map((item, i) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs"
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-800 font-black text-[10px] flex items-center justify-center shrink-0">
-                          {i + 1}
-                        </span>
-                        <span className="font-bold text-slate-800 truncate text-[11px]" title={item.title}>
-                          {item.title}
-                        </span>
-                      </div>
-                      <span className="shrink-0 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
-                        {item.views} 👁️
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* لوحة إحصائيات تفاعل التلاميذ والزوار مع الموقع (أعمدة بيانية متطورة ومراقبة دقيقة للأجهزة) */}
+          <AnalyticsDashboard
+            data={analyticsData}
+            loading={loadingAnalytics}
+            onRefresh={loadAnalytics}
+          />
 
           {/* إرشاد وتوضيح حول رفع حلول الواجبات وصور السبورة */}
           <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border border-blue-200/90 rounded-2xl p-3.5 flex items-start gap-3 shadow-2xs">

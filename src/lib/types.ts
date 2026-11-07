@@ -168,6 +168,80 @@ export type AnonymousMessage = {
   reply?: MessageReply; // رد الأستاذ
 };
 
+export type VisitorDeviceType = "mobile" | "desktop" | "tablet";
+
+export type AnalyticsEventLog = {
+  id: string;
+  timestamp: string; // ISO string
+  type: "visit" | "lesson_view";
+  visitorId: string; // Persistent device UUID e.g. "dev_a1b2c3d4"
+  shortDeviceId: string; // Readable code e.g. "DEV-A1B2"
+  isNewVisitor: boolean; // First time seen
+  visitIndex: number; // 1 = first visit, 2+ = returning
+  deviceType: VisitorDeviceType;
+  os: string;
+  browser: string;
+  screen?: string;
+  path?: string;
+  lessonId?: string;
+  lessonTitle?: string;
+  level?: 1 | 2;
+  referrer?: string;
+};
+
+export type HourlyBucket = {
+  date: string; // YYYY-MM-DD
+  hour: number; // 0..23
+  visits: number;
+  views: number;
+  devices: string[]; // unique visitorIds for this hour
+};
+
+export type DailyBucket = {
+  date: string; // YYYY-MM-DD
+  visits: number;
+  views: number;
+  uniqueDevices: number;
+  newVisitors: number;
+  returningVisitors: number;
+  devicesBreakdown: {
+    mobile: number;
+    desktop: number;
+    tablet: number;
+  };
+  browsers: Record<string, number>;
+  os: Record<string, number>;
+};
+
+export type KnownDeviceSummary = {
+  id: string; // visitorId
+  shortId: string; // e.g. DEV-8F2A
+  deviceType: VisitorDeviceType;
+  os: string;
+  browser: string;
+  screen?: string;
+  firstSeen: string;
+  lastSeen: string;
+  totalVisits: number;
+  totalViews: number;
+  lastPage?: string;
+  lastLessonTitle?: string;
+};
+
+export type SiteAnalyticsData = {
+  totalVisits: number;
+  lastVisit?: string;
+  todayVisits?: number;
+  todayDate?: string;
+  todayViews?: number;
+  totalViews?: number;
+  uniqueDevicesCount?: number;
+  hourly?: Record<string, HourlyBucket>; // key: "YYYY-MM-DD_HH"
+  daily?: Record<string, DailyBucket>; // key: "YYYY-MM-DD"
+  knownDevices?: Record<string, KnownDeviceSummary>; // key: visitorId
+  recentEvents?: AnalyticsEventLog[]; // last ~150-200 events
+};
+
 export type LessonsData = {
   lessons: Lesson[];
   summons?: ParentSummons[];
@@ -178,12 +252,7 @@ export type LessonsData = {
   studentRoster?: StudentRosterItem[];
   announcements?: Announcement[];
   anonymousMessages?: AnonymousMessage[];
-  siteAnalytics?: {
-    totalVisits: number;
-    lastVisit?: string;
-    todayVisits?: number;
-    todayDate?: string;
-  };
+  siteAnalytics?: SiteAnalyticsData;
 };
 
 export const LEVELS = {
