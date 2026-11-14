@@ -31,26 +31,65 @@ function getVersionTs(pathname: string, uploadedAt?: string | Date): number {
   return uploadedAt ? new Date(uploadedAt).getTime() : 0;
 }
 
-// مزامنة تامة ومتبادلة بين قائمة تلاميذ القسم (studentRoster) وسجلات التقويم (evaluations)
+function normalizeClass(raw?: string): string {
+  if (!raw) return "1م1";
+  const s = raw.replace(/\s+/g, "").trim();
+  if (s === "1م1" || s === "1-1" || s === "11") return "1م1";
+  if (s === "1م2" || s === "2م1" || s === "1-2" || s === "12" || s === "م12") return "1م2";
+  if (s === "1م3" || s === "3م1" || s === "1-3" || s === "13" || s === "م13") return "1م3";
+  if (s === "2م3" || s === "3م2" || s === "2-3" || s === "23" || s === "م23") return "2م3";
+  if (s.startsWith("1م") || s.endsWith("م1")) {
+    if (s.includes("1")) return "1م1";
+    if (s.includes("2")) return "1م2";
+    if (s.includes("3")) return "1م3";
+  }
+  if (s.startsWith("2م") || s.endsWith("م2")) {
+    return "2م3";
+  }
+  return s;
+}
+
+// مزامنة آمنة: قائمة التلاميذ الرسمية (studentRoster) هي المرجع الوحيد
 export function synchronizeStudents(data: LessonsData): LessonsData {
   if (!data.studentRoster) data.studentRoster = [];
   if (!data.evaluations) data.evaluations = [];
+  if (!data.gradebookRecords) data.gradebookRecords = [];
 
-  // 1. كل تلميذ في studentRoster ينعكس تلقائياً في evaluations
+  // توحيد أسماء الأفواج إلى الأفواج الأربعة الرسمية
+  data.studentRoster = data.studentRoster.map((r) => ({
+    ...r,
+    className: normalizeClass(r.className),
+  }));
+
+  const rosterKeys = new Set(
+    data.studentRoster.map(
+      (r) => `${(r.studentName || "").trim().toLowerCase()}_${normalizeClass(r.className)}`
+    )
+  );
+
+  // إذا كانت قائمة التلاميذ تحتوي على تلاميذ: أي تلميذ حُذف منها يُحذف تلقائياً من التقييمات وسجلات النقاط
+  if (data.studentRoster.length > 0) {
+    data.evaluations = data.evaluations.filter((e) => {
+      const key = `${(e.studentName || "").trim().toLowerCase()}_${normalizeClass(e.className)}`;
+      return rosterKeys.has(key);
+    });
+  }
+
+  // مزامنة التلاميذ في studentRoster إلى evaluations إن لم يكونوا مسجلين
   for (const r of data.studentRoster) {
     const rName = (r.studentName || "").trim();
     if (!rName) continue;
-    const rCls = (r.className || "").replace(/\s+/g, "");
+    const rCls = normalizeClass(r.className);
     const exists = data.evaluations.some(
       (e) =>
         (e.studentName || "").trim().toLowerCase() === rName.toLowerCase() &&
-        (e.className || "").replace(/\s+/g, "") === rCls
+        normalizeClass(e.className) === rCls
     );
     if (!exists) {
       data.evaluations.push({
         id: `eval_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         studentName: rName,
-        className: r.className,
+        className: rCls,
         groupName: (r.groupName as any) || "فوج 1",
         notebookScore: 5,
         notebookComplete: true,
@@ -63,26 +102,6 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
         rating: "excellent",
         ratingColor: "emerald",
         updatedAt: new Date().toISOString(),
-      });
-    }
-  }
-
-  // 2. كل تلميذ في evaluations ينعكس تلقائياً في studentRoster
-  for (const e of data.evaluations) {
-    const eName = (e.studentName || "").trim();
-    if (!eName) continue;
-    const eCls = (e.className || "").replace(/\s+/g, "");
-    const exists = data.studentRoster.some(
-      (r) =>
-        (r.studentName || "").trim().toLowerCase() === eName.toLowerCase() &&
-        (r.className || "").replace(/\s+/g, "") === eCls
-    );
-    if (!exists) {
-      data.studentRoster.push({
-        id: `rst_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        studentName: eName,
-        className: e.className,
-        groupName: e.groupName || "فوج 1",
       });
     }
   }

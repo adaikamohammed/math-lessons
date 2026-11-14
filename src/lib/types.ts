@@ -142,20 +142,30 @@ export type StudentGradeRecord = {
   className: string;
   academicYear?: string;
   trimester: 1 | 2 | 3;
-  behaviorScore?: number;
-  homework1Score?: number;
-  notebook1Score?: number;
-  quiz1Score?: number;
-  continuousScore?: number;
-  test1Score?: number;
-  test2Score?: number;
-  examScore?: number;
-  termAverage?: number;
+
+  // تفاصيل التقويم المستمر (المجموع 20 نقطة)
+  behaviorScore?: number | string; // 1. المشاركة والسلوك (4 نقاط)
+  quiz1Score?: number | string; // 2. استجواب 1 (4 نقاط)
+  homework1Score?: number | string; // 3. وظيفة 1 (نقطتان)
+  quiz2Score?: number | string; // 4. استجواب 2 (4 نقاط)
+  homework2Score?: number | string; // 5. وظيفة 2 (نقطتان)
+  notebook1Score?: number | string; // 6. كراس 1 (نقطتان)
+  notebook2Score?: number | string; // 7. كراس 2 (نقطتان)
+  bonusScore?: number | string; // 8. نقاط إضافية (حل واجبات)
+  continuousScore?: number | string; // مجموع التقويم التلقائي (من 20)
+
+  // الفرض، المراقبة، الاختبار والمعدل
+  test1Score?: number | string; // علامة الفرض (من 20)
+  test2Score?: number | string; // فرض 2 إن وجد
+  continuousMonitoring?: number | string; // المراقبة المستمرة = (الفرض + التقويم) / 2
+  examScore?: number | string; // الاختبار (من 20)
+  termAverage?: number | string; // المعدل الفصلي
+
   rank?: number;
   totalStudents?: number;
   classAvg?: number;
   appreciation?: string;
-  customScores?: Record<string, number>;
+  customScores?: Record<string, any>;
   evaluatedColumns?: Record<string, boolean>;
   updatedAt?: string;
 };

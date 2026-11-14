@@ -212,6 +212,21 @@ export async function POST(req: NextRequest) {
       addedGradesCount++;
     }
 
+    // في حال الاستبدال أو الحذف: حذف أي تقييمات أو نقاط للتلاميذ الذين لم يعودوا في القائمة
+    if (mode === "replace") {
+      const rosterKeys = new Set(
+        currentRoster.map(
+          (s) => `${(s.studentName || "").trim().toLowerCase()}_${normalizeClass(s.className)}`
+        )
+      );
+      currentData.evaluations = (currentData.evaluations || []).filter((e) =>
+        rosterKeys.has(`${(e.studentName || "").trim().toLowerCase()}_${normalizeClass(e.className)}`)
+      );
+      currentGrades = currentGrades.filter((g) =>
+        rosterKeys.has(`${(g.studentName || "").trim().toLowerCase()}_${normalizeClass(g.className)}`)
+      );
+    }
+
     // حفظ التغييرات وتحديث Vercel Blob بعد توحيد أسماء الأفواج بدقة
     currentData.studentRoster = currentRoster.map((s) => ({ ...s, className: normalizeClass(s.className) }));
     currentData.evaluations = (currentData.evaluations || []).map((e) => ({ ...e, className: normalizeClass(e.className) }));

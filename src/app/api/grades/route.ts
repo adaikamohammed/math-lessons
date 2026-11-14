@@ -94,9 +94,18 @@ export async function GET(req: NextRequest) {
         groupName: s.groupName || "فوج 1",
         birthDate: s.birthDate || "",
         gender: s.gender || "M",
+        behaviorScore: g?.behaviorScore ?? "",
+        quiz1Score: g?.quiz1Score ?? "",
+        homework1Score: g?.homework1Score ?? "",
+        quiz2Score: g?.quiz2Score ?? "",
+        homework2Score: g?.homework2Score ?? "",
+        notebook1Score: g?.notebook1Score ?? "",
+        notebook2Score: g?.notebook2Score ?? "",
+        bonusScore: g?.bonusScore ?? "",
         continuousScore: g?.continuousScore ?? "",
         test1Score: g?.test1Score ?? "",
         test2Score: g?.test2Score ?? "",
+        continuousMonitoring: g?.continuousMonitoring ?? "",
         examScore: g?.examScore ?? "",
         termAverage: g?.termAverage ?? "",
         appreciation: g?.appreciation || "",
@@ -159,12 +168,28 @@ export async function POST(req: NextRequest) {
           (g.studentName === studentName && normalizeClass(g.className) === normalizeClass(className) && g.trimester === triNum)
       );
 
-      const cont = item.continuousScore === "" || item.continuousScore === null ? undefined : Number(item.continuousScore);
-      const t1 = item.test1Score === "" || item.test1Score === null ? undefined : Number(item.test1Score);
-      const t2 = item.test2Score === "" || item.test2Score === null ? undefined : Number(item.test2Score);
-      const exam = item.examScore === "" || item.examScore === null ? undefined : Number(item.examScore);
+      const cont = item.continuousScore === "" || item.continuousScore === null ? undefined : (typeof item.continuousScore === "number" ? item.continuousScore : Number(item.continuousScore) || item.continuousScore);
+      const t1 = item.test1Score === "" || item.test1Score === null ? undefined : (typeof item.test1Score === "number" ? item.test1Score : Number(item.test1Score) || item.test1Score);
+      const t2 = item.test2Score === "" || item.test2Score === null ? undefined : (typeof item.test2Score === "number" ? item.test2Score : Number(item.test2Score) || item.test2Score);
+      const exam = item.examScore === "" || item.examScore === null ? undefined : (typeof item.examScore === "number" ? item.examScore : Number(item.examScore) || item.examScore);
 
-      const { termAvg, isPendingExam } = calculateTermAverage(cont, t1, t2, exam);
+      const numCont = typeof cont === "number" ? cont : (Number(cont) || undefined);
+      const numT1 = typeof t1 === "number" ? t1 : (Number(t1) || undefined);
+      const numT2 = typeof t2 === "number" ? t2 : (Number(t2) || undefined);
+      const numExam = typeof exam === "number" ? exam : (Number(exam) || undefined);
+
+      const { termAvg, isPendingExam } = calculateTermAverage(numCont, numT1, numT2, numExam);
+
+      let continuousMonitoringVal = item.continuousMonitoring;
+      if (continuousMonitoringVal === undefined || continuousMonitoringVal === "") {
+        if (typeof numCont === "number" && typeof numT1 === "number") {
+          continuousMonitoringVal = Number(((numCont + numT1) / 2).toFixed(2));
+        } else if (typeof numCont === "number") {
+          continuousMonitoringVal = numCont;
+        } else if (typeof numT1 === "number") {
+          continuousMonitoringVal = numT1;
+        }
+      }
 
       let apprec = item.appreciation;
       if (!apprec) {
@@ -186,11 +211,20 @@ export async function POST(req: NextRequest) {
         className,
         academicYear: "2026/2027",
         trimester: triNum,
+        behaviorScore: item.behaviorScore ?? "",
+        quiz1Score: item.quiz1Score ?? "",
+        homework1Score: item.homework1Score ?? "",
+        quiz2Score: item.quiz2Score ?? "",
+        homework2Score: item.homework2Score ?? "",
+        notebook1Score: item.notebook1Score ?? "",
+        notebook2Score: item.notebook2Score ?? "",
+        bonusScore: item.bonusScore ?? "",
         continuousScore: cont,
         test1Score: t1,
         test2Score: t2,
+        continuousMonitoring: continuousMonitoringVal,
         examScore: exam,
-        termAverage: termAvg,
+        termAverage: item.termAverage ? Number(item.termAverage) : termAvg,
         appreciation: apprec,
         updatedAt: new Date().toISOString(),
       };
@@ -210,7 +244,7 @@ export async function POST(req: NextRequest) {
     for (const cls of classesSet) {
       const clsGrades = allGrades
         .filter((g) => normalizeClass(g.className) === cls && g.trimester === triNum && typeof g.termAverage === "number")
-        .sort((a, b) => (b.termAverage || 0) - (a.termAverage || 0));
+        .sort((a, b) => (Number(b.termAverage) || 0) - (Number(a.termAverage) || 0));
 
       clsGrades.forEach((g, idx) => {
         g.rank = idx + 1;

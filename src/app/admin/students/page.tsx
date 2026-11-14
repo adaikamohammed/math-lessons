@@ -31,6 +31,7 @@ import {
   UserX,
   Layers,
   ChevronDown,
+  ArrowUpDown,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { StudentRosterItem } from "@/lib/types";
@@ -90,6 +91,17 @@ function parseExcelDate(val: any): string {
   return str;
 }
 
+// دالة لتطبيع الحروف العربية للترتيب الأبجدي الدقيق
+export function normalizeArabicForSort(text: string): string {
+  if (!text) return "";
+  return text
+    .trim()
+    .replace(/[إأآا]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[\u064B-\u065F]/g, ""); // إزالة حركات التشكيل
+}
+
 export default function AdminStudentsPage() {
   const [roster, setRoster] = useState<StudentRosterItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +109,8 @@ export default function AdminStudentsPage() {
   const [selectedClass, setSelectedClass] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [subgroupFilter, setSubgroupFilter] = useState<"all" | "فوج 1" | "فوج 2">("all");
-  const [genderFilter, setGenderFilter] = useState<"all" | "M" | "F">("all");
+    const [genderFilter, setGenderFilter] = useState<"all" | "M" | "F">("all");
+  const [sortAlphabetical, setSortAlphabetical] = useState<"none" | "asc" | "desc">("none");
 
   // التحديد المتعدد (Bulk Selection)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -206,6 +219,25 @@ export default function AdminStudentsPage() {
     });
   }, [roster, selectedClass, search, subgroupFilter, genderFilter]);
 
+  // ترتيب التلاميذ أبجدياً (أ-ي أو ي-أ)
+  const sortedRoster = useMemo(() => {
+    const list = [...filteredRoster];
+    if (sortAlphabetical === "asc") {
+      list.sort((a, b) => {
+        const na = normalizeArabicForSort(a.studentName);
+        const nb = normalizeArabicForSort(b.studentName);
+        return na.localeCompare(nb, "ar");
+      });
+    } else if (sortAlphabetical === "desc") {
+      list.sort((a, b) => {
+        const na = normalizeArabicForSort(a.studentName);
+        const nb = normalizeArabicForSort(b.studentName);
+        return nb.localeCompare(na, "ar");
+      });
+    }
+    return list;
+  }, [filteredRoster, sortAlphabetical]);
+
   // إحصائيات الأفواج الأربعة والإجمالي
   const classCounts = useMemo(() => {
     const counts: Record<string, number> = { "1م1": 0, "1م2": 0, "1م3": 0, "2م3": 0 };
@@ -235,18 +267,18 @@ export default function AdminStudentsPage() {
 
   // منطق التحديد المتعدد (Selection logic)
   const isAllVisibleSelected = useMemo(() => {
-    if (filteredRoster.length === 0) return false;
-    return filteredRoster.every((s) => selectedIds.has(s.id));
-  }, [filteredRoster, selectedIds]);
+    if (sortedRoster.length === 0) return false;
+    return sortedRoster.every((s) => selectedIds.has(s.id));
+  }, [sortedRoster, selectedIds]);
 
   const toggleSelectAllVisible = () => {
     if (isAllVisibleSelected) {
       const next = new Set(selectedIds);
-      filteredRoster.forEach((s) => next.delete(s.id));
+      sortedRoster.forEach((s) => next.delete(s.id));
       setSelectedIds(next);
     } else {
       const next = new Set(selectedIds);
-      filteredRoster.forEach((s) => next.add(s.id));
+      sortedRoster.forEach((s) => next.add(s.id));
       setSelectedIds(next);
     }
   };
@@ -285,6 +317,38 @@ export default function AdminStudentsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // حفظ الترتيب الأبجدي الحالي بشكل دائم كترتيب رسمي للقائمة
+  const handleSaveAlphabeticalOrder = async () => {
+    if (sortAlphabetical === "none") {
+      notify("err", "يرجى تفعيل الترتيب الأبجدي أولاً (أ - ي أو ي - أ)");
+      return;
+    }
+
+    const reordered = [...roster].sort((a, b) => {
+      if (selectedClass !== "all") {
+        if (a.className === selectedClass && b.className === selectedClass) {
+          const na = normalizeArabicForSort(a.studentName);
+          const nb = normalizeArabicForSort(b.studentName);
+          return sortAlphabetical === "asc" ? na.localeCompare(nb, "ar") : nb.localeCompare(na, "ar");
+        }
+        return 0;
+      }
+      if (a.className !== b.className) {
+        return a.className.localeCompare(b.className, "ar");
+      }
+      const na = normalizeArabicForSort(a.studentName);
+      const nb = normalizeArabicForSort(b.studentName);
+      return sortAlphabetical === "asc" ? na.localeCompare(nb, "ar") : nb.localeCompare(na, "ar");
+    });
+
+    await saveUpdatedRoster(
+      reordered,
+      selectedClass !== "all"
+        ? `✅ تم حفظ الترتيب الأبجدي لتلاميذ ${selectedClass} كترتيب رسمي دائم!`
+        : `✅ تم حفظ الترتيب الأبجدي لجميع الأفواج كترتيب رسمي دائم!`
+    );
   };
 
   // 1. عملية جماعية: نقل التلاميذ المحددين إلى فوج آخر
@@ -996,6 +1060,48 @@ export default function AdminStudentsPage() {
               </button>
             </div>
 
+                        {/* زر الترتيب الأبجدي وتثبيته */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setSortAlphabetical((prev) =>
+                    prev === "none" ? "asc" : prev === "asc" ? "desc" : "none"
+                  );
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 border cursor-pointer active:scale-95 ${
+                  sortAlphabetical === "asc"
+                    ? "bg-emerald-700 text-white border-emerald-800 shadow-xs"
+                    : sortAlphabetical === "desc"
+                    ? "bg-teal-700 text-white border-teal-800 shadow-xs"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                }`}
+                title="اضغط للترتيب أبجدياً: تصاعدي (أ-ي)، تنازلي (ي-أ)، أو العودة للترتيب الأصلي"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5" />
+                <span>
+                  {sortAlphabetical === "asc"
+                    ? "أبجدي: أ ⬅ ي"
+                    : sortAlphabetical === "desc"
+                    ? "أبجدي: ي ⬅ أ"
+                    : "ترتيب أبجدي"}
+                </span>
+              </button>
+
+              {sortAlphabetical !== "none" && (
+                <button
+                  type="button"
+                  onClick={handleSaveAlphabeticalOrder}
+                  disabled={saving}
+                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-black transition flex items-center gap-1 shadow-xs cursor-pointer active:scale-95 animate-in fade-in"
+                  title="حفظ هذا الترتيب الأبجدي بشكل دائم في قاعدة البيانات ليصبح الترتيب الافتراضي دائماً"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>تثبيت الترتيب كدائم 💾</span>
+                </button>
+              )}
+            </div>
+
             {/* خانة البحث */}
             <div className="relative w-full sm:w-60">
               <input
@@ -1085,7 +1191,24 @@ export default function AdminStudentsPage() {
                     </button>
                   </th>
                   <th className="py-3 px-2 w-10 text-center">#</th>
-                  <th className="py-3 px-3.5">اسم ولقب التلميذ</th>
+                  <th
+    onClick={() => {
+      setSortAlphabetical((prev) => (prev === "asc" ? "desc" : "asc"));
+    }}
+    className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/80 transition select-none"
+    title="انقر هنا للترتيب الأبجدي"
+  >
+    <div className="flex items-center gap-1.5">
+      <span>اسم ولقب التلميذ</span>
+      <ArrowUpDown className="w-3 h-3 text-slate-400 group-hover:text-slate-600" />
+      {sortAlphabetical === "asc" && (
+        <span className="text-[10px] text-emerald-700 font-black bg-emerald-100 px-1 rounded">أ-ي</span>
+      )}
+      {sortAlphabetical === "desc" && (
+        <span className="text-[10px] text-teal-700 font-black bg-teal-100 px-1 rounded">ي-أ</span>
+      )}
+    </div>
+  </th>
                   <th className="py-3 px-3.5">القسم</th>
                   <th className="py-3 px-3.5">الفوج الفرعي</th>
                   <th className="py-3 px-3.5">تاريخ الميلاد (رمز دخول الولي 🔑)</th>
@@ -1096,7 +1219,7 @@ export default function AdminStudentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredRoster.map((s, idx) => {
+                {sortedRoster.map((s, idx) => {
                   const isMale = s.gender === "M" || s.gender === "ذكر";
                   const isSelected = selectedIds.has(s.id);
                   return (
