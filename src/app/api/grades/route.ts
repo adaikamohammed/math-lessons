@@ -119,6 +119,11 @@ export async function GET(req: NextRequest) {
       totalStudents: result.length,
       className,
       trimester,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        Pragma: "no-cache",
+      },
     });
   } catch (err: any) {
     console.error("Fetch grades error:", err);
@@ -258,6 +263,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `تم حفظ وتحديث ${updates.length} علامة بنجاح ومزامنتها سحابياً.`,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        Pragma: "no-cache",
+      },
     });
   } catch (err: any) {
     console.error("Save grades error:", err);

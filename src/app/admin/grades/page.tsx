@@ -147,6 +147,11 @@ export default function AdminGradesExcelPage() {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [syncStatus, setSyncStatus] = useState<"synced" | "saving" | "unsaved" | "error">("synced");
+
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const latestStudentsRef = useRef<StudentGradeRow[]>([]);
+  latestStudentsRef.current = students;
 
   const [subgroupFilter, setSubgroupFilter] = useState<"all" | "فوج 1" | "فوج 2">("all");
   const [search, setSearch] = useState("");
@@ -217,6 +222,21 @@ export default function AdminGradesExcelPage() {
     fetchGrades();
   }, [fetchGrades]);
 
+  // تحذير المستخدم إن حاول إغلاق الصفحة وهناك تعديل قيد الحفظ
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [isDirty]);
+
   // تعديل خلية وحساب التقويم والمراقبة والمعدل لحظياً (مع دعم كتابة الفاصلة 0.5 أو 0,5)
   const handleCellChange = (rowIdx: number, col: EvalColKey, val: string) => {
     setStudents((prev) => {
@@ -281,9 +301,20 @@ export default function AdminGradesExcelPage() {
       row.termAverage = scores.termAverage;
 
       next[rowIdx] = row;
+      latestStudentsRef.current = next;
+
+      // جدولة الحفظ والمزامنة التلقائية فورياً في الخلفية (Debounce 1000ms)
+      setIsDirty(true);
+      setSyncStatus("unsaved");
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      autoSaveTimerRef.current = setTimeout(() => {
+        performSave(next);
+      }, 1000);
+
       return next;
     });
-    setIsDirty(true);
   };
 
   // تعيين عمود كامل بشرطة «—» (ليس الآن) أو إرجاعه فارغاً بنقرة واحدة لجميع الأعمدة
@@ -292,7 +323,7 @@ export default function AdminGradesExcelPage() {
       const isAllPending = prev.length > 0 && prev.every((s) => s[col] === "—" || s[col] === "-");
       const nextVal = isAllPending ? "" : "—";
 
-      return prev.map((s) => {
+      const updated = prev.map((s) => {
         const row = { ...s, [col]: nextVal };
         const scores = calculateRowScores(row);
         return {
@@ -302,8 +333,17 @@ export default function AdminGradesExcelPage() {
           termAverage: scores.termAverage,
         };
       });
+
+      latestStudentsRef.current = updated;
+      setIsDirty(true);
+      setSyncStatus("unsaved");
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      performSave(updated);
+
+      return updated;
     });
-    setIsDirty(true);
   };
 
   // التنقل الذكي بالكيبورد (إكسل)
@@ -342,49 +382,78 @@ export default function AdminGradesExcelPage() {
     }
   };
 
-  // حفظ النقاط على السيرفر
-  const handleSave = async () => {
-    setSaving(true);
-    setFeedback(null);
-    try {
-      const res = await fetch("/api/grades", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trimester,
-          updates: students.map((s) => ({
-            studentId: s.studentId,
-            studentName: s.studentName,
-            className: s.className,
-            behaviorScore: s.behaviorScore,
-            quiz1Score: s.quiz1Score,
-            homework1Score: s.homework1Score,
-            quiz2Score: s.quiz2Score,
-            homework2Score: s.homework2Score,
-            notebook1Score: s.notebook1Score,
-            notebook2Score: s.notebook2Score,
-            bonusScore: s.bonusScore,
-            continuousScore: s.continuousScore,
-            test1Score: s.test1Score,
-            continuousMonitoring: s.continuousMonitoring,
-            examScore: s.examScore,
-            termAverage: s.termAverage,
-            appreciation: s.appreciation,
-          })),
-        }),
-      });
+  // الدالة المركزية للحفظ والمزامنة السحابية الفورية
+  const performSave = useCallback(
+    async (rowsToSave: StudentGradeRow[], isManual = false) => {
+      if (rowsToSave.length === 0) return;
+      setSaving(true);
+      setSyncStatus("saving");
 
-      if (!res.ok) throw new Error("فشل الحفظ على السيرفر");
+      try {
+        const res = await fetch("/api/grades", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trimester,
+            updates: rowsToSave.map((s) => ({
+              studentId: s.studentId,
+              studentName: s.studentName,
+              className: s.className,
+              behaviorScore: s.behaviorScore,
+              quiz1Score: s.quiz1Score,
+              homework1Score: s.homework1Score,
+              quiz2Score: s.quiz2Score,
+              homework2Score: s.homework2Score,
+              notebook1Score: s.notebook1Score,
+              notebook2Score: s.notebook2Score,
+              bonusScore: s.bonusScore,
+              continuousScore: s.continuousScore,
+              test1Score: s.test1Score,
+              continuousMonitoring: s.continuousMonitoring,
+              examScore: s.examScore,
+              termAverage: s.termAverage,
+              appreciation: s.appreciation,
+            })),
+          }),
+        });
 
-      setIsDirty(false);
-      setFeedback({ type: "ok", text: "تم حفظ جميع النقاط والتفاصيل بنجاح في السحابة!" });
-      fetchGrades();
-    } catch (err: any) {
-      console.error(err);
-      setFeedback({ type: "err", text: err.message || "حدث خطأ أثناء الحفظ" });
-    } finally {
-      setSaving(false);
+        if (!res.ok) throw new Error("فشل الحفظ في السحابة");
+
+        setIsDirty(false);
+        setSyncStatus("synced");
+        if (isManual) {
+          setFeedback({ type: "ok", text: "تم تأكيد حفظ جميع النقاط بنجاح في السحابة!" });
+          setTimeout(() => setFeedback(null), 3500);
+        }
+      } catch (err: any) {
+        console.error("Save error:", err);
+        setSyncStatus("error");
+        setFeedback({ type: "err", text: err.message || "فشل الحفظ السحابي، تأكد من الإنترنت" });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [trimester]
+  );
+
+  // تبديل الفوج مع حفظ أي تعديلات معلقة فوراً
+  const handleSwitchClass = async (newCls: (typeof CLASSES)[number]) => {
+    if (newCls === selectedClass) return;
+    if (isDirty && latestStudentsRef.current.length > 0) {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      await performSave(latestStudentsRef.current);
     }
+    setSelectedClass(newCls);
+  };
+
+  // تبديل الفصل مع حفظ أي تعديلات معلقة فوراً
+  const handleSwitchTrimester = async (newTri: 1 | 2 | 3) => {
+    if (newTri === trimester) return;
+    if (isDirty && latestStudentsRef.current.length > 0) {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      await performSave(latestStudentsRef.current);
+    }
+    setTrimester(newTri);
   };
 
   // تصدير دفتر التنقيط المفصل كملف Excel
@@ -472,10 +541,35 @@ export default function AdminGradesExcelPage() {
                 <span className="text-[11px] bg-emerald-100 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-200">
                   فوج {selectedClass} • الفصل {trimester}
                 </span>
-                {isDirty && (
-                  <span className="text-[11px] bg-amber-100 text-amber-800 font-black px-2.5 py-0.5 rounded-full border border-amber-200 animate-pulse">
-                    تعديلات غير محفوظة ⚠️
+
+                {/* شارة حالة المزامنة السحابية الفورية */}
+                {syncStatus === "saving" && (
+                  <span className="text-[11px] bg-amber-100 text-amber-900 font-black px-2.5 py-0.5 rounded-full border border-amber-300 flex items-center gap-1.5 animate-pulse">
+                    <RefreshCw className="w-3 h-3 animate-spin text-amber-700" />
+                    <span>جاري الحفظ التلقائي...</span>
                   </span>
+                )}
+                {syncStatus === "synced" && !isDirty && (
+                  <span className="text-[11px] bg-emerald-50 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>تم الحفظ والمزامنة تلقائياً ✓</span>
+                  </span>
+                )}
+                {syncStatus === "unsaved" && (
+                  <span className="text-[11px] bg-blue-50 text-blue-800 font-bold px-2.5 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-blue-600" />
+                    <span>تعديلات جديدة (حفظ تلقائي...)</span>
+                  </span>
+                )}
+                {syncStatus === "error" && (
+                  <button
+                    type="button"
+                    onClick={() => performSave(latestStudentsRef.current, true)}
+                    className="text-[11px] bg-red-100 text-red-800 font-black px-2.5 py-0.5 rounded-full border border-red-300 flex items-center gap-1 cursor-pointer"
+                  >
+                    <AlertCircle className="w-3 h-3 text-red-600" />
+                    <span>فشل الحفظ - انقر لإعادة المحاولة ↻</span>
+                  </button>
                 )}
               </div>
               <p className="text-xs text-slate-500 font-bold">
@@ -485,15 +579,36 @@ export default function AdminGradesExcelPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* زر حفظ التعديلات */}
+            {/* زر حفظ التعديلات اليدوي أو التأكيدي */}
             <button
-              onClick={handleSave}
+              onClick={() => performSave(latestStudentsRef.current, true)}
               disabled={saving}
               type="button"
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50 ring-2 ring-emerald-500/20"
+              className={`px-4 py-2 rounded-xl text-xs font-black transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50 ${
+                saving
+                  ? "bg-amber-600 text-white"
+                  : isDirty
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white ring-2 ring-emerald-500/30"
+                  : "bg-slate-900 hover:bg-black text-white"
+              }`}
+              title="يتم الحفظ التلقائي في الخلفية دائماً، ويمكنك النقر للحفظ الفوري المؤكد"
             >
-              <Save className="w-4 h-4 text-emerald-200" />
-              <span>{saving ? "جاري الحفظ..." : "حفظ النقاط الآن 💾"}</span>
+              {saving ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-amber-200" />
+                  <span>جاري الحفظ...</span>
+                </>
+              ) : isDirty ? (
+                <>
+                  <Save className="w-4 h-4 text-emerald-200" />
+                  <span>حفظ فوري 💾</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                  <span>محفوظ تلقائياً ✓</span>
+                </>
+              )}
             </button>
 
             {/* تصدير إكسل */}
@@ -518,7 +633,7 @@ export default function AdminGradesExcelPage() {
             {CLASSES.map((cls) => (
               <button
                 key={cls}
-                onClick={() => setSelectedClass(cls)}
+                onClick={() => handleSwitchClass(cls)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
                   selectedClass === cls
                     ? "bg-slate-900 text-white shadow-sm"
@@ -535,7 +650,7 @@ export default function AdminGradesExcelPage() {
             {([1, 2, 3] as const).map((tri) => (
               <button
                 key={tri}
-                onClick={() => setTrimester(tri)}
+                onClick={() => handleSwitchTrimester(tri)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
                   trimester === tri
                     ? "bg-white text-emerald-800 shadow-xs"
@@ -849,6 +964,12 @@ export default function AdminGradesExcelPage() {
                               value={val}
                               onChange={(e) => handleCellChange(rowIdx, colKey, e.target.value)}
                               onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
+                              onBlur={() => {
+                                if (isDirty && latestStudentsRef.current.length > 0) {
+                                  if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+                                  performSave(latestStudentsRef.current);
+                                }
+                              }}
                               className={`w-full h-8 text-center text-xs font-mono font-bold rounded-lg transition outline-none border focus:ring-2 focus:ring-emerald-500/30 ${
                                 isAbsent
                                   ? "bg-red-50 text-red-700 border-red-300 font-sans font-black"
@@ -879,6 +1000,12 @@ export default function AdminGradesExcelPage() {
                           value={s.test1Score ?? ""}
                           onChange={(e) => handleCellChange(rowIdx, "test1Score", e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, rowIdx, 8)}
+                          onBlur={() => {
+                            if (isDirty && latestStudentsRef.current.length > 0) {
+                              if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+                              performSave(latestStudentsRef.current);
+                            }
+                          }}
                           placeholder="الفرض"
                           className="w-full h-8 text-center text-xs font-mono font-black text-blue-950 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500/30 outline-none"
                         />
@@ -904,6 +1031,12 @@ export default function AdminGradesExcelPage() {
                           value={s.examScore ?? ""}
                           onChange={(e) => handleCellChange(rowIdx, "examScore", e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, rowIdx, 9)}
+                          onBlur={() => {
+                            if (isDirty && latestStudentsRef.current.length > 0) {
+                              if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+                              performSave(latestStudentsRef.current);
+                            }
+                          }}
                           placeholder="اختبار"
                           className="w-full h-8 text-center text-xs font-mono font-black text-indigo-950 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 outline-none"
                         />

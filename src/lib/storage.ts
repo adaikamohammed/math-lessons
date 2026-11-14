@@ -24,6 +24,9 @@ async function ensureLocalDirs() {
 // Mutex lock to serialize writes and prevent concurrent race conditions
 let writeQueue: Promise<any> = Promise.resolve();
 
+// كاش ذاكرة فوري لمنع قراءة بيانات قديمة من كاش CDN بعد الحفظ المباشر
+let memoryCache: { data: LessonsData; timestamp: number } | null = null;
+
 // استخراج الطابع الزمني الرقمي من مسار النسخة db/v-123456.json
 function getVersionTs(pathname: string, uploadedAt?: string | Date): number {
   const match = pathname.match(/v-(\d+)\.json/);
@@ -143,6 +146,7 @@ export async function getLessonsData(): Promise<LessonsData> {
           siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
         };
         const result = synchronizeStudents(rawResult);
+        memoryCache = { data: JSON.parse(JSON.stringify(result)), timestamp: Date.now() };
         // حفظ نسخة محلية احتياطية
         ensureLocalDirs()
           .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
