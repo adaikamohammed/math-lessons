@@ -51,7 +51,7 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
         id: `eval_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         studentName: rName,
         className: r.className,
-        groupName: r.groupName || "فوج 1",
+        groupName: (r.groupName as any) || "فوج 1",
         notebookScore: 5,
         notebookComplete: true,
         homeworkScore: 5,
@@ -117,6 +117,8 @@ export async function getLessonsData(): Promise<LessonsData> {
           evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
           inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
           studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
+          gradebookRecords: Array.isArray(json.gradebookRecords) ? json.gradebookRecords : [],
+          parentGradebookLookup: Array.isArray(json.parentGradebookLookup) ? json.parentGradebookLookup : [],
           announcements: Array.isArray(json.announcements) ? json.announcements : [],
           anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
           siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
@@ -146,6 +148,8 @@ export async function getLessonsData(): Promise<LessonsData> {
       evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
       inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
       studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
+      gradebookRecords: Array.isArray(json.gradebookRecords) ? json.gradebookRecords : [],
+      parentGradebookLookup: Array.isArray(json.parentGradebookLookup) ? json.parentGradebookLookup : [],
       announcements: Array.isArray(json.announcements) ? json.announcements : [],
       anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
       siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
@@ -159,6 +163,8 @@ export async function getLessonsData(): Promise<LessonsData> {
       evaluations: [],
       inspectionSessions: [],
       studentRoster: [],
+      gradebookRecords: [],
+      parentGradebookLookup: [],
       announcements: [],
       anonymousMessages: [],
       siteAnalytics: { totalVisits: 0 },
@@ -182,6 +188,12 @@ async function executeSave(data: LessonsData): Promise<void> {
     }
     if ((!data.inspectionSessions || data.inspectionSessions.length === 0) && existing.inspectionSessions && existing.inspectionSessions.length > 0) {
       data.inspectionSessions = existing.inspectionSessions;
+    }
+    if ((!data.gradebookRecords || data.gradebookRecords.length === 0) && existing.gradebookRecords && existing.gradebookRecords.length > 0) {
+      data.gradebookRecords = existing.gradebookRecords;
+    }
+    if ((!data.parentGradebookLookup || data.parentGradebookLookup.length === 0) && existing.parentGradebookLookup && existing.parentGradebookLookup.length > 0) {
+      data.parentGradebookLookup = existing.parentGradebookLookup;
     }
     if (data.announcements === undefined && existing.announcements) {
       data.announcements = existing.announcements;

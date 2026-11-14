@@ -1330,6 +1330,69 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </Link>
           </div>
         </div>
+
+        {/* شريط الإدارة المتطورة: إدارة الأفواج ورصد النقاط كإكسل وفضاء استعلام الأولياء */}
+        <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <Link
+            href="/admin/students"
+            className="p-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 hover:border-emerald-300 text-emerald-950 flex items-center justify-between gap-2 transition group shadow-2xs active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-xs">
+                👥
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs font-black text-slate-900 group-hover:text-emerald-700 transition truncate">
+                  إدارة الأفواج واستيراد جسور
+                </div>
+                <div className="text-[10px] text-slate-500 font-medium truncate">
+                  رفع قوائم 1م1، 1م2، 1م3، 2م3 وتواريخ الميلاد
+                </div>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-emerald-600 shrink-0" />
+          </Link>
+
+          <Link
+            href="/admin/grades"
+            className="p-3 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 hover:border-blue-300 text-blue-950 flex items-center justify-between gap-2 transition group shadow-2xs active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-xs">
+                ⚡
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs font-black text-slate-900 group-hover:text-blue-700 transition truncate">
+                  رصد النقاط السريع (Excel)
+                </div>
+                <div className="text-[10px] text-slate-500 font-medium truncate">
+                  إدخال مباشر بدون أسهم مع تنقل كامل بالكيبورد
+                </div>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-blue-600 shrink-0" />
+          </Link>
+
+          <Link
+            href="/grades"
+            className="p-3 rounded-2xl bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 hover:border-purple-300 text-purple-950 flex items-center justify-between gap-2 transition group shadow-2xs active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-xs">
+                🛡️
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs font-black text-slate-900 group-hover:text-purple-700 transition truncate">
+                  فضاء استعلام الأولياء
+                </div>
+                <div className="text-[10px] text-slate-500 font-medium truncate">
+                  معاينة كشف التلميذ برقم وتاريخ الميلاد
+                </div>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-purple-600 shrink-0" />
+          </Link>
+        </div>
       </div>
 
       {/* التبويب الرئيسي: إدارة الدروس أو تقييم الحصة أو الإعلانات أو الرسائل أو الاستدعاءات أو لوحة الشرف أو الخصومات */}

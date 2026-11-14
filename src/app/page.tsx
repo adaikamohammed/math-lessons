@@ -10,6 +10,7 @@ import {
   Scale,
   MessageSquare,
   Lock,
+  Calculator,
 } from "lucide-react";
 import { getLessonsData } from "@/lib/storage";
 import HomeAnnouncements from "@/components/HomeAnnouncements";
@@ -57,6 +58,28 @@ export default async function Home() {
 
       {/* خانة الإعلانات والتنبيهات المباشرة (غياب، تحديثات، دروس جديدة...) */}
       <HomeAnnouncements announcements={announcements} />
+
+      {/* فضاء كشف النقاط بالاستعلام بتاريخ الميلاد للأولياء والتلاميذ */}
+      <Link
+        href="/grades"
+        className="flex items-center gap-3.5 bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-blue-500/10 rounded-2xl p-4 border-2 border-emerald-400/80 shadow-xs hover:border-emerald-500 hover:shadow-sm active:scale-[0.98] transition group"
+      >
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-600/25 group-hover:scale-105 transition-transform">
+          <Calculator className="w-6 h-6 text-emerald-100" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-black text-sm text-slate-900">كشف نقاط ومتابعة التلميذ</span>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-md border border-emerald-200">
+              بتاريخ الميلاد 🛡️
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 mt-1 line-clamp-1 font-semibold">
+            استعلام الأولياء والتلاميذ عن علامات التقويم المستمر، الفروض والمعدل الفصلي لمادة الرياضيات
+          </p>
+        </div>
+        <ChevronLeft className="w-5 h-5 text-emerald-600 group-hover:text-emerald-800 transition shrink-0" />
+      </Link>
 
       {/* 1. الأساس: الدروس المصورة للسبورة (أول ما يراه التلميذ) */}
       <div className="space-y-2.5 pt-1">

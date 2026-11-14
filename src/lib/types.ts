@@ -127,7 +127,37 @@ export type StudentRosterItem = {
   id: string;
   studentName: string;
   className: string;
-  groupName: "فوج 1" | "فوج 2" | "القسم كامل";
+  groupName?: "فوج 1" | "فوج 2" | "القسم كامل" | string;
+  birthDate?: string; // YYYY-MM-DD
+  gender?: "M" | "F" | string;
+  isRepeater?: boolean;
+  parentPhone?: string;
+  notes?: string;
+};
+
+export type StudentGradeRecord = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  academicYear?: string;
+  trimester: 1 | 2 | 3;
+  behaviorScore?: number;
+  homework1Score?: number;
+  notebook1Score?: number;
+  quiz1Score?: number;
+  continuousScore?: number;
+  test1Score?: number;
+  test2Score?: number;
+  examScore?: number;
+  termAverage?: number;
+  rank?: number;
+  totalStudents?: number;
+  classAvg?: number;
+  appreciation?: string;
+  customScores?: Record<string, number>;
+  evaluatedColumns?: Record<string, boolean>;
+  updatedAt?: string;
 };
 
 export type AnnouncementCategory = "absence" | "lesson" | "update" | "general" | "urgent";
@@ -250,6 +280,8 @@ export type LessonsData = {
   evaluations?: StudentEvaluation[];
   inspectionSessions?: InspectionSession[];
   studentRoster?: StudentRosterItem[];
+  gradebookRecords?: StudentGradeRecord[];
+  parentGradebookLookup?: any[];
   announcements?: Announcement[];
   anonymousMessages?: AnonymousMessage[];
   siteAnalytics?: SiteAnalyticsData;
