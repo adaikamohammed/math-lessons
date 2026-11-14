@@ -21,6 +21,12 @@ import {
   HelpCircle,
   Download,
   Users,
+  LayoutGrid,
+  Table as TableIcon,
+  X,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Search,
   Check,
 } from "lucide-react";
@@ -218,6 +224,17 @@ export type StudentGradeRow = {
 };
 
 // دالة لحساب التقويم والمراقبة والمعدل لأي سطر لحظياً
+function normalizeArabic(text?: string): string {
+  if (!text) return "";
+  return text
+    .trim()
+    .replace(/[إأآا]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
 export function calculateRowScores(row: Partial<StudentGradeRow>): {
   continuousScore: string | number;
   continuousMonitoring: string | number;
@@ -298,6 +315,112 @@ export function calculateRowScores(row: Partial<StudentGradeRow>): {
   };
 }
 
+export type QuickChip = { label: string; val: string };
+
+export const QUICK_CHIPS_MAP: Record<string, QuickChip[]> = {
+  // خانات من نقطتين (كراس ووظائف)
+  homework1Score: [
+    { label: "2", val: "2" },
+    { label: "1.5", val: "1.5" },
+    { label: "1", val: "1" },
+    { label: "0.5", val: "0.5" },
+    { label: "0", val: "0" },
+    { label: "غ", val: "غ" },
+    { label: "—", val: "—" },
+  ],
+  homework2Score: [
+    { label: "2", val: "2" },
+    { label: "1.5", val: "1.5" },
+    { label: "1", val: "1" },
+    { label: "0.5", val: "0.5" },
+    { label: "0", val: "0" },
+    { label: "غ", val: "غ" },
+    { label: "—", val: "—" },
+  ],
+  notebook1Score: [
+    { label: "2", val: "2" },
+    { label: "1.5", val: "1.5" },
+    { label: "1", val: "1" },
+    { label: "0.5", val: "0.5" },
+    { label: "0", val: "0" },
+    { label: "غ", val: "غ" },
+    { label: "—", val: "—" },
+  ],
+  notebook2Score: [
+    { label: "2", val: "2" },
+    { label: "1.5", val: "1.5" },
+    { label: "1", val: "1" },
+    { label: "0.5", val: "0.5" },
+    { label: "0", val: "0" },
+    { label: "غ", val: "غ" },
+    { label: "—", val: "—" },
+  ],
+
+  // خانات من 4 نقاط (مشاركة واستجوابات)
+  behaviorScore: [
+    { label: "4", val: "4" },
+    { label: "3.5", val: "3.5" },
+    { label: "3", val: "3" },
+    { label: "2.5", val: "2.5" },
+    { label: "2", val: "2" },
+    { label: "1", val: "1" },
+    { label: "غ", val: "غ" },
+    { label: "—", val: "—" },
+  ],
+  quiz1Score: [
+    { label: "4", val: "4" },
+    { label: "3.5", val: "3.5" },
+    { label: "3", val: "3" },
+    { label: "2.5", val: "2.5" },
+    { label: "2", val: "2" },
+    { label: "1", val: "1" },
+    { label: "غ", val: "غ" },
+    { label: "—", val: "—" },
+  ],
+  quiz2Score: [
+    { label: "4", val: "4" },
+    { label: "3.5", val: "3.5" },
+    { label: "3", val: "3" },
+    { label: "2.5", val: "2.5" },
+    { label: "2", val: "2" },
+    { label: "1", val: "1" },
+    { label: "غ", val: "غ" },
+    { label: "—", val: "—" },
+  ],
+
+  // بونص من 5 نقاط
+  bonusScore: [
+    { label: "+1", val: "1" },
+    { label: "+2", val: "2" },
+    { label: "+3", val: "3" },
+    { label: "+5", val: "5" },
+    { label: "0", val: "0" },
+    { label: "—", val: "—" },
+  ],
+
+  // الفرض والاختبار من 20
+  test1Score: [
+    { label: "20", val: "20" },
+    { label: "18", val: "18" },
+    { label: "16", val: "16" },
+    { label: "14", val: "14" },
+    { label: "12", val: "12" },
+    { label: "10", val: "10" },
+    { label: "غ", val: "غ" },
+    { label: "—", val: "—" },
+  ],
+  examScore: [
+    { label: "20", val: "20" },
+    { label: "18", val: "18" },
+    { label: "16", val: "16" },
+    { label: "14", val: "14" },
+    { label: "12", val: "12" },
+    { label: "10", val: "10" },
+    { label: "غ", val: "غ" },
+    { label: "—", val: "—" },
+  ],
+};
+
 export default function AdminGradesExcelPage() {
   const [selectedClass, setSelectedClass] = useState<string>("1م1");
   const [trimester, setTrimester] = useState<1 | 2 | 3>(1);
@@ -364,6 +487,8 @@ export default function AdminGradesExcelPage() {
 
   const [subgroupFilter, setSubgroupFilter] = useState<"all" | "فوج 1" | "فوج 2">("all");
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
 
   // مراجع عناصر الإدخال لدعم التنقل بالكيبورد مثل إكسل
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -431,6 +556,15 @@ export default function AdminGradesExcelPage() {
     fetchGrades();
   }, [fetchGrades]);
 
+  // الكشف عن الهواتف لفتح وضع البطاقات والمربعات تلقائياً
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth > 768) {
+      setViewMode("table");
+    } else {
+      setViewMode("cards");
+    }
+  }, []);
+
   // تحذير المستخدم إن حاول إغلاق الصفحة وهناك تعديل قيد الحفظ
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -447,9 +581,13 @@ export default function AdminGradesExcelPage() {
   }, [isDirty]);
 
   // تعديل خلية وحساب التقويم والمراقبة والمعدل لحظياً (مع دعم كتابة الفاصلة 0.5 أو 0,5)
-  const handleCellChange = (rowIdx: number, col: EvalColKey, val: string) => {
+  const handleCellChange = (studentIdentifier: string | number, col: EvalColKey, val: string) => {
     setStudents((prev) => {
       const next = [...prev];
+      const rowIdx = typeof studentIdentifier === "number"
+        ? studentIdentifier
+        : next.findIndex((s) => s.studentId === studentIdentifier);
+      if (rowIdx === -1 || rowIdx >= next.length) return prev;
       const row = { ...next[rowIdx] };
 
       // قبول الحروف الخاصة: غ (غائب)، — (ليس الآن)، أو الأرقام
@@ -723,7 +861,7 @@ export default function AdminGradesExcelPage() {
       const matchSub = subgroupFilter === "all" || s.groupName === subgroupFilter;
       const matchSearch =
         !search.trim() ||
-        s.studentName.toLowerCase().includes(search.toLowerCase());
+        normalizeArabic(s.studentName).includes(normalizeArabic(search));
       return matchSub && matchSearch;
     });
   }, [students, subgroupFilter, search]);
@@ -842,6 +980,36 @@ export default function AdminGradesExcelPage() {
               )}
             </button>
 
+            {/* زر التبديل بين وضع البطاقات (المربعات) بالهاتف ووضع جدول الإكسل */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setViewMode("cards")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === "cards"
+                    ? "bg-emerald-700 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="عرض التلاميذ على شكل مربعات سهلة للتنقيط بالهاتف"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>مربعات الهاتف 📱</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === "table"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="عرض جدول الإكسل المتكامل"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                <span>جدول إكسل 📊</span>
+              </button>
+            </div>
+
             {/* زر تخصيص وترتيب الأعمدة */}
             <button
               type="button"
@@ -927,15 +1095,100 @@ export default function AdminGradesExcelPage() {
               </button>
             </div>
 
-            <div className="relative w-44">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="بحث عن تلميذ..."
-                className="w-full h-8 pr-7 pl-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none"
-              />
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2 pointer-events-none" />
+            {/* حقل البحث الذكي مع قائمة منسدلة بأسماء التلاميذ */}
+            <div className="relative w-56 sm:w-72">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setIsSearchDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsSearchDropdownOpen(true)}
+                  placeholder="ابحث بالاسم (مثال: محمد)..."
+                  className="w-full h-9 pr-8 pl-14 text-xs font-black bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:bg-white outline-none transition"
+                  autoComplete="off"
+                />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+
+                <div className="absolute left-1.5 top-1.5 flex items-center gap-0.5">
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch("");
+                        setIsSearchDropdownOpen(false);
+                      }}
+                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                      title="مسح البحث"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsSearchDropdownOpen((prev) => !prev);
+                    }}
+                    className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
+                    title="فتح / إغلاق قائمة تلاميذ الفوج"
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isSearchDropdownOpen ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* القائمة المنسدلة للبحث واختيار التلميذ */}
+              {isSearchDropdownOpen && students.length > 0 && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setIsSearchDropdownOpen(false)}
+                  />
+                  <div className="absolute top-full mt-1.5 right-0 left-0 max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl z-30 divide-y divide-slate-100 py-1 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-black text-slate-500 flex items-center justify-between">
+                      <span>
+                        {filteredStudents.length > 0
+                          ? `النتائج (${filteredStudents.length} تلميذ)`
+                          : "لا يوجد تلميذ مطابق"}
+                      </span>
+                      <span className="text-emerald-700">اضغط للاختيار</span>
+                    </div>
+
+                    {filteredStudents.map((s, idx) => {
+                      const isSelected = search.trim() === s.studentName.trim();
+                      return (
+                        <button
+                          key={s.studentId}
+                          type="button"
+                          onClick={() => {
+                            setSearch(s.studentName);
+                            setIsSearchDropdownOpen(false);
+                            setViewMode("cards"); // التبديل التلقائي لوضع المربعات
+                          }}
+                          className={`w-full text-right px-3 py-2 text-xs font-black flex items-center justify-between transition cursor-pointer ${
+                            isSelected
+                              ? "bg-emerald-50 text-emerald-900"
+                              : "text-slate-800 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-[10px] flex items-center justify-center font-mono font-bold">
+                              {idx + 1}
+                            </span>
+                            <span style={{ fontFamily: "'Cairo', sans-serif" }}>{s.studentName}</span>
+                            <span className="text-[10px] font-normal text-slate-400">({s.groupName})</span>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -954,7 +1207,247 @@ export default function AdminGradesExcelPage() {
         </div>
       </div>
 
+            {/* ─── وضع البطاقات والمربعات للتنقيط بالهاتف (عند المرور على التلاميذ في الحصة) ─── */}
+      {viewMode === "cards" && (
+        <div className="space-y-4">
+          {loading ? (
+            <div className="bg-white rounded-3xl p-12 text-center text-slate-400 font-bold border border-slate-200">
+              جاري تحميل قائمة التلاميذ...
+            </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="bg-white rounded-3xl p-8 text-center space-y-3 border border-slate-200">
+              <Users className="w-8 h-8 text-slate-300 mx-auto" />
+              <h4 className="text-sm font-black text-slate-700">لم يتم العثور على أي تلميذ</h4>
+              <p className="text-xs text-slate-400 font-bold">
+                تأكد من كتابة الاسم بدقة، أو انقر على الزر أدناه لإلغاء التصفية
+              </p>
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="px-4 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-black hover:bg-emerald-100 transition cursor-pointer"
+                >
+                  عرض جميع تلاميذ الفوج ↺
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* شريط النتائج المتطابقة عند البحث */}
+              {search.trim() && (
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-emerald-900">
+                      نتائج البحث عن «{search}»:
+                    </span>
+                    <span className="text-xs font-mono font-black bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full">
+                      {filteredStudents.length} تلميذ
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>إلغاء البحث</span>
+                  </button>
+                </div>
+              )}
+
+              {/* بطاقات التلاميذ والمربعات */}
+              <div className="space-y-4">
+                {filteredStudents.map((s) => {
+                  const currentOverallIdx = students.findIndex((st) => st.studentId === s.studentId);
+                  const prevStudent = currentOverallIdx > 0 ? students[currentOverallIdx - 1] : null;
+                  const nextStudent = currentOverallIdx < students.length - 1 ? students[currentOverallIdx + 1] : null;
+
+                  return (
+                    <div
+                      key={s.studentId}
+                      className="bg-white rounded-3xl border-2 border-slate-200 p-4 sm:p-6 shadow-sm space-y-4 transition hover:border-emerald-300"
+                    >
+                      {/* رأس بطاقة التلميذ مع أزرار التنقل السريع */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-mono font-black flex items-center justify-center shrink-0">
+                              {currentOverallIdx + 1}
+                            </span>
+                            <h3
+                              className="text-base sm:text-lg font-black text-slate-900 tracking-normal"
+                              style={{ fontFamily: "'Cairo', sans-serif" }}
+                            >
+                              {s.studentName}
+                            </h3>
+                            <span className="text-[11px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg border border-slate-200">
+                              {s.className} • {s.groupName}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* مؤشر الحفظ وأزرار التنقل بين التلاميذ أثناء المشي في القسم */}
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          {isDirty ? (
+                            <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-1 rounded-xl flex items-center gap-1 animate-pulse">
+                              <RefreshCw className="w-3 h-3 animate-spin text-amber-600" />
+                              <span>جاري الحفظ...</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-1 rounded-xl flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>محفوظ تلقائياً ✓</span>
+                            </span>
+                          )}
+
+                          {/* أزرار السابق والتالي للمرور بين التلاميذ بسلاسة بالهاتف */}
+                          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                            <button
+                              type="button"
+                              disabled={!prevStudent}
+                              onClick={() => {
+                                if (prevStudent) setSearch(prevStudent.studentName);
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-xs font-black bg-white hover:bg-slate-200 text-slate-800 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                              title={prevStudent ? `الانتقال إلى: ${prevStudent.studentName}` : ""}
+                            >
+                              <ChevronRight className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">السابق</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!nextStudent}
+                              onClick={() => {
+                                if (nextStudent) setSearch(nextStudent.studentName);
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-xs font-black bg-white hover:bg-slate-200 text-slate-800 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                              title={nextStudent ? `الانتقال إلى: ${nextStudent.studentName}` : ""}
+                            >
+                              <span className="hidden sm:inline">التالي</span>
+                              <ChevronLeft className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* شريط الإحصائيات الفورية للتلميذ */}
+                      <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100 text-center">
+                        <div className="bg-emerald-100/60 p-2 rounded-xl border border-emerald-200/80">
+                          <span className="text-[10px] font-bold text-emerald-800 block">مجموع التقويم</span>
+                          <span className="text-sm sm:text-base font-black font-mono text-emerald-950">
+                            {s.continuousScore !== "" && s.continuousScore !== undefined ? s.continuousScore : "—"}
+                          </span>
+                          <span className="text-[9px] text-emerald-700 block font-bold">/ 20</span>
+                        </div>
+
+                        <div className="bg-blue-100/60 p-2 rounded-xl border border-blue-200/80">
+                          <span className="text-[10px] font-bold text-blue-800 block">المراقبة المستمرة</span>
+                          <span className="text-sm sm:text-base font-black font-mono text-blue-950">
+                            {s.continuousMonitoring !== "" && s.continuousMonitoring !== undefined ? s.continuousMonitoring : "—"}
+                          </span>
+                          <span className="text-[9px] text-blue-700 block font-bold">(ف+ت)/2</span>
+                        </div>
+
+                        <div className="bg-amber-100/60 p-2 rounded-xl border border-amber-200/80">
+                          <span className="text-[10px] font-bold text-amber-900 block">المعدل الفصلي</span>
+                          <span className="text-sm sm:text-base font-black font-mono text-amber-950">
+                            {s.termAverage !== "" && s.termAverage !== undefined ? s.termAverage : "—"}
+                          </span>
+                          <span className="text-[9px] text-amber-800 block font-bold">معامل 3</span>
+                        </div>
+                      </div>
+
+                      {/* ─── شبكة المربعات العشرة للتنقيط باللمس السريع ─── */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>مربعات النقاط (اضغط على الرقم السريع أو اكتب مباشرة):</span>
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold">حفظ تلقائي فوري ⚡</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+                          {columnOrder.map((colKey) => {
+                            const meta = COLUMN_DEFINITIONS[colKey];
+                            if (!meta || meta.category === "calc") return null;
+
+                            const val = (s as any)[colKey] ?? "";
+                            const isAbsent = val === "غ";
+                            const isPending = val === "—" || val === "-";
+                            const chips = QUICK_CHIPS_MAP[colKey] || [];
+
+                            return (
+                              <div
+                                key={colKey}
+                                className="bg-white border-2 border-slate-200 rounded-2xl p-2.5 shadow-2xs flex flex-col justify-between transition hover:border-emerald-400"
+                              >
+                                <div className="flex items-center justify-between gap-1 mb-1.5">
+                                  <span className="text-xs font-black text-slate-800 truncate" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                                    {meta.title}
+                                  </span>
+                                  <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
+                                    {meta.subTitle}
+                                  </span>
+                                </div>
+
+                                {/* مربع النقطة الكبير */}
+                                <div className="relative mb-2">
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={val}
+                                    onChange={(e) => handleCellChange(s.studentId, colKey as EvalColKey, e.target.value)}
+                                    onBlur={handleCellBlur}
+                                    placeholder="—"
+                                    className={`w-full h-10 text-center text-base sm:text-lg font-mono font-black rounded-xl border transition outline-none ${
+                                      isAbsent
+                                        ? "bg-red-50 text-red-700 border-red-300 font-sans font-black"
+                                        : isPending
+                                        ? "bg-slate-100 text-slate-400 border-slate-200 font-bold"
+                                        : val !== "" && val !== undefined
+                                        ? "bg-emerald-50 text-emerald-950 border-emerald-400 font-black ring-1 ring-emerald-300/40"
+                                        : "bg-slate-50 text-slate-400 border-slate-200 focus:bg-white focus:border-emerald-500"
+                                    }`}
+                                  />
+                                </div>
+
+                                {/* أزرار الاختيار السريع للأستاذ المتنقل */}
+                                <div className="flex items-center justify-center gap-1 flex-wrap">
+                                  {chips.map((chip) => {
+                                    const isChipSelected = String(val) === chip.val;
+                                    return (
+                                      <button
+                                        key={chip.label}
+                                        type="button"
+                                        onClick={() => handleCellChange(s.studentId, colKey as EvalColKey, chip.val)}
+                                        className={`min-w-[24px] h-6 px-1 rounded-md text-[10px] font-bold font-mono transition cursor-pointer active:scale-90 ${
+                                          isChipSelected
+                                            ? "bg-emerald-700 text-white font-black shadow-xs ring-1 ring-emerald-800"
+                                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                        }`}
+                                      >
+                                        {chip.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ─── جدول الإكسل المتكامل ─── */}
+      {viewMode === "table" && (
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-center text-xs border-collapse">
@@ -1094,7 +1587,7 @@ export default function AdminGradesExcelPage() {
                                 type="text"
                                 inputMode="decimal"
                                 value={val}
-                                onChange={(e) => handleCellChange(rowIdx, colKey as EvalColKey, e.target.value)}
+                                onChange={(e) => handleCellChange(s.studentId, colKey as EvalColKey, e.target.value)}
                                 onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
                                 onBlur={handleCellBlur}
                                 className={`w-full h-8 text-center text-xs font-mono font-bold rounded-lg transition outline-none border focus:ring-2 focus:ring-emerald-500/30 ${
@@ -1122,7 +1615,7 @@ export default function AdminGradesExcelPage() {
                                 type="text"
                                 inputMode="decimal"
                                 value={s.test1Score ?? ""}
-                                onChange={(e) => handleCellChange(rowIdx, "test1Score", e.target.value)}
+                                onChange={(e) => handleCellChange(s.studentId, "test1Score", e.target.value)}
                                 onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
                                 onBlur={handleCellBlur}
                                 placeholder="الفرض"
@@ -1143,7 +1636,7 @@ export default function AdminGradesExcelPage() {
                                 type="text"
                                 inputMode="decimal"
                                 value={s.examScore ?? ""}
-                                onChange={(e) => handleCellChange(rowIdx, "examScore", e.target.value)}
+                                onChange={(e) => handleCellChange(s.studentId, "examScore", e.target.value)}
                                 onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
                                 onBlur={handleCellBlur}
                                 placeholder="اختبار"
@@ -1194,6 +1687,8 @@ export default function AdminGradesExcelPage() {
           </table>
         </div>
       </div>
+      )}
+
       {/* ─── نافذة تخصيص وترتيب الأعمدة ─── */}
       {showColModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
