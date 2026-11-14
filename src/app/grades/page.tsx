@@ -24,9 +24,24 @@ import {
   Target,
   HelpCircle,
   Info,
+  X,
 } from "lucide-react";
 
 const CLASSES = ["1م1", "1م2", "1م3", "2م3"];
+
+export const COLUMN_MAX_LIMITS: Record<string, number> = {
+  behaviorScore: 4,
+  quiz1Score: 4,
+  homework1Score: 2,
+  quiz2Score: 4,
+  homework2Score: 2,
+  notebook1Score: 2,
+  notebook2Score: 2,
+  bonusScore: 5,
+  continuousScore: 20,
+  test1Score: 20,
+  examScore: 20,
+};
 
 type LookupResult = {
   student: {
@@ -76,6 +91,7 @@ export default function GradesLookupPage() {
   const [trimester, setTrimester] = useState<number>(1);
   const [classStudents, setClassStudents] = useState<string[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [isStudentListOpen, setIsStudentListOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,27 +102,45 @@ export default function GradesLookupPage() {
   const [showExplanation, setShowExplanation] = useState(false);
 
   // جلب قائمة تلاميذ القسم المختار
+  // جلب قائمة أسماء تلاميذ القسم المختار (متاح لجميع الزوار عبر endpoint الاستعلام العام)
   useEffect(() => {
     setLoadingStudents(true);
     setStudentName("");
+    setIsStudentListOpen(false);
     setResult(null);
     setError(null);
 
-    fetch(`/api/grades?className=${encodeURIComponent(selectedClass)}&trimester=${trimester}`)
+    fetch(`/api/grades/lookup?className=${encodeURIComponent(selectedClass)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.students && Array.isArray(data.students)) {
-          const names = data.students
-            .map((s: any) => s.studentName)
-            .sort((a: string, b: string) => a.localeCompare(b, "ar"));
-          setClassStudents(names);
+          setClassStudents(data.students);
         } else {
           setClassStudents([]);
         }
       })
       .catch(() => setClassStudents([]))
       .finally(() => setLoadingStudents(false));
-  }, [selectedClass, trimester]);
+  }, [selectedClass]);
+
+  // تطبيع الحروف العربية للبحث المرن (أ/إ/آ -> ا، ة -> ه، ى -> ي)
+  const normalizeArabicSearch = (text: string) => {
+    return text
+      .trim()
+      .replace(/[إأآا]/g, "ا")
+      .replace(/ة/g, "ه")
+      .replace(/ى/g, "ي")
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+  };
+
+  const filteredStudents = useMemo(() => {
+    if (!studentName.trim()) return classStudents;
+    const query = normalizeArabicSearch(studentName);
+    return classStudents.filter((name) =>
+      normalizeArabicSearch(name).includes(query)
+    );
+  }, [classStudents, studentName]);
 
   // تعبئة بيانات المحاكي فور تحميل نتائج التلميذ
   useEffect(() => {
@@ -189,9 +223,36 @@ export default function GradesLookupPage() {
     });
   };
 
-  // تعديل قيمة في المحاكي من قبل التلميذ أو الولي
+  // تعديل قيمة في المحاكي من قبل التلميذ أو الولي مع التحقق الصارم من الحد الأقصى لكل خانة
   const handleSimChange = (colKey: string, val: string) => {
     const clean = val.replace(/[,،]/g, ".").trim();
+    if (clean === "" || clean === "غ" || clean === "غياب" || clean === "—" || clean === "-") {
+      setSimScores((prev) => ({
+        ...prev,
+        [colKey]: clean,
+      }));
+      return;
+    }
+
+    const maxLimit = COLUMN_MAX_LIMITS[colKey] ?? 20;
+    const num = parseFloat(clean);
+    if (!isNaN(num)) {
+      if (num > maxLimit) {
+        setSimScores((prev) => ({
+          ...prev,
+          [colKey]: String(maxLimit),
+        }));
+        return;
+      }
+      if (num < 0) {
+        setSimScores((prev) => ({
+          ...prev,
+          [colKey]: "0",
+        }));
+        return;
+      }
+    }
+
     setSimScores((prev) => ({
       ...prev,
       [colKey]: clean,
@@ -211,14 +272,20 @@ export default function GradesLookupPage() {
       return isNaN(n) ? null : n;
     };
 
-    const b = parseNum(simScores.behaviorScore);
-    const q1 = parseNum(simScores.quiz1Score);
-    const hw1 = parseNum(simScores.homework1Score);
-    const q2 = parseNum(simScores.quiz2Score);
-    const hw2 = parseNum(simScores.homework2Score);
-    const nb1 = parseNum(simScores.notebook1Score);
-    const nb2 = parseNum(simScores.notebook2Score);
-    const bonus = parseNum(simScores.bonusScore) || 0;
+    const clampVal = (v: any, max: number): number | null => {
+      const n = parseNum(v);
+      if (n === null) return null;
+      return Math.min(max, Math.max(0, n));
+    };
+
+    const b = clampVal(simScores.behaviorScore, 4);
+    const q1 = clampVal(simScores.quiz1Score, 4);
+    const hw1 = clampVal(simScores.homework1Score, 2);
+    const q2 = clampVal(simScores.quiz2Score, 4);
+    const hw2 = clampVal(simScores.homework2Score, 2);
+    const nb1 = clampVal(simScores.notebook1Score, 2);
+    const nb2 = clampVal(simScores.notebook2Score, 2);
+    const bonus = clampVal(simScores.bonusScore, 5) || 0;
 
     const evalItems = [b, q1, hw1, q2, hw2, nb1, nb2];
     const hasAnyEval = evalItems.some((x) => x !== null) || bonus > 0;
@@ -229,8 +296,8 @@ export default function GradesLookupPage() {
       continuousScore = Number(Math.min(20, Math.max(0, sum)).toFixed(2));
     }
 
-    const test1 = parseNum(simScores.test1Score);
-    const exam = parseNum(simScores.examScore);
+    const test1 = clampVal(simScores.test1Score, 20);
+    const exam = clampVal(simScores.examScore, 20);
 
     let continuousMonitoring: number | null = null;
     if (continuousScore !== null && test1 !== null) {
@@ -367,35 +434,119 @@ export default function GradesLookupPage() {
               </select>
             </div>
 
-            {/* اسم التلميذ */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-black text-slate-700 block">2. اسم التلميذ:</label>
-              {loadingStudents ? (
-                <div className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center text-xs text-slate-400 font-bold">
-                  جاري تحميل أسماء القسم...
-                </div>
-              ) : classStudents.length > 0 ? (
-                <select
-                  value={studentName}
-                  onChange={(e) => setStudentName(e.target.value)}
-                  className="w-full h-11 px-3 text-xs font-black bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none"
-                >
-                  <option value="">-- اختر اسم التلميذ من القائمة --</option>
-                  {classStudents.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
+            {/* اسم التلميذ - يدعم البحث المباشر بالكتابة والاقتراحات الفورية والقائمة المنسدلة */}
+            <div className="space-y-1.5 relative">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-slate-700 block">2. اسم ولقب التلميذ:</label>
+                <span className="text-[10px] text-emerald-700 font-bold">
+                  اكتب اسمك للبحث ⚡ أو اختر من القائمة
+                </span>
+              </div>
+
+              <div className="relative">
                 <input
                   type="text"
+                  list="class-students-datalist"
                   value={studentName}
-                  onChange={(e) => setStudentName(e.target.value)}
-                  placeholder="اكتب الاسم واللقب..."
-                  className="w-full h-11 px-3 text-xs font-black bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none"
+                  onChange={(e) => {
+                    setStudentName(e.target.value);
+                    setIsStudentListOpen(true);
+                  }}
+                  onFocus={() => setIsStudentListOpen(true)}
+                  placeholder={loadingStudents ? "جاري جلب أسماء القسم..." : "اكتب الاسم واللقب للبحث مباشرة..."}
+                  disabled={loadingStudents}
+                  className="w-full h-11 pr-9 pl-16 text-xs font-black bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:bg-white outline-none transition"
+                  autoComplete="off"
                 />
-              )}
+
+                {/* أيقونة البحث في اليمين */}
+                <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+
+                {/* أزرار الحذف وفتح القائمة في اليسار */}
+                <div className="absolute left-2 top-2 flex items-center gap-1">
+                  {studentName && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStudentName("");
+                        setIsStudentListOpen(true);
+                      }}
+                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                      title="مسح الاسم"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsStudentListOpen((prev) => !prev)}
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
+                    title="فتح / إغلاق قائمة تلاميذ القسم"
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isStudentListOpen ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+
+                {/* datalist للمتصفحات والهواتف المحمولة */}
+                <datalist id="class-students-datalist">
+                  {classStudents.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+
+                {/* القائمة المقترحة المنسدلة التفاعلية */}
+                {isStudentListOpen && classStudents.length > 0 && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setIsStudentListOpen(false)}
+                    />
+                    <div className="absolute top-full mt-1.5 right-0 left-0 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl z-30 divide-y divide-slate-100 py-1 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-black text-slate-500 flex items-center justify-between">
+                        <span>
+                          {filteredStudents.length > 0
+                            ? `النتائج المطابقة (${filteredStudents.length} تلميذ)`
+                            : "لا يوجد تلميذ مطابق للاسم المكتوب"}
+                        </span>
+                        <span className="text-emerald-700">اضغط للاختيار</span>
+                      </div>
+
+                      {filteredStudents.length > 0 ? (
+                        filteredStudents.map((name, idx) => {
+                          const isSelected = studentName.trim() === name.trim();
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => {
+                                setStudentName(name);
+                                setIsStudentListOpen(false);
+                              }}
+                              className={`w-full text-right px-3.5 py-2 text-xs font-black flex items-center justify-between transition cursor-pointer ${
+                                isSelected
+                                  ? "bg-emerald-50 text-emerald-900"
+                                  : "text-slate-800 hover:bg-slate-50"
+                              }`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-[10px] flex items-center justify-center font-mono font-bold">
+                                  {idx + 1}
+                                </span>
+                                <span style={{ fontFamily: "'Cairo', sans-serif" }}>{name}</span>
+                              </span>
+                              {isSelected && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="p-3 text-center text-xs text-slate-400 font-bold">
+                          لم يتم العثور على اسم مطابق في هذا الفوج، يمكنك متابعة كتابة اسمك مباشرة
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* تاريخ الميلاد */}
@@ -605,6 +756,9 @@ export default function GradesLookupPage() {
                           inputMode="decimal"
                           value={simScores.behaviorScore ?? ""}
                           onChange={(e) => handleSimChange("behaviorScore", e.target.value)}
+                          min="0"
+                          max={COLUMN_MAX_LIMITS.behaviorScore}
+                          title="الحد الأقصى: 4 نقاط"
                           placeholder="قيد الرصد"
                           className="w-14 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
                         />
@@ -620,6 +774,9 @@ export default function GradesLookupPage() {
                           inputMode="decimal"
                           value={simScores.quiz1Score ?? ""}
                           onChange={(e) => handleSimChange("quiz1Score", e.target.value)}
+                          min="0"
+                          max={COLUMN_MAX_LIMITS.quiz1Score}
+                          title="الحد الأقصى: 4 نقاط"
                           placeholder="قيد الرصد"
                           className="w-14 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
                         />
@@ -635,6 +792,9 @@ export default function GradesLookupPage() {
                           inputMode="decimal"
                           value={simScores.homework1Score ?? ""}
                           onChange={(e) => handleSimChange("homework1Score", e.target.value)}
+                          min="0"
+                          max={COLUMN_MAX_LIMITS.homework1Score}
+                          title="الحد الأقصى: نقطتان"
                           placeholder="قيد الرصد"
                           className="w-14 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
                         />
@@ -650,6 +810,9 @@ export default function GradesLookupPage() {
                           inputMode="decimal"
                           value={simScores.quiz2Score ?? ""}
                           onChange={(e) => handleSimChange("quiz2Score", e.target.value)}
+                          min="0"
+                          max={COLUMN_MAX_LIMITS.quiz2Score}
+                          title="الحد الأقصى: 4 نقاط"
                           placeholder="لم يقوّم بعد"
                           className="w-16 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
                         />
@@ -665,6 +828,9 @@ export default function GradesLookupPage() {
                           inputMode="decimal"
                           value={simScores.homework2Score ?? ""}
                           onChange={(e) => handleSimChange("homework2Score", e.target.value)}
+                          min="0"
+                          max={COLUMN_MAX_LIMITS.homework2Score}
+                          title="الحد الأقصى: نقطتان"
                           placeholder="لم يقوّم بعد"
                           className="w-16 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
                         />
@@ -680,6 +846,9 @@ export default function GradesLookupPage() {
                           inputMode="decimal"
                           value={simScores.notebook1Score ?? ""}
                           onChange={(e) => handleSimChange("notebook1Score", e.target.value)}
+                          min="0"
+                          max={COLUMN_MAX_LIMITS.notebook1Score}
+                          title="الحد الأقصى: نقطتان"
                           placeholder="لم يقوّم بعد"
                           className="w-16 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
                         />
@@ -695,6 +864,9 @@ export default function GradesLookupPage() {
                           inputMode="decimal"
                           value={simScores.notebook2Score ?? ""}
                           onChange={(e) => handleSimChange("notebook2Score", e.target.value)}
+                          min="0"
+                          max={COLUMN_MAX_LIMITS.notebook2Score}
+                          title="الحد الأقصى: نقطتان"
                           placeholder="لم يقوّم بعد"
                           className="w-16 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
                         />
@@ -710,6 +882,9 @@ export default function GradesLookupPage() {
                           inputMode="decimal"
                           value={simScores.bonusScore ?? ""}
                           onChange={(e) => handleSimChange("bonusScore", e.target.value)}
+                          min="0"
+                          max={COLUMN_MAX_LIMITS.bonusScore}
+                          title="الحد الأقصى: 5 نقاط"
                           placeholder="+"
                           className="w-12 h-8 text-center text-xs font-mono font-black text-purple-700 bg-purple-50/60 hover:bg-white focus:bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500/30 outline-none transition"
                         />
@@ -755,6 +930,9 @@ export default function GradesLookupPage() {
                   inputMode="decimal"
                   value={simScores.test1Score ?? ""}
                   onChange={(e) => handleSimChange("test1Score", e.target.value)}
+                  min="0"
+                  max={COLUMN_MAX_LIMITS.test1Score}
+                  title="الحد الأقصى: 20 نقطة"
                   placeholder="20"
                   className="w-16 h-8 text-center text-sm font-mono font-black text-blue-950 bg-white border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500/30 outline-none"
                 />
@@ -790,6 +968,9 @@ export default function GradesLookupPage() {
                   inputMode="decimal"
                   value={simScores.examScore ?? ""}
                   onChange={(e) => handleSimChange("examScore", e.target.value)}
+                  min="0"
+                  max={COLUMN_MAX_LIMITS.examScore}
+                  title="الحد الأقصى: 20 نقطة"
                   placeholder="توقع علامتك"
                   className="w-full h-8 text-center text-sm font-mono font-black text-indigo-950 bg-white border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500/30 outline-none"
                 />

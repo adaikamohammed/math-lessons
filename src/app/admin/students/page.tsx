@@ -1095,7 +1095,29 @@ export default function AdminStudentsPage() {
               </button>
             </div>
 
-                        {/* زر الترتيب الأبجدي وتثبيته */}
+            {/* حقل البحث السريع بالاسم وتاريخ الميلاد */}
+            <div className="relative w-44 sm:w-52">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="بحث عن تلميذ بالاسم..."
+                className="w-full h-8 pr-7 pl-6 text-xs font-bold bg-white border border-slate-200 rounded-xl focus:border-emerald-500 outline-none shadow-2xs"
+              />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2.5 pointer-events-none" />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute left-2 top-2 text-slate-400 hover:text-slate-600"
+                  title="مسح البحث"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* زر الترتيب الأبجدي وتثبيته */}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"

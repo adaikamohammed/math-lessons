@@ -232,14 +232,20 @@ export function calculateRowScores(row: Partial<StudentGradeRow>): {
     return isNaN(n) ? null : n;
   };
 
-  const b = parseVal(row.behaviorScore);
-  const q1 = parseVal(row.quiz1Score);
-  const hw1 = parseVal(row.homework1Score);
-  const q2 = parseVal(row.quiz2Score);
-  const hw2 = parseVal(row.homework2Score);
-  const nb1 = parseVal(row.notebook1Score);
-  const nb2 = parseVal(row.notebook2Score);
-  const bonus = parseVal(row.bonusScore) || 0;
+  const clampVal = (v: any, max: number): number | null => {
+    const n = parseVal(v);
+    if (n === null) return null;
+    return Math.min(max, Math.max(0, n));
+  };
+
+  const b = clampVal(row.behaviorScore, 4);
+  const q1 = clampVal(row.quiz1Score, 4);
+  const hw1 = clampVal(row.homework1Score, 2);
+  const q2 = clampVal(row.quiz2Score, 4);
+  const hw2 = clampVal(row.homework2Score, 2);
+  const nb1 = clampVal(row.notebook1Score, 2);
+  const nb2 = clampVal(row.notebook2Score, 2);
+  const bonus = clampVal(row.bonusScore, 5) || 0;
 
   const evalItems = [b, q1, hw1, q2, hw2, nb1, nb2];
   const hasAnyEval = evalItems.some((x) => x !== null) || bonus > 0;
@@ -257,7 +263,8 @@ export function calculateRowScores(row: Partial<StudentGradeRow>): {
       bonus;
     continuousScore = Number(Math.min(20, Math.max(0, sum)).toFixed(2));
   } else if (row.continuousScore !== undefined && row.continuousScore !== "") {
-    continuousScore = row.continuousScore;
+    const c = parseVal(row.continuousScore);
+    continuousScore = c !== null ? Math.min(20, Math.max(0, c)) : row.continuousScore;
   }
 
   // حساب المراقبة المستمرة = (الفرض + التقويم) / 2
@@ -480,7 +487,7 @@ export default function AdminGradesExcelPage() {
           ) {
             maxVal = 4;
           } else if (col === "bonusScore") {
-            maxVal = 10;
+            maxVal = 5;
           }
 
           if (num > maxVal) {

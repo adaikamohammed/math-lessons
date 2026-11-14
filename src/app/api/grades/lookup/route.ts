@@ -162,3 +162,43 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// جلب قائمة أسماء تلاميذ الفوج للبحث والاقتراح في واجهة الاستعلام (بدون بيانات حساسة)
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const className = searchParams.get("className") || "";
+    const normCls = normalizeClass(className);
+
+    const data = await getLessonsData();
+    const roster = data.studentRoster || [];
+
+    const students = normCls
+      ? roster.filter((s) => normalizeClass(s.className) === normCls)
+      : roster;
+
+    const names = students
+      .map((s) => s.studentName)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, "ar"));
+
+    return NextResponse.json(
+      {
+        success: true,
+        students: names,
+        count: names.length,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
+  } catch (err: any) {
+    console.error("Fetch lookup students error:", err);
+    return NextResponse.json(
+      { error: "تعذر جلب قائمة الأسماء" },
+      { status: 500 }
+    );
+  }
+}

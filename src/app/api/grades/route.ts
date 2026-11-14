@@ -173,20 +173,41 @@ export async function POST(req: NextRequest) {
           (g.studentName === studentName && normalizeClass(g.className) === normalizeClass(className) && g.trimester === triNum)
       );
 
-      const cont = item.continuousScore === "" || item.continuousScore === null ? undefined : (typeof item.continuousScore === "number" ? item.continuousScore : Number(item.continuousScore) || item.continuousScore);
-      const t1 = item.test1Score === "" || item.test1Score === null ? undefined : (typeof item.test1Score === "number" ? item.test1Score : Number(item.test1Score) || item.test1Score);
-      const t2 = item.test2Score === "" || item.test2Score === null ? undefined : (typeof item.test2Score === "number" ? item.test2Score : Number(item.test2Score) || item.test2Score);
-      const exam = item.examScore === "" || item.examScore === null ? undefined : (typeof item.examScore === "number" ? item.examScore : Number(item.examScore) || item.examScore);
+      const clamp = (v: any, max: number): any => {
+        if (v === "" || v === undefined || v === null || v === "—" || v === "-") return v ?? "";
+        if (v === "غ" || v === "غياب") return "غ";
+        const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[,،]/g, "."));
+        if (isNaN(n)) return v;
+        return Math.min(max, Math.max(0, n));
+      };
 
-      const numCont = typeof cont === "number" ? cont : (Number(cont) || undefined);
-      const numT1 = typeof t1 === "number" ? t1 : (Number(t1) || undefined);
-      const numT2 = typeof t2 === "number" ? t2 : (Number(t2) || undefined);
-      const numExam = typeof exam === "number" ? exam : (Number(exam) || undefined);
+      const beh = clamp(item.behaviorScore, 4);
+      const q1 = clamp(item.quiz1Score, 4);
+      const hw1 = clamp(item.homework1Score, 2);
+      const q2 = clamp(item.quiz2Score, 4);
+      const hw2 = clamp(item.homework2Score, 2);
+      const nb1 = clamp(item.notebook1Score, 2);
+      const nb2 = clamp(item.notebook2Score, 2);
+      const bon = clamp(item.bonusScore, 5);
+
+      const contRaw = clamp(item.continuousScore, 20);
+      const cont = contRaw === "" || contRaw === undefined ? undefined : contRaw;
+      const t1Raw = clamp(item.test1Score, 20);
+      const t1 = t1Raw === "" || t1Raw === undefined ? undefined : t1Raw;
+      const t2Raw = clamp(item.test2Score, 20);
+      const t2 = t2Raw === "" || t2Raw === undefined ? undefined : t2Raw;
+      const examRaw = clamp(item.examScore, 20);
+      const exam = examRaw === "" || examRaw === undefined ? undefined : examRaw;
+
+      const numCont = typeof cont === "number" ? cont : undefined;
+      const numT1 = typeof t1 === "number" ? t1 : undefined;
+      const numT2 = typeof t2 === "number" ? t2 : undefined;
+      const numExam = typeof exam === "number" ? exam : undefined;
 
       const { termAvg, isPendingExam } = calculateTermAverage(numCont, numT1, numT2, numExam);
 
-      let continuousMonitoringVal = item.continuousMonitoring;
-      if (continuousMonitoringVal === undefined || continuousMonitoringVal === "") {
+      let continuousMonitoringVal = clamp(item.continuousMonitoring, 20);
+      if (continuousMonitoringVal === undefined || continuousMonitoringVal === "" || continuousMonitoringVal === null) {
         if (typeof numCont === "number" && typeof numT1 === "number") {
           continuousMonitoringVal = Number(((numCont + numT1) / 2).toFixed(2));
         } else if (typeof numCont === "number") {
@@ -216,20 +237,20 @@ export async function POST(req: NextRequest) {
         className,
         academicYear: "2026/2027",
         trimester: triNum,
-        behaviorScore: item.behaviorScore ?? "",
-        quiz1Score: item.quiz1Score ?? "",
-        homework1Score: item.homework1Score ?? "",
-        quiz2Score: item.quiz2Score ?? "",
-        homework2Score: item.homework2Score ?? "",
-        notebook1Score: item.notebook1Score ?? "",
-        notebook2Score: item.notebook2Score ?? "",
-        bonusScore: item.bonusScore ?? "",
+        behaviorScore: beh,
+        quiz1Score: q1,
+        homework1Score: hw1,
+        quiz2Score: q2,
+        homework2Score: hw2,
+        notebook1Score: nb1,
+        notebook2Score: nb2,
+        bonusScore: bon,
         continuousScore: cont,
         test1Score: t1,
         test2Score: t2,
         continuousMonitoring: continuousMonitoringVal,
         examScore: exam,
-        termAverage: item.termAverage ? Number(item.termAverage) : termAvg,
+        termAverage: item.termAverage ? Number(clamp(item.termAverage, 20)) : termAvg,
         appreciation: apprec,
         updatedAt: new Date().toISOString(),
       };
