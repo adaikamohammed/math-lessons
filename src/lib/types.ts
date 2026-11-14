@@ -127,8 +127,144 @@ export type StudentRosterItem = {
   id: string;
   studentName: string;
   className: string;
-  groupName: "فوج 1" | "فوج 2" | "القسم كامل";
+  groupName?: "فوج 1" | "فوج 2" | "القسم كامل";
+  birthDate?: string; // YYYY-MM-DD وتستخدم ككود سري لدخول الولي
+  gender?: "ذكر" | "أنثى";
+  isRepeater?: boolean;
+  registrationNumber?: string;
+  parentPhone?: string;
+  notes?: string;
 };
+
+// معايير التقويم المستمر
+export type ContinuousCriterion = {
+  id: string;
+  name: string;
+  maxScore: number;
+  icon?: string;
+  description?: string;
+};
+
+export type ContinuousEvalRubricType = "official_ministerial" | "equal_four" | "custom";
+
+export type ContinuousEvalConfig = {
+  rubricType: ContinuousEvalRubricType;
+  totalMax: number; // 20
+  criteria: ContinuousCriterion[];
+  allowBonusPoints: boolean;
+};
+
+export const OFFICIAL_MINISTERIAL_CRITERIA: ContinuousCriterion[] = [
+  { id: "c_beh", name: "الانضباط والسلوك والمشاركة الصفية", maxScore: 4, icon: "🙋‍♂️", description: "الحضور المنتظم، إحضار الأدوات والكتاب، والمشاركة الإيجابية في بناء الدرس." },
+  { id: "c_nb1", name: "كراس التلميذ: المقطع 1", maxScore: 2, icon: "📖", description: "نظافة الكراس واكتمال الدروس وتدوين الأنشطة." },
+  { id: "c_nb2", name: "كراس التلميذ: المقطع 2", maxScore: 2, icon: "📖", description: "اكتمال الدروس وخلوه من البياض والاعتناء بالأشكال الهندسية." },
+  { id: "c_hw1", name: "الوظائف المنزلية: وظيفة 1", maxScore: 2, icon: "📝", description: "تسليم الوظيفة في موعدها والجدية في المحاولات الفردية." },
+  { id: "c_hw2", name: "الوظائف المنزلية: وظيفة 2", maxScore: 2, icon: "📝", description: "تسليم الوظيفة الثانية ومحاولات كراس المحاولات." },
+  { id: "c_qz1", name: "الاستجواب الكتابي 1", maxScore: 4, icon: "✍️", description: "الاستجواب الكتابي السريع الأول خلال الفصل." },
+  { id: "c_qz2", name: "الاستجواب الكتابي 2", maxScore: 4, icon: "✍️", description: "الاستجواب الكتابي السريع الثاني خلال الفصل." },
+];
+
+export const EQUAL_FOUR_CRITERIA: ContinuousCriterion[] = [
+  { id: "c_beh", name: "السلوك والمواظبة والأدوات", maxScore: 5, icon: "📐", description: "الانضباط الصفي وإحضار الأدوات الهندسية والكتاب المدرسي." },
+  { id: "c_nb", name: "كراس الدروس والمحاولات", maxScore: 5, icon: "📖", description: "اكتمال عناصر الدرس وخلوه من البياض ونظافة الخط وتصحيح التمارين." },
+  { id: "c_hw", name: "الواجبات والأنشطة المنزلية", maxScore: 5, icon: "📝", description: "إنجاز الواجبات المنزلية والجدية في المحاولات الفردية وتجنب النقل." },
+  { id: "c_act", name: "المشاركة والاستجوابات", maxScore: 5, icon: "🙋‍♂️", description: "المشاركة الفعالة في بناء الدرس على السبورة والاستجوابات الدورية." },
+];
+
+export const MIDDLE_SCHOOL_SUBJECTS = [
+  { id: "mathematics", name: "الرياضيات", icon: "📐", codePrefix: "MTH" },
+  { id: "physics", name: "العلوم الفيزيائية والتكنولوجيا", icon: "⚛️", codePrefix: "PHY" },
+  { id: "science", name: "علوم الطبيعة والحياة", icon: "🔬", codePrefix: "SCI" },
+  { id: "arabic", name: "اللغة العربية وآدابها", icon: "📖", codePrefix: "ARA" },
+  { id: "french", name: "اللغة الفرنسية", icon: "🇫🇷", codePrefix: "FRN" },
+  { id: "english", name: "اللغة الإنجليزية", icon: "🇬🇧", codePrefix: "ENG" },
+  { id: "history_geo", name: "التاريخ والجغرافيا", icon: "🗺️", codePrefix: "HIS" },
+  { id: "islamic", name: "التربية الإسلامية", icon: "🕌", codePrefix: "ISL" },
+  { id: "civics", name: "التربية المدنية", icon: "⚖️", codePrefix: "CIV" },
+  { id: "computer", name: "الإعلام الآلي والتكنولوجيا", icon: "💻", codePrefix: "INF" },
+  { id: "art", name: "التربية التشكيلية / الموسيقية", icon: "🎨", codePrefix: "ART" },
+  { id: "pe", name: "التربية البدنية والرياضية", icon: "🏃", codePrefix: "EPS" },
+  { id: "amazigh", name: "اللغة الأمازيغية", icon: "ⵣ", codePrefix: "AMZ" },
+] as const;
+
+export type SubjectId = (typeof MIDDLE_SCHOOL_SUBJECTS)[number]["id"];
+
+// سجل الرصد والتنقيط الفصلي الرسمي
+export type OfficialGradeRecord = {
+  id?: string;
+  studentName: string;
+  className: string;
+  groupName?: string;
+  trimester: 1 | 2 | 3;
+  continuousScore: number; // علامة التقويم المستمر الإجمالية (من 20)
+  behaviorScore?: number;
+  notebook1Score?: number;
+  notebook2Score?: number;
+  homework1Score?: number;
+  homework2Score?: number;
+  quiz1Score?: number;
+  quiz2Score?: number;
+  bonusPoints?: number;
+  notebookStatus?: "complete" | "incomplete" | "blank" | "missing";
+  homeworkStatus?: "complete" | "partial" | "missing";
+  customScores?: Record<string, number>;
+  test1Score?: number;
+  test2Score?: number;
+  examScore?: number;
+  notes?: string;
+  updatedAt?: string;
+};
+
+export function sortClasses(classes: string[]): string[] {
+  if (!Array.isArray(classes)) return [];
+  return [...classes].sort((a, b) => {
+    const normalize = (str: string) => (str || "").trim().replace(/\s+/g, "");
+    const cleanA = normalize(a);
+    const cleanB = normalize(b);
+    const matchA = cleanA.match(/^(\d+)(.*?)(\d+)?$/);
+    const matchB = cleanB.match(/^(\d+)(.*?)(\d+)?$/);
+
+    if (matchA && matchB) {
+      const levelA = parseInt(matchA[1], 10);
+      const levelB = parseInt(matchB[1], 10);
+      if (levelA !== levelB) return levelA - levelB;
+      const midA = matchA[2] || "";
+      const midB = matchB[2] || "";
+      if (midA !== midB) return midA.localeCompare(midB, "ar");
+      const numA = matchA[3] ? parseInt(matchA[3], 10) : 0;
+      const numB = matchB[3] ? parseInt(matchB[3], 10) : 0;
+      return numA - numB;
+    }
+    return cleanA.localeCompare(cleanB, "ar");
+  });
+}
+
+export function getLevelFromClassName(className: any): number {
+  if (!className) return 1;
+  const str = typeof className === "string" ? className : String(className || "");
+  const match = str.match(/([1-4])/);
+  if (match) return parseInt(match[1], 10);
+  return 1;
+}
+
+export const OFFICIAL_SUBJECT_COEFFICIENTS: Record<string, Record<number, number>> = {
+  mathematics: { 1: 2, 2: 3, 3: 3, 4: 4 },
+  arabic: { 1: 2, 2: 2, 3: 2, 4: 5 },
+  french: { 1: 1, 2: 1, 3: 1, 4: 3 },
+  english: { 1: 1, 2: 1, 3: 1, 4: 2 },
+  physics: { 1: 1, 2: 1, 3: 1, 4: 2 },
+  sciences: { 1: 1, 2: 1, 3: 1, 4: 2 },
+  history_geo: { 1: 2, 2: 2, 3: 2, 4: 3 },
+  islamic: { 1: 1, 2: 1, 3: 1, 4: 2 },
+  civics: { 1: 1, 2: 1, 3: 1, 4: 1 },
+  sports: { 1: 1, 2: 1, 3: 1, 4: 1 },
+  art: { 1: 1, 2: 1, 3: 1, 4: 1 },
+};
+
+export function getOfficialSubjectCoefficient(subjectName: string = "mathematics", levelNum: number = 1): number {
+  const map = OFFICIAL_SUBJECT_COEFFICIENTS["mathematics"];
+  return map[levelNum] || 2;
+}
 
 export type AnnouncementCategory = "absence" | "lesson" | "update" | "general" | "urgent";
 
@@ -248,12 +384,21 @@ export type LessonsData = {
   honors?: HonorStudent[];
   penalties?: Penalty[];
   evaluations?: StudentEvaluation[];
+  gradebookRecords?: OfficialGradeRecord[]; // سجل التنقيط والتقويم المستمر الفصلي
   inspectionSessions?: InspectionSession[];
   studentRoster?: StudentRosterItem[];
   announcements?: Announcement[];
   anonymousMessages?: AnonymousMessage[];
   siteAnalytics?: SiteAnalyticsData;
+  subject?: string;
+  customClasses?: string[];
+  continuousEvalConfig?: Record<string, ContinuousEvalConfig>;
+  parentGradebookLookup?: Record<string, any>; // كشوفات الأولياء المفهرسة بتاريخ الميلاد
 };
+
+export type DailyDiaryEntry = any;
+export type SpecialDayRecord = any;
+export type TimetableSettings = any;
 
 export const LEVELS = {
   1: { label: "السنة الأولى متوسط", short: "1 متوسط" },

@@ -120,6 +120,11 @@ export async function getLessonsData(): Promise<LessonsData> {
           announcements: Array.isArray(json.announcements) ? json.announcements : [],
           anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
           siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
+          gradebookRecords: Array.isArray(json.gradebookRecords) ? json.gradebookRecords : [],
+          continuousEvalConfig: json.continuousEvalConfig || {},
+          parentGradebookLookup: json.parentGradebookLookup || {},
+          customClasses: Array.isArray(json.customClasses) ? json.customClasses : undefined,
+          subject: json.subject || "الرياضيات",
         };
         const result = synchronizeStudents(rawResult);
         // حفظ نسخة محلية احتياطية
@@ -149,6 +154,11 @@ export async function getLessonsData(): Promise<LessonsData> {
       announcements: Array.isArray(json.announcements) ? json.announcements : [],
       anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
       siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
+      gradebookRecords: Array.isArray(json.gradebookRecords) ? json.gradebookRecords : [],
+      continuousEvalConfig: json.continuousEvalConfig || {},
+      parentGradebookLookup: json.parentGradebookLookup || {},
+      customClasses: Array.isArray(json.customClasses) ? json.customClasses : undefined,
+      subject: json.subject || "الرياضيات",
     };
   } catch {
     return {
@@ -162,6 +172,10 @@ export async function getLessonsData(): Promise<LessonsData> {
       announcements: [],
       anonymousMessages: [],
       siteAnalytics: { totalVisits: 0 },
+      gradebookRecords: [],
+      continuousEvalConfig: {},
+      parentGradebookLookup: {},
+      subject: "الرياضيات",
     };
   }
 }
@@ -191,6 +205,15 @@ async function executeSave(data: LessonsData): Promise<void> {
     }
     if (data.siteAnalytics === undefined && existing.siteAnalytics) {
       data.siteAnalytics = existing.siteAnalytics;
+    }
+    if ((!data.gradebookRecords || data.gradebookRecords.length === 0) && existing.gradebookRecords && existing.gradebookRecords.length > 0) {
+      data.gradebookRecords = existing.gradebookRecords;
+    }
+    if ((!data.continuousEvalConfig || Object.keys(data.continuousEvalConfig).length === 0) && existing.continuousEvalConfig) {
+      data.continuousEvalConfig = existing.continuousEvalConfig;
+    }
+    if ((!data.parentGradebookLookup || Object.keys(data.parentGradebookLookup).length === 0) && existing.parentGradebookLookup) {
+      data.parentGradebookLookup = existing.parentGradebookLookup;
     }
   } catch (mergeErr) {
     console.warn("Could not merge existing data before save:", mergeErr);
