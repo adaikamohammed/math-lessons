@@ -72,9 +72,11 @@ export function calculateRowScores(row: Partial<StudentGradeRow>): {
   termAverage: string | number;
 } {
   const parseVal = (v: any): number | null => {
-    if (v === "" || v === undefined || v === null || v === "—" || v === "ليس الآن") return null;
+    if (v === "" || v === undefined || v === null || v === "—" || v === "ليس الآن" || v === "-") return null;
     if (v === "غ" || v === "غياب") return 0;
-    const n = Number(v);
+    const str = String(v).replace(/[,،]/g, ".").trim();
+    if (str === "" || str === ".") return null;
+    const n = parseFloat(str);
     return isNaN(n) ? null : n;
   };
 
@@ -215,15 +217,18 @@ export default function AdminGradesExcelPage() {
     fetchGrades();
   }, [fetchGrades]);
 
-  // تعديل خلية وحساب التقويم والمراقبة والمعدل لحظياً
+  // تعديل خلية وحساب التقويم والمراقبة والمعدل لحظياً (مع دعم كتابة الفاصلة 0.5 أو 0,5)
   const handleCellChange = (rowIdx: number, col: EvalColKey, val: string) => {
     setStudents((prev) => {
       const next = [...prev];
       const row = { ...next[rowIdx] };
 
       // قبول الحروف الخاصة: غ (غائب)، — (ليس الآن)، أو الأرقام
-      let formattedVal: string | number = val;
-      const trimmed = val.trim();
+      // دعم الفواصل العربية والفرنسية (0,5 -> 0.5)
+      const cleanVal = val.replace(/[,،]/g, ".");
+      const trimmed = cleanVal.trim();
+
+      let formattedVal: string | number = cleanVal;
 
       if (trimmed === "غ" || trimmed.toLowerCase() === "g") {
         formattedVal = "غ";
@@ -231,18 +236,38 @@ export default function AdminGradesExcelPage() {
         formattedVal = "—";
       } else if (trimmed === "") {
         formattedVal = "";
+      } else if (trimmed === "." || trimmed.endsWith(".")) {
+        // أثناء كتابة الفاصلة (مثل "0." أو "1.")، نتركها كما هي تماماً ليتمكن الأستاذ من إكمال كتابة العُشر
+        formattedVal = cleanVal;
       } else {
         const num = parseFloat(trimmed);
         if (!isNaN(num)) {
           // التحقق من السقف لكل عمود
-          if (col === "homework1Score" || col === "homework2Score" || col === "notebook1Score" || col === "notebook2Score") {
-            formattedVal = Math.min(2, Math.max(0, num));
-          } else if (col === "behaviorScore" || col === "quiz1Score" || col === "quiz2Score") {
-            formattedVal = Math.min(4, Math.max(0, num));
-          } else if (col === "test1Score" || col === "examScore") {
-            formattedVal = Math.min(20, Math.max(0, num));
+          let maxVal = 20;
+          if (
+            col === "homework1Score" ||
+            col === "homework2Score" ||
+            col === "notebook1Score" ||
+            col === "notebook2Score"
+          ) {
+            maxVal = 2;
+          } else if (
+            col === "behaviorScore" ||
+            col === "quiz1Score" ||
+            col === "quiz2Score"
+          ) {
+            maxVal = 4;
+          } else if (col === "bonusScore") {
+            maxVal = 10;
+          }
+
+          if (num > maxVal) {
+            formattedVal = maxVal;
+          } else if (num < 0) {
+            formattedVal = 0;
           } else {
-            formattedVal = num;
+            // نترك ما كتبه الأستاذ كنص أو رقم (مثلاً 0.5 أو 1.5) دون اقتطاع
+            formattedVal = trimmed;
           }
         }
       }
@@ -261,12 +286,14 @@ export default function AdminGradesExcelPage() {
     setIsDirty(true);
   };
 
-  // تعيين عمود كامل بقيمة معينة (مثل "ليس الآن" أو "—" لكراس 2)
-  const handleBulkSetColumn = (col: EvalColKey, val: string) => {
-    if (!confirm(`هل تريد تعيين قيمة «${val}» لجميع تلاميذ هذا القسم في هذا العمود؟`)) return;
+  // تعيين عمود كامل بشرطة «—» (ليس الآن) أو إرجاعه فارغاً بنقرة واحدة لجميع الأعمدة
+  const handleBulkSetColumn = (col: EvalColKey) => {
     setStudents((prev) => {
+      const isAllPending = prev.length > 0 && prev.every((s) => s[col] === "—" || s[col] === "-");
+      const nextVal = isAllPending ? "" : "—";
+
       return prev.map((s) => {
-        const row = { ...s, [col]: val };
+        const row = { ...s, [col]: nextVal };
         const scores = calculateRowScores(row);
         return {
           ...row,
@@ -587,45 +614,141 @@ export default function AdminGradesExcelPage() {
                   📊 الفرض والاختبار والمعدل الفصلي
                 </th>
               </tr>
-              <tr className="bg-slate-50 text-slate-600 font-black border-b border-slate-200 text-[11px]">
+              <tr className="bg-slate-50 text-slate-700 font-black border-b border-slate-200 text-[11px]" style={{ fontFamily: "'Cairo', sans-serif" }}>
                 <th className="py-2 px-1 w-8">#</th>
-                <th className="py-2 px-3 text-right min-w-[150px]">اسم ولقب التلميذ</th>
+                <th className="py-2 px-3 text-right min-w-[160px] font-black text-slate-900">
+                  اسم ولقب التلميذ
+                </th>
                 <th className="py-2 px-2 border-l border-slate-200 w-16">الفوج</th>
 
-                {/* أعمدة التقويم المفصلة */}
-                <th className="py-2 px-1 w-16 bg-emerald-50/40" title="المشاركة والانضباط داخل القسم (4 نقاط)">
-                  مشاركة<br/><span className="text-[10px] text-emerald-700 font-normal">/ 4</span>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/40" title="الاستجواب الكتابي الأول (4 نقاط)">
-                  استجواب 1<br/><span className="text-[10px] text-emerald-700 font-normal">/ 4</span>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/40" title="الوظيفة المنزلية الأولى (2 نقطتان)">
-                  وظيفة 1<br/><span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/40" title="الاستجواب الكتابي الثاني (4 نقاط)">
-                  استجواب 2<br/><span className="text-[10px] text-emerald-700 font-normal">/ 4</span>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/40" title="الوظيفة المنزلية الثانية (2 نقطتان)">
-                  وظيفة 2<br/><span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/40" title="مراقبة الكراس 1 (2 نقطتان)">
-                  كراس 1<br/><span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/40" title="مراقبة الكراس 2 (2 نقطتان)">
-                  <div className="flex flex-col items-center">
-                    <span>كراس 2</span>
-                    <button
-                      type="button"
-                      onClick={() => handleBulkSetColumn("notebook2Score", "—")}
-                      className="text-[9px] text-teal-700 hover:underline cursor-pointer"
-                      title="تعيين (ليس الآن) للجميع"
-                    >
-                      ليس الآن
-                    </button>
+                {/* أعمدة التقويم المفصلة مع زر (-) للكل في كل عمود */}
+                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="المشاركة والانضباط داخل القسم (4 نقاط)">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">مشاركة</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-emerald-700 font-normal">/ 4</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("behaviorScore")}
+                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
                   </div>
                 </th>
-                <th className="py-2 px-1 w-14 bg-emerald-50/40" title="نقاط إضافية لحل الواجبات والمبادرات">
-                  إضافي<br/><span className="text-[10px] text-purple-700 font-normal">(+)</span>
+                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="الاستجواب الكتابي الأول (4 نقاط)">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">استجواب 1</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-emerald-700 font-normal">/ 4</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("quiz1Score")}
+                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
+                  </div>
+                </th>
+                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="الوظيفة المنزلية الأولى (2 نقطتان)">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">وظيفة 1</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("homework1Score")}
+                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
+                  </div>
+                </th>
+                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="الاستجواب الكتابي الثاني (4 نقاط)">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">استجواب 2</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-emerald-700 font-normal">/ 4</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("quiz2Score")}
+                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
+                  </div>
+                </th>
+                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="الوظيفة المنزلية الثانية (2 نقطتان)">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">وظيفة 2</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("homework2Score")}
+                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
+                  </div>
+                </th>
+                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="مراقبة الكراس 1 (2 نقطتان)">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">كراس 1</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("notebook1Score")}
+                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
+                  </div>
+                </th>
+                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="مراقبة الكراس 2 (2 نقطتان)">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">كراس 2</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("notebook2Score")}
+                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
+                  </div>
+                </th>
+                <th className="py-2 px-1 w-14 bg-emerald-50/50" title="نقاط إضافية لحل الواجبات والمبادرات">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">إضافي</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-purple-700 font-normal">(+)</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("bonusScore")}
+                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-purple-200 text-slate-800 hover:text-purple-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
+                  </div>
                 </th>
                 <th className="py-2 px-2 w-20 border-l border-emerald-300 bg-emerald-100/90 text-emerald-950 font-black">
                   التقويم<br/><span className="text-[10px] font-mono">/ 20</span>
@@ -633,13 +756,39 @@ export default function AdminGradesExcelPage() {
 
                 {/* الفرض، المراقبة، الاختبار، المعدل */}
                 <th className="py-2 px-1.5 w-20 bg-blue-50/40 text-blue-950 font-black" title="علامة الفرض الفصلي من 20">
-                  الفرض<br/><span className="text-[10px] text-blue-700 font-normal">/ 20</span>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">الفرض</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-blue-700 font-normal">/ 20</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("test1Score")}
+                        className="px-1 py-0.2 rounded bg-blue-200/80 hover:bg-blue-300 text-blue-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
+                  </div>
                 </th>
                 <th className="py-2 px-2 w-24 bg-blue-100/90 text-blue-950 font-black" title="المراقبة المستمرة = (الفرض + التقويم) / 2">
                   المراقبة<br/><span className="text-[10px] font-mono text-blue-800">(ف+ت)/2</span>
                 </th>
                 <th className="py-2 px-1.5 w-20 bg-indigo-50/40 text-indigo-950 font-black" title="علامة الاختبار الفصلي من 20">
-                  الاختبار<br/><span className="text-[10px] text-indigo-700 font-normal">/ 20</span>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="leading-tight">الاختبار</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-indigo-700 font-normal">/ 20</span>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkSetColumn("examScore")}
+                        className="px-1 py-0.2 rounded bg-indigo-200/80 hover:bg-indigo-300 text-indigo-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
+                      >
+                        - للكل
+                      </button>
+                    </div>
+                  </div>
                 </th>
                 <th className="py-2 px-2 w-24 bg-gradient-to-b from-amber-100 to-amber-200 text-amber-950 font-black">
                   المعدل<br/><span className="text-[10px] font-mono text-amber-900">الفصلي</span>
@@ -648,7 +797,7 @@ export default function AdminGradesExcelPage() {
             </thead>
 
             {/* الأسطر */}
-            <tbody className="divide-y divide-slate-100 font-mono font-bold text-xs">
+            <tbody className="divide-y divide-slate-100 text-xs">
               {loading ? (
                 <tr>
                   <td colSpan={16} className="py-12 text-center text-slate-400 font-sans">
@@ -666,9 +815,12 @@ export default function AdminGradesExcelPage() {
                   return (
                     <tr key={s.studentId} className="hover:bg-slate-50 transition">
                       <td className="py-1.5 px-1 text-slate-400 text-[11px]">{rowIdx + 1}</td>
-                      <td className="py-1.5 px-3 text-right font-sans font-black text-slate-900 whitespace-nowrap">
-                        {s.studentName}
-                      </td>
+                      <td
+    className="py-1.5 px-3 text-right font-black text-slate-900 whitespace-nowrap text-xs sm:text-sm tracking-normal"
+    style={{ fontFamily: "'Cairo', sans-serif" }}
+  >
+    {s.studentName}
+  </td>
                       <td className="py-1.5 px-2 border-l border-slate-200 font-sans text-[11px] text-slate-500">
                         <span
                           className={`px-1.5 py-0.5 rounded ${
@@ -693,6 +845,7 @@ export default function AdminGradesExcelPage() {
                                 inputRefs.current[cellKey] = el;
                               }}
                               type="text"
+                              inputMode="decimal"
                               value={val}
                               onChange={(e) => handleCellChange(rowIdx, colKey, e.target.value)}
                               onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
@@ -722,6 +875,7 @@ export default function AdminGradesExcelPage() {
                             inputRefs.current[`cell_${rowIdx}_8`] = el;
                           }}
                           type="text"
+                          inputMode="decimal"
                           value={s.test1Score ?? ""}
                           onChange={(e) => handleCellChange(rowIdx, "test1Score", e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, rowIdx, 8)}
@@ -746,6 +900,7 @@ export default function AdminGradesExcelPage() {
                             inputRefs.current[`cell_${rowIdx}_9`] = el;
                           }}
                           type="text"
+                          inputMode="decimal"
                           value={s.examScore ?? ""}
                           onChange={(e) => handleCellChange(rowIdx, "examScore", e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, rowIdx, 9)}
