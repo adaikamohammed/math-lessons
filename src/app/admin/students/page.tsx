@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -24,18 +24,45 @@ import {
   Filter,
   Eye,
   FileUp,
+  CheckSquare,
+  Square,
+  ArrowRightLeft,
+  UserCheck,
+  UserX,
+  Layers,
+  ChevronDown,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { StudentRosterItem } from "@/lib/types";
 
-const DEFAULT_CLASSES = ["1م1", "1م2", "1م3", "2م3"];
+// الأفواج الأربعة الرسمية للأستاذ
+export const TEACHER_CLASSES = ["1م1", "1م2", "1م3", "2م3"] as const;
+export type TeacherClass = (typeof TEACHER_CLASSES)[number];
+
+// دالة لتوحيد وتصحيح أسماء الأفواج بدقة (إزالة المسافات، تصحيح 2م1 -> 1م2، 3م1 -> 1م3، إلخ)
+export function normalizeClassName(raw?: string): TeacherClass {
+  if (!raw) return "1م1";
+  const s = raw.replace(/\s+/g, "").trim();
+  if (s === "1م1" || s === "1-1" || s === "11") return "1م1";
+  if (s === "1م2" || s === "2م1" || s === "1-2" || s === "12" || s === "م12") return "1م2";
+  if (s === "1م3" || s === "3م1" || s === "1-3" || s === "13" || s === "م13") return "1م3";
+  if (s === "2م3" || s === "3م2" || s === "2-3" || s === "23" || s === "م23") return "2م3";
+  if (s.startsWith("1م") || s.endsWith("م1")) {
+    if (s.includes("1")) return "1م1";
+    if (s.includes("2")) return "1م2";
+    if (s.includes("3")) return "1م3";
+  }
+  if (s.startsWith("2م") || s.endsWith("م2")) {
+    return "2م3";
+  }
+  return "1م1";
+}
 
 // دالة لمعالجة وتوحيد تواريخ الإكسل بمختلف الصيغ (Serial number, DD/MM/YYYY, YYYY-MM-DD)
 function parseExcelDate(val: any): string {
   if (!val) return "";
   if (typeof val === "number") {
     try {
-      // Excel base date starts at 1899-12-30
       const date = new Date(Math.round((val - 25569) * 86400 * 1000));
       const y = date.getUTCFullYear();
       const m = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -46,7 +73,6 @@ function parseExcelDate(val: any): string {
     }
   }
   const str = String(val).trim();
-  // صيغة DD/MM/YYYY أو DD-MM-YYYY
   const dmyMatch = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
   if (dmyMatch) {
     const d = dmyMatch[1].padStart(2, "0");
@@ -54,7 +80,6 @@ function parseExcelDate(val: any): string {
     const y = dmyMatch[3];
     return `${y}-${m}-${d}`;
   }
-  // صيغة YYYY-MM-DD أو YYYY/MM/DD
   const ymdMatch = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
   if (ymdMatch) {
     const y = ymdMatch[1];
@@ -68,10 +93,14 @@ function parseExcelDate(val: any): string {
 export default function AdminStudentsPage() {
   const [roster, setRoster] = useState<StudentRosterItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedClass, setSelectedClass] = useState("all");
+  const [saving, setSaving] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [subgroupFilter, setSubgroupFilter] = useState<"all" | "فوج 1" | "فوج 2">("all");
   const [genderFilter, setGenderFilter] = useState<"all" | "M" | "F">("all");
+
+  // التحديد المتعدد (Bulk Selection)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // تنبيهات الرسائل
   const [alertMsg, setAlertMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -80,12 +109,16 @@ export default function AdminStudentsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentRosterItem | null>(null);
   const [studentName, setStudentName] = useState("");
-  const [className, setClassName] = useState("1م1");
-  const [groupName, setGroupName] = useState("فوج 1");
+  const [className, setClassName] = useState<TeacherClass>("1م1");
+  const [groupName, setGroupName] = useState<"فوج 1" | "فوج 2">("فوج 1");
   const [birthDate, setBirthDate] = useState("");
   const [parentPhone, setParentPhone] = useState("");
   const [gender, setGender] = useState<"M" | "F">("M");
   const [isRepeater, setIsRepeater] = useState(false);
+
+  // حالة نافذة النقل الجماعي (Bulk Move Modal)
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [targetMoveClass, setTargetMoveClass] = useState<TeacherClass>("1م1");
 
   // حالة نافذة معاينة واستيراد ملف Excel
   const [showExcelModal, setShowExcelModal] = useState(false);
@@ -103,25 +136,41 @@ export default function AdminStudentsPage() {
     setTimeout(() => setAlertMsg(null), 4500);
   };
 
-  // جلب قائمة التلاميذ من السيرفر
+  // جلب قائمة التلاميذ وتوحيد أسماء الأفواج تلقائياً
   const fetchRoster = async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/grades?className=&trimester=1");
       const data = await res.json();
       if (data.students) {
-        setRoster(
-          data.students.map((s: any) => ({
+        let hasUnnormalized = false;
+        const normalized: StudentRosterItem[] = data.students.map((s: any) => {
+          const normCls = normalizeClassName(s.className);
+          if (s.className !== normCls) {
+            hasUnnormalized = true;
+          }
+          return {
             id: s.studentId || s.id,
             studentName: s.studentName,
-            className: s.className,
+            className: normCls,
             groupName: s.groupName || "فوج 1",
             birthDate: s.birthDate || "",
             gender: s.gender === "ذكر" || s.gender === "M" ? "M" : "F",
             isRepeater: Boolean(s.isRepeater),
             parentPhone: s.parentPhone || "",
-          }))
-        );
+          };
+        });
+
+        setRoster(normalized);
+
+        // إذا كان هناك أي قسم غير موحد، نحفظه في السيرفر فوراً ليتم تنظيف القاعدة نهائياً
+        if (hasUnnormalized && normalized.length > 0) {
+          fetch("/api/students/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ studentsList: normalized, mode: "replace" }),
+          }).catch(() => {});
+        }
       }
     } catch (err) {
       console.error(err);
@@ -135,23 +184,11 @@ export default function AdminStudentsPage() {
     fetchRoster();
   }, []);
 
-  const normalizeClass = (c?: string) => (c ? c.replace(/\s+/g, "").trim() : "");
-
-  // قائمة جميع الأقسام المتاحة ديناميكياً
-  const availableClasses = useMemo(() => {
-    const set = new Set<string>(DEFAULT_CLASSES);
-    roster.forEach((s) => {
-      if (s.className) set.add(s.className.trim());
-    });
-    return Array.from(set);
-  }, [roster]);
-
   // التلاميذ بعد الفلترة بالقسم، البحث، الفوج، والجنس
   const filteredRoster = useMemo(() => {
     return roster.filter((s) => {
       const matchCls =
-        selectedClass === "all" ||
-        normalizeClass(s.className) === normalizeClass(selectedClass);
+        selectedClass === "all" || s.className === selectedClass;
 
       const matchSearch =
         !search.trim() ||
@@ -169,12 +206,21 @@ export default function AdminStudentsPage() {
     });
   }, [roster, selectedClass, search, subgroupFilter, genderFilter]);
 
-  // إحصائيات القسم المختار أو الإجمالي
+  // إحصائيات الأفواج الأربعة والإجمالي
+  const classCounts = useMemo(() => {
+    const counts: Record<string, number> = { "1م1": 0, "1م2": 0, "1م3": 0, "2م3": 0 };
+    roster.forEach((s) => {
+      const c = normalizeClassName(s.className);
+      if (counts[c] !== undefined) counts[c]++;
+    });
+    return counts;
+  }, [roster]);
+
   const stats = useMemo(() => {
     const base =
       selectedClass === "all"
         ? roster
-        : roster.filter((s) => normalizeClass(s.className) === normalizeClass(selectedClass));
+        : roster.filter((s) => s.className === selectedClass);
 
     const total = base.length;
     const male = base.filter((s) => s.gender === "M" || s.gender === "ذكر").length;
@@ -187,7 +233,166 @@ export default function AdminStudentsPage() {
     return { total, male, female, g1, g2, repeaters, newStudents };
   }, [roster, selectedClass]);
 
-  // معالجة قراءة ملف Excel محلياً في المتصفح
+  // منطق التحديد المتعدد (Selection logic)
+  const isAllVisibleSelected = useMemo(() => {
+    if (filteredRoster.length === 0) return false;
+    return filteredRoster.every((s) => selectedIds.has(s.id));
+  }, [filteredRoster, selectedIds]);
+
+  const toggleSelectAllVisible = () => {
+    if (isAllVisibleSelected) {
+      const next = new Set(selectedIds);
+      filteredRoster.forEach((s) => next.delete(s.id));
+      setSelectedIds(next);
+    } else {
+      const next = new Set(selectedIds);
+      filteredRoster.forEach((s) => next.add(s.id));
+      setSelectedIds(next);
+    }
+  };
+
+  const toggleSelectRow = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  // حفظ التعديلات الجماعية على السيرفر
+  const saveUpdatedRoster = async (updated: StudentRosterItem[], msgSuccess: string) => {
+    setSaving(true);
+    setRoster(updated);
+    try {
+      const res = await fetch("/api/students/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentsList: updated,
+          mode: "replace",
+        }),
+      });
+      if (!res.ok) throw new Error("فشل الحفظ على السيرفر");
+      notify("ok", msgSuccess);
+      clearSelection();
+    } catch (err: any) {
+      console.error(err);
+      notify("err", err.message || "حدث خطأ أثناء الحفظ");
+      fetchRoster(); // إعادة التحميل عند الخطأ
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 1. عملية جماعية: نقل التلاميذ المحددين إلى فوج آخر
+  const handleBulkMoveClass = async () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const updated = roster.map((s) => {
+      if (selectedIds.has(s.id)) {
+        return { ...s, className: targetMoveClass };
+      }
+      return s;
+    });
+
+    await saveUpdatedRoster(
+      updated,
+      `✅ تم بنجاح نقل ${count} تلميذاً إلى فوج ${targetMoveClass}!`
+    );
+    setShowMoveModal(false);
+  };
+
+  // 2. عملية جماعية: تغيير الفوج الفرعي (فوج 1 أو فوج 2)
+  const handleBulkSetSubgroup = async (targetGroup: "فوج 1" | "فوج 2") => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const updated = roster.map((s) => {
+      if (selectedIds.has(s.id)) {
+        return { ...s, groupName: targetGroup };
+      }
+      return s;
+    });
+
+    await saveUpdatedRoster(
+      updated,
+      `✅ تم تعيين ${count} تلميذاً في «${targetGroup}» بنجاح!`
+    );
+  };
+
+  // 3. عملية جماعية: تغيير الجنس (ذكر / أنثى)
+  const handleBulkSetGender = async (targetGender: "M" | "F") => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const updated = roster.map((s) => {
+      if (selectedIds.has(s.id)) {
+        return { ...s, gender: targetGender };
+      }
+      return s;
+    });
+
+    const label = targetGender === "M" ? "ذكور" : "إناث";
+    await saveUpdatedRoster(
+      updated,
+      `✅ تم تحويل ${count} تلميذاً إلى «${label}» بنجاح!`
+    );
+  };
+
+  // 4. عملية جماعية: تغيير الحالة (جديد / معيد)
+  const handleBulkSetRepeater = async (isRep: boolean) => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const updated = roster.map((s) => {
+      if (selectedIds.has(s.id)) {
+        return { ...s, isRepeater: isRep };
+      }
+      return s;
+    });
+
+    const label = isRep ? "معيدون 🔁" : "جدد ✅";
+    await saveUpdatedRoster(
+      updated,
+      `✅ تم تحديث حالة ${count} تلميذاً إلى «${label}»!`
+    );
+  };
+
+  // 5. عملية جماعية: حذف التلاميذ المحددين
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (!confirm(`⚠️ هل أنت متأكد تماماً من حذف ${count} تلميذاً من القائمة نهائياً؟`)) {
+      return;
+    }
+
+    const updated = roster.filter((s) => !selectedIds.has(s.id));
+    await saveUpdatedRoster(
+      updated,
+      `🗑️ تم حذف ${count} تلميذاً من القائمة بنجاح.`
+    );
+  };
+
+  // تبديل سريع للفوج الفرعي بالضغط عليه مباشرة في الجدول
+  const handleQuickToggleSubgroup = async (s: StudentRosterItem) => {
+    const nextGroup = (s.groupName || "فوج 1") === "فوج 1" ? "فوج 2" : "فوج 1";
+    const updated = roster.map((item) =>
+      item.id === s.id ? { ...item, groupName: nextGroup } : item
+    );
+    setRoster(updated);
+    try {
+      await fetch("/api/students/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentsList: updated, mode: "replace" }),
+      });
+      notify("ok", `تم تحويل ${s.studentName} إلى ${nextGroup}`);
+    } catch {
+      notify("err", "فشل التحديث السريع");
+    }
+  };
+
+  // معالجة ملف الإكسل
   const handleProcessExcelBuffer = (buffer: ArrayBuffer, fileName: string) => {
     try {
       const workbook = XLSX.read(buffer, { type: "array" });
@@ -200,15 +405,13 @@ export default function AdminStudentsPage() {
       const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
       if (!rawRows || rawRows.length === 0) {
-        notify("err", "لم يتم العثور على أي صفوف أو بيانات داخل ملف الإكسل!");
+        notify("err", "لم يتم العثور على أي بيانات داخل ملف الإكسل!");
         return;
       }
 
-      // مطابقة الأعمدة بذكاء (الأسماء باللغة العربية والفرنسية والإنجليزية)
       const parsedStudents: StudentRosterItem[] = [];
 
       rawRows.forEach((row, idx) => {
-        // البحث عن حقل الاسم
         const nameKey = Object.keys(row).find((k) => {
           const lk = k.trim().toLowerCase();
           return (
@@ -223,17 +426,16 @@ export default function AdminStudentsPage() {
         const studentNameVal = nameKey ? String(row[nameKey]).trim() : "";
         if (!studentNameVal) return;
 
-        // البحث عن حقل القسم
         const classKey = Object.keys(row).find((k) => {
           const lk = k.trim().toLowerCase();
           return lk.includes("قسم") || lk.includes("فوج") || lk.includes("صف") || lk === "class" || lk === "classe";
         });
-        let classVal = classKey ? String(row[classKey]).trim() : "";
-        if (!classVal) {
-          classVal = selectedClass !== "all" ? selectedClass : "1م1";
+        let rawClassVal = classKey ? String(row[classKey]).trim() : "";
+        if (!rawClassVal) {
+          rawClassVal = selectedClass !== "all" ? selectedClass : "1م1";
         }
+        const classVal = normalizeClassName(rawClassVal);
 
-        // البحث عن حقل الفوج الفرعي (فوج 1 / فوج 2)
         const subgroupKey = Object.keys(row).find((k) => {
           const lk = k.trim().toLowerCase();
           return (
@@ -250,7 +452,6 @@ export default function AdminStudentsPage() {
           if (subText.includes("2") || subText.includes("٢")) groupVal = "فوج 2";
         }
 
-        // البحث عن حقل تاريخ الميلاد
         const birthKey = Object.keys(row).find((k) => {
           const lk = k.trim().toLowerCase();
           return (
@@ -263,7 +464,6 @@ export default function AdminStudentsPage() {
         });
         const birthVal = birthKey ? parseExcelDate(row[birthKey]) : "";
 
-        // البحث عن حقل الجنس
         const genderKey = Object.keys(row).find((k) => {
           const lk = k.trim().toLowerCase();
           return lk.includes("جنس") || lk.includes("نوع") || lk === "gender" || lk === "sexe" || lk === "sex";
@@ -276,7 +476,6 @@ export default function AdminStudentsPage() {
           }
         }
 
-        // البحث عن حقل الإعادة
         const repeaterKey = Object.keys(row).find((k) => {
           const lk = k.trim().toLowerCase();
           return lk.includes("حالة") || lk.includes("معيد") || lk.includes("إعادة") || lk === "repeater" || lk === "redoublant";
@@ -289,7 +488,6 @@ export default function AdminStudentsPage() {
           }
         }
 
-        // البحث عن حقل هاتف الولي
         const phoneKey = Object.keys(row).find((k) => {
           const lk = k.trim().toLowerCase();
           return lk.includes("هاتف") || lk.includes("جوال") || lk === "phone" || lk === "tel" || lk === "telephone";
@@ -322,7 +520,6 @@ export default function AdminStudentsPage() {
     }
   };
 
-  // رفع ملف عبر زر التصفح
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -335,7 +532,6 @@ export default function AdminStudentsPage() {
     e.target.value = "";
   };
 
-  // دعم السحب والإفلات (Drag & Drop)
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(false);
@@ -349,7 +545,6 @@ export default function AdminStudentsPage() {
     reader.readAsArrayBuffer(file);
   };
 
-  // تأكيد وحفظ بيانات ملف الإكسل في قاعدة البيانات
   const handleConfirmExcelImport = async () => {
     if (excelPreviewRows.length === 0) return;
     setImportLoading(true);
@@ -377,7 +572,7 @@ export default function AdminStudentsPage() {
     }
   };
 
-  // تنزيل نموذج إكسل فارغ جاهز للتسجيل
+  // تنزيل نموذج فارغ للتسجيل
   const handleDownloadBlankTemplate = () => {
     const sampleData = [
       {
@@ -394,7 +589,7 @@ export default function AdminStudentsPage() {
       {
         "الرقم": 2,
         "الاسم واللقب": "فاطمة الزهراء علي",
-        "القسم": "1م1",
+        "القسم": "1م2",
         "الفوج الفرعي": "فوج 2",
         "تاريخ الميلاد": "2012-09-21",
         "الجنس": "أنثى",
@@ -405,13 +600,24 @@ export default function AdminStudentsPage() {
       {
         "الرقم": 3,
         "الاسم واللقب": "أمين باهي",
-        "القسم": "1م2",
+        "القسم": "1م3",
         "الفوج الفرعي": "فوج 1",
         "تاريخ الميلاد": "2011-11-03",
         "الجنس": "ذكر",
         "الحالة": "معيد",
         "هاتف الولي": "0665554433",
         "ملاحظات": "تلميذ معيد",
+      },
+      {
+        "الرقم": 4,
+        "الاسم واللقب": "ياسين شريف",
+        "القسم": "2م3",
+        "الفوج الفرعي": "فوج 2",
+        "تاريخ الميلاد": "2011-03-18",
+        "الجنس": "ذكر",
+        "الحالة": "جديد",
+        "هاتف الولي": "0667778899",
+        "ملاحظات": "",
       },
     ];
 
@@ -421,12 +627,12 @@ export default function AdminStudentsPage() {
     XLSX.writeFile(workbook, "نموذج_تسجيل_التلاميذ_موقع_الرياضيات.xlsx");
   };
 
-  // تصدير القائمة الحالية كملف Excel
+  // تصدير القائمة كملف Excel
   const handleExportCurrentRosterExcel = () => {
     const target =
       selectedClass === "all"
         ? roster
-        : roster.filter((s) => normalizeClass(s.className) === normalizeClass(selectedClass));
+        : roster.filter((s) => s.className === selectedClass);
 
     if (target.length === 0) {
       notify("err", "لا يوجد تلاميذ لتصديرهم في هذا الفوج!");
@@ -466,7 +672,7 @@ export default function AdminStudentsPage() {
     const studentPayload: StudentRosterItem = {
       id: editingStudent ? editingStudent.id : `rst_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       studentName: studentName.trim(),
-      className,
+      className: normalizeClassName(className),
       groupName: groupName as any,
       birthDate: birthDate.trim(),
       parentPhone: parentPhone.trim(),
@@ -499,8 +705,8 @@ export default function AdminStudentsPage() {
   const handleEdit = (s: StudentRosterItem) => {
     setEditingStudent(s);
     setStudentName(s.studentName);
-    setClassName(s.className);
-    setGroupName(s.groupName || "فوج 1");
+    setClassName(normalizeClassName(s.className));
+    setGroupName(s.groupName === "فوج 2" ? "فوج 2" : "فوج 1");
     setBirthDate(s.birthDate || "");
     setParentPhone(s.parentPhone || "");
     setGender(s.gender === "ذكر" || s.gender === "M" ? "M" : "F");
@@ -512,26 +718,12 @@ export default function AdminStudentsPage() {
     if (!confirm(`هل أنت متأكد من حذف التلميذ "${s.studentName}" من القائمة؟`)) return;
 
     const updated = roster.filter((item) => item.id !== s.id);
-    setRoster(updated);
-    try {
-      await fetch("/api/students/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studentsList: updated,
-          mode: "replace",
-        }),
-      });
-      notify("ok", `تم حذف التلميذ ${s.studentName}`);
-    } catch (err) {
-      console.error(err);
-      notify("err", "فشل الحذف");
-    }
+    await saveUpdatedRoster(updated, `تم حذف التلميذ ${s.studentName}`);
   };
 
   const resetForm = () => {
     setStudentName("");
-    setClassName(selectedClass !== "all" ? selectedClass : "1م1");
+    setClassName(selectedClass !== "all" ? (selectedClass as TeacherClass) : "1م1");
     setGroupName("فوج 1");
     setBirthDate("");
     setParentPhone("");
@@ -540,7 +732,7 @@ export default function AdminStudentsPage() {
   };
 
   return (
-    <div className="pb-16 pt-3 fade-up space-y-4 max-w-6xl mx-auto px-2 sm:px-4" dir="rtl">
+    <div className="pb-24 pt-3 fade-up space-y-4 max-w-6xl mx-auto px-2 sm:px-4" dir="rtl">
       {/* مدخل رفع ملف الإكسل المخفي */}
       <input
         ref={fileInputRef}
@@ -587,11 +779,16 @@ export default function AdminStudentsPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-black text-slate-900">
-                  إدارة الأفواج وقوائم التلاميذ
+                  إدارة وتفويج التلاميذ
                 </h1>
                 <span className="text-[11px] bg-emerald-100 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-200">
                   {roster.length} تلميذ 👥
                 </span>
+                {saving && (
+                  <span className="text-[11px] bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded-full animate-pulse">
+                    جاري الحفظ...
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 font-bold">
                 الأستاذ محمد عدايكة — متوسطة المجاهد باهي علي — الوادي
@@ -601,7 +798,7 @@ export default function AdminStudentsPage() {
 
           {/* أزرار الإجراءات الرئيسية الملونة */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* زر رفع ملف الإكسل البارز جداً */}
+            {/* زر رفع ملف الإكسل */}
             <button
               onClick={() => fileInputRef.current?.click()}
               type="button"
@@ -609,10 +806,10 @@ export default function AdminStudentsPage() {
               title="اضغط لرفع ملف Excel أو CSV لقائمة تلاميذك مباشرة"
             >
               <FileUp className="w-4 h-4 text-emerald-200" />
-              <span>📥 رفع ملف Excel للتلاميذ</span>
+              <span>📥 رفع ملف Excel</span>
             </button>
 
-            {/* زر تنزيل نموذج فارغ للتسجيل */}
+            {/* زر تنزيل نموذج فارغ */}
             <button
               onClick={handleDownloadBlankTemplate}
               type="button"
@@ -623,7 +820,7 @@ export default function AdminStudentsPage() {
               <span>نموذج Excel فارغ</span>
             </button>
 
-            {/* زر تصدير القائمة الحالية */}
+            {/* زر تصدير القائمة */}
             <button
               onClick={handleExportCurrentRosterExcel}
               type="button"
@@ -651,7 +848,7 @@ export default function AdminStudentsPage() {
         </div>
       </div>
 
-      {/* ─── محدد الأفواج والتبويبات البارزة ─── */}
+      {/* ─── محدد الأفواج الأربعة فقط بدقة (1م1، 1م2، 1م3، 2م3) ─── */}
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
@@ -660,13 +857,19 @@ export default function AdminStudentsPage() {
               اختر الفوج لعرض وتعديل تلاميذه وتفويجهم:
             </h2>
           </div>
+          <span className="text-[11px] font-bold text-slate-400">
+            الأفواج الرسمية المسندة: 1م1، 1م2، 1م3، 2م3
+          </span>
         </div>
 
-        {/* تبويبات الأفواج */}
+        {/* تبويبات الأفواج الأربعة الصافية */}
         <div className="flex items-center gap-2 flex-wrap pt-1">
           {/* زر جميع الأقسام */}
           <button
-            onClick={() => setSelectedClass("all")}
+            onClick={() => {
+              setSelectedClass("all");
+              clearSelection();
+            }}
             className={`px-3.5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-2xs ${
               selectedClass === "all"
                 ? "bg-slate-900 text-white ring-2 ring-slate-800/40 shadow-sm scale-102"
@@ -684,16 +887,17 @@ export default function AdminStudentsPage() {
             </span>
           </button>
 
-          {/* تبويبات الأقسام الفردية */}
-          {availableClasses.map((cls) => {
-            const count = roster.filter(
-              (s) => normalizeClass(s.className) === normalizeClass(cls)
-            ).length;
+          {/* تبويبات الأفواج الأربعة المحددة فقط */}
+          {TEACHER_CLASSES.map((cls) => {
+            const count = classCounts[cls] || 0;
             const isSelected = selectedClass === cls;
             return (
               <button
                 key={cls}
-                onClick={() => setSelectedClass(cls)}
+                onClick={() => {
+                  setSelectedClass(cls);
+                  clearSelection();
+                }}
                 className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-2xs ${
                   isSelected
                     ? "bg-gradient-to-r from-emerald-800 to-teal-800 text-white ring-2 ring-emerald-500/40 shadow-sm scale-102"
@@ -718,7 +922,7 @@ export default function AdminStudentsPage() {
 
       {/* ─── بطاقة الجدول مع الإحصائيات الملونة والبحث ─── */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* شريط الإحصائيات الملونة الدقيقة (مطابق لطلب الأستاذ) */}
+        {/* شريط الإحصائيات الملونة الدقيقة */}
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/70 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
@@ -793,7 +997,7 @@ export default function AdminStudentsPage() {
             </div>
 
             {/* خانة البحث */}
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full sm:w-60">
               <input
                 type="text"
                 value={search}
@@ -859,13 +1063,28 @@ export default function AdminStudentsPage() {
           </div>
         )}
 
-        {/* ─── جدول قائمة التلاميذ المطور ─── */}
+        {/* ─── جدول قائمة التلاميذ مع التحديد المتعدد ─── */}
         {filteredRoster.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
-              <thead className="bg-slate-100/80 text-slate-600 font-black border-b border-slate-200">
+              <thead className="bg-slate-100/90 text-slate-700 font-black border-b border-slate-200">
                 <tr>
-                  <th className="py-3 px-3.5 w-12 text-center">#</th>
+                  {/* مربع اختيار الكل */}
+                  <th className="py-3 px-3 w-10 text-center">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllVisible}
+                      className="text-slate-600 hover:text-emerald-700 transition"
+                      title={isAllVisibleSelected ? "إلغاء تحديد الكل" : "تحديد الكل"}
+                    >
+                      {isAllVisibleSelected ? (
+                        <CheckSquare className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="py-3 px-2 w-10 text-center">#</th>
                   <th className="py-3 px-3.5">اسم ولقب التلميذ</th>
                   <th className="py-3 px-3.5">القسم</th>
                   <th className="py-3 px-3.5">الفوج الفرعي</th>
@@ -879,9 +1098,26 @@ export default function AdminStudentsPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredRoster.map((s, idx) => {
                   const isMale = s.gender === "M" || s.gender === "ذكر";
+                  const isSelected = selectedIds.has(s.id);
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50/80 transition group">
-                      <td className="py-2.5 px-3.5 text-center font-mono font-bold text-slate-400">
+                    <tr
+                      key={s.id}
+                      className={`transition group ${
+                        isSelected
+                          ? "bg-emerald-50/80 hover:bg-emerald-100/80"
+                          : "hover:bg-slate-50/80"
+                      }`}
+                    >
+                      {/* مربع اختيار السطر */}
+                      <td className="py-2.5 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectRow(s.id)}
+                          className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 cursor-pointer"
+                        />
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-400">
                         {idx + 1}
                       </td>
                       <td className="py-2.5 px-3.5">
@@ -899,20 +1135,23 @@ export default function AdminStudentsPage() {
                         </div>
                       </td>
                       <td className="py-2.5 px-3.5">
-                        <span className="inline-block px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold font-mono">
+                        <span className="inline-block px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-black font-mono">
                           {s.className}
                         </span>
                       </td>
                       <td className="py-2.5 px-3.5">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] ${
+                        <button
+                          type="button"
+                          onClick={() => handleQuickToggleSubgroup(s)}
+                          className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] cursor-pointer hover:scale-105 active:scale-95 transition ${
                             (s.groupName || "فوج 1") === "فوج 1"
-                              ? "bg-purple-50 text-purple-800 border border-purple-200"
-                              : "bg-amber-50 text-amber-900 border border-amber-200"
+                              ? "bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100"
+                              : "bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100"
                           }`}
+                          title="انقر للتبديل الفوري بين فوج 1 وفوج 2"
                         >
-                          {s.groupName || "فوج 1"}
-                        </span>
+                          {s.groupName || "فوج 1"} ⇄
+                        </button>
                       </td>
                       <td className="py-2.5 px-3.5">
                         {s.birthDate ? (
@@ -983,6 +1222,177 @@ export default function AdminStudentsPage() {
         )}
       </div>
 
+      {/* ─── شريط العمليات الجماعية العائم (Bulk Actions Floating Bar) ─── */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-4xl w-[94%] bg-slate-900/95 backdrop-blur-md text-white p-3 sm:p-4 rounded-3xl shadow-2xl border border-slate-700 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2">
+            <span className="bg-emerald-500 text-slate-900 font-mono font-black text-xs px-2.5 py-1 rounded-xl">
+              {selectedIds.size} محدد
+            </span>
+            <span className="text-xs font-bold hidden sm:inline text-slate-300">
+              تم تحديد {selectedIds.size} من أصل {filteredRoster.length} تلميذاً
+            </span>
+          </div>
+
+          {/* أزرار العمليات الجماعية */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* نقل إلى فوج آخر */}
+            <button
+              onClick={() => setShowMoveModal(true)}
+              type="button"
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition flex items-center gap-1 cursor-pointer active:scale-95"
+              title="نقل التلاميذ المحددين إلى فوج آخر (1م1، 1م2، 1م3، 2م3)"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              <span>نقل الفوج 🔄</span>
+            </button>
+
+            {/* تفويج فرعي: فوج 1 */}
+            <button
+              onClick={() => handleBulkSetSubgroup("فوج 1")}
+              type="button"
+              className="px-2.5 py-1.5 rounded-xl bg-purple-900 hover:bg-purple-800 text-purple-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
+            >
+              <span>فوج 1</span>
+            </button>
+
+            {/* تفويج فرعي: فوج 2 */}
+            <button
+              onClick={() => handleBulkSetSubgroup("فوج 2")}
+              type="button"
+              className="px-2.5 py-1.5 rounded-xl bg-amber-900 hover:bg-amber-800 text-amber-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
+            >
+              <span>فوج 2</span>
+            </button>
+
+            {/* تعيين كذكور */}
+            <button
+              onClick={() => handleBulkSetGender("M")}
+              type="button"
+              className="px-2 py-1.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs font-bold transition cursor-pointer active:scale-95"
+              title="تعيين الجنس: ذكر"
+            >
+              👦 ذكور
+            </button>
+
+            {/* تعيين كإناث */}
+            <button
+              onClick={() => handleBulkSetGender("F")}
+              type="button"
+              className="px-2 py-1.5 rounded-xl bg-pink-900 hover:bg-pink-800 text-pink-200 text-xs font-bold transition cursor-pointer active:scale-95"
+              title="تعيين الجنس: أنثى"
+            >
+              👧 إناث
+            </button>
+
+            {/* تعيين الحالة: جدد */}
+            <button
+              onClick={() => handleBulkSetRepeater(false)}
+              type="button"
+              className="px-2 py-1.5 rounded-xl bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-xs font-bold transition cursor-pointer active:scale-95"
+              title="تعيين الحالة: جديد"
+            >
+              جدد
+            </button>
+
+            {/* تعيين الحالة: معيدون */}
+            <button
+              onClick={() => handleBulkSetRepeater(true)}
+              type="button"
+              className="px-2 py-1.5 rounded-xl bg-red-900 hover:bg-red-800 text-red-200 text-xs font-bold transition cursor-pointer active:scale-95"
+              title="تعيين الحالة: معيد"
+            >
+              معيدون 🔁
+            </button>
+
+            {/* حذف المحدد */}
+            <button
+              onClick={handleBulkDelete}
+              type="button"
+              className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black transition flex items-center gap-1 cursor-pointer active:scale-95"
+              title="حذف جميع التلاميذ المحددين"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>حذف 🗑️</span>
+            </button>
+
+            {/* إلغاء التحديد */}
+            <button
+              onClick={clearSelection}
+              type="button"
+              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              title="إلغاء التحديد"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── نافذة النقل الجماعي للأفواج (Move Modal) ─── */}
+      {showMoveModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <ArrowRightLeft className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-black text-slate-900">
+                  نقل التلاميذ إلى فوج آخر
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowMoveModal(false)}
+                className="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 font-bold">
+              سيتم نقل <strong className="text-emerald-700 font-mono font-black">{selectedIds.size} تلميذاً</strong> محدداً إلى الفوج المختار:
+            </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              {TEACHER_CLASSES.map((cls) => (
+                <button
+                  key={cls}
+                  type="button"
+                  onClick={() => setTargetMoveClass(cls)}
+                  className={`p-3 rounded-2xl border text-center transition font-black text-xs cursor-pointer ${
+                    targetMoveClass === cls
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                      : "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  فوج {cls}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowMoveModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleBulkMoveClass}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" />
+                <span>تأكيد النقل إلى فوج {targetMoveClass}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── نافذة معاينة وتأكيد استيراد ملف Excel ─── */}
       {showExcelModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-200">
@@ -1020,7 +1430,7 @@ export default function AdminStudentsPage() {
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                 <span className="text-slate-500 block text-[11px] font-bold">الأقسام المكتشفة</span>
                 <strong className="text-slate-800 text-xs font-mono font-black">
-                  {Array.from(new Set(excelPreviewRows.map((r) => r.className))).join("، ") || "افتراضي"}
+                  {Array.from(new Set(excelPreviewRows.map((r) => r.className))).join("، ") || "1م1"}
                 </strong>
               </div>
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
@@ -1160,19 +1570,23 @@ export default function AdminStudentsPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block font-black text-slate-700 mb-1">القسم</label>
-                  <input
-                    type="text"
+                  <select
                     value={className}
-                    onChange={(e) => setClassName(e.target.value)}
-                    placeholder="مثال: 1م1"
+                    onChange={(e) => setClassName(e.target.value as TeacherClass)}
                     className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
-                  />
+                  >
+                    {TEACHER_CLASSES.map((c) => (
+                      <option key={c} value={c}>
+                        فوج {c}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block font-black text-slate-700 mb-1">الفوج الفرعي</label>
                   <select
                     value={groupName}
-                    onChange={(e) => setGroupName(e.target.value)}
+                    onChange={(e) => setGroupName(e.target.value as "فوج 1" | "فوج 2")}
                     className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
                   >
                     <option value="فوج 1">فوج 1</option>

@@ -17,9 +17,22 @@ function normalizeArabic(text?: string): string {
     .toLowerCase();
 }
 
-function normalizeClass(cls?: string): string {
-  if (!cls) return "";
-  return cls.replace(/\s+/g, "").trim();
+export function normalizeClass(cls?: string): string {
+  if (!cls) return "1م1";
+  const s = cls.replace(/\s+/g, "").trim();
+  if (s === "1م1" || s === "1-1" || s === "11") return "1م1";
+  if (s === "1م2" || s === "2م1" || s === "1-2" || s === "12" || s === "م12") return "1م2";
+  if (s === "1م3" || s === "3م1" || s === "1-3" || s === "13" || s === "م13") return "1م3";
+  if (s === "2م3" || s === "3م2" || s === "2-3" || s === "23" || s === "م23") return "2م3";
+  if (s.startsWith("1م") || s.endsWith("م1")) {
+    if (s.includes("1")) return "1م1";
+    if (s.includes("2")) return "1م2";
+    if (s.includes("3")) return "1م3";
+  }
+  if (s.startsWith("2م") || s.endsWith("م2")) {
+    return "2م3";
+  }
+  return s;
 }
 
 export async function POST(req: NextRequest) {
@@ -52,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
 
     const currentData = await getLessonsData();
-    let currentRoster = [...(currentData.studentRoster || [])];
+    let currentRoster = mode === "replace" ? [] : [...(currentData.studentRoster || [])];
     let currentGrades = [...(currentData.gradebookRecords || [])];
 
     // استخراج قائمة التلاميذ المحتملة من مختلف الصيغ المعتمدة في جسور
@@ -199,9 +212,10 @@ export async function POST(req: NextRequest) {
       addedGradesCount++;
     }
 
-    // حفظ التغييرات وتحديث Vercel Blob
-    currentData.studentRoster = currentRoster;
-    currentData.gradebookRecords = currentGrades;
+    // حفظ التغييرات وتحديث Vercel Blob بعد توحيد أسماء الأفواج بدقة
+    currentData.studentRoster = currentRoster.map((s) => ({ ...s, className: normalizeClass(s.className) }));
+    currentData.evaluations = (currentData.evaluations || []).map((e) => ({ ...e, className: normalizeClass(e.className) }));
+    currentData.gradebookRecords = currentGrades.map((g) => ({ ...g, className: normalizeClass(g.className) }));
     await saveLessonsData(currentData);
 
     return NextResponse.json({
