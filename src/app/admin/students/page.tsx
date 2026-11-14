@@ -32,6 +32,8 @@ import {
   Layers,
   ChevronDown,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { StudentRosterItem } from "@/lib/types";
@@ -349,6 +351,39 @@ export default function AdminStudentsPage() {
         ? `✅ تم حفظ الترتيب الأبجدي لتلاميذ ${selectedClass} كترتيب رسمي دائم!`
         : `✅ تم حفظ الترتيب الأبجدي لجميع الأفواج كترتيب رسمي دائم!`
     );
+  };
+
+  // إعادة ترتيب التلميذ يدوياً لأعلى أو لأسفل وحفظ الترتيب فورياً في السيرفر
+  const handleMoveStudent = async (studentId: string, direction: "up" | "down") => {
+    // إيقاف الترتيب الأبجدي الآلي ليعمل الترتيب اليدوي المخصص فوراً
+    setSortAlphabetical("none");
+
+    const currentList = [...roster];
+    const visibleIds = sortedRoster.map((s) => s.id);
+    const visibleIdx = visibleIds.indexOf(studentId);
+
+    if (visibleIdx === -1) return;
+    if (direction === "up" && visibleIdx === 0) return;
+    if (direction === "down" && visibleIdx === visibleIds.length - 1) return;
+
+    const targetVisibleIdx = direction === "up" ? visibleIdx - 1 : visibleIdx + 1;
+    const targetId = visibleIds[targetVisibleIdx];
+
+    const idxA = currentList.findIndex((s) => s.id === studentId);
+    const idxB = currentList.findIndex((s) => s.id === targetId);
+
+    if (idxA === -1 || idxB === -1) return;
+
+    // تبديل المكانين
+    const temp = currentList[idxA];
+    currentList[idxA] = currentList[idxB];
+    currentList[idxB] = temp;
+
+    // تحديث الحالة فوراً
+    setRoster(currentList);
+
+    // حفظ الترتيب الجديد في السيرفر تلقائياً ليتطابق مع دفتر التنقيط
+    await saveUpdatedRoster(currentList, "تم تحديث ترتيب التلاميذ وتطبيقه في دفتر التنقيط!");
   };
 
   // 1. عملية جماعية: نقل التلاميذ المحددين إلى فوج آخر
@@ -1240,8 +1275,30 @@ export default function AdminStudentsPage() {
                           className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 cursor-pointer"
                         />
                       </td>
-                      <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-400">
-                        {idx + 1}
+                      <td className="py-1 px-1 text-center select-none w-12">
+                        <div className="flex flex-col items-center justify-center -space-y-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveStudent(s.id, "up")}
+                            disabled={idx === 0 || saving}
+                            className="p-0.5 rounded hover:bg-emerald-100 text-slate-400 hover:text-emerald-800 disabled:opacity-20 cursor-pointer transition active:scale-90"
+                            title="نقل التلميذ خطوة لأعلى ⬆"
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </button>
+                          <span className="font-mono font-black text-slate-600 text-[11px] leading-tight">
+                            {idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveStudent(s.id, "down")}
+                            disabled={idx === sortedRoster.length - 1 || saving}
+                            className="p-0.5 rounded hover:bg-emerald-100 text-slate-400 hover:text-emerald-800 disabled:opacity-20 cursor-pointer transition active:scale-90"
+                            title="نقل التلميذ خطوة لأسفل ⬇"
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </button>
+                        </div>
                       </td>
                       <td className="py-2.5 px-3.5">
                         <div className="flex items-center gap-2">
@@ -1320,6 +1377,24 @@ export default function AdminStudentsPage() {
                       </td>
                       <td className="py-2.5 px-3.5 text-center">
                         <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveStudent(s.id, "up")}
+                            disabled={idx === 0 || saving}
+                            className="p-1 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-20 transition"
+                            title="تقديم التلميذ لأعلى ⬆"
+                          >
+                            <ArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveStudent(s.id, "down")}
+                            disabled={idx === sortedRoster.length - 1 || saving}
+                            className="p-1 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-20 transition"
+                            title="تأخير التلميذ لأسفل ⬇"
+                          >
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => handleEdit(s)}
                             className="p-1.5 rounded-lg text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition"

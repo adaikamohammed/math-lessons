@@ -5,6 +5,12 @@ import Link from "next/link";
 import {
   ArrowRight,
   Save,
+  SlidersHorizontal,
+  ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  RotateCcw,
+  Settings,
   CheckCircle2,
   AlertCircle,
   FileSpreadsheet,
@@ -21,6 +27,152 @@ import {
 import * as XLSX from "xlsx";
 
 const CLASSES = ["1م1", "1م2", "1م3", "2م3"] as const;
+
+export type ColumnMeta = {
+  key: string;
+  title: string;
+  subTitle: string;
+  category: "eval" | "test" | "exam" | "calc";
+  bgHeader: string;
+  textHeader: string;
+  description: string;
+};
+
+export const DEFAULT_COLUMN_KEYS = [
+  "behaviorScore",
+  "quiz1Score",
+  "homework1Score",
+  "quiz2Score",
+  "homework2Score",
+  "notebook1Score",
+  "notebook2Score",
+  "bonusScore",
+  "continuousScore",
+  "test1Score",
+  "continuousMonitoring",
+  "examScore",
+  "termAverage",
+] as const;
+
+export const COLUMN_DEFINITIONS: Record<string, ColumnMeta> = {
+  behaviorScore: {
+    key: "behaviorScore",
+    title: "مشاركة",
+    subTitle: "/ 4",
+    category: "eval",
+    bgHeader: "bg-emerald-50/50",
+    textHeader: "text-emerald-700",
+    description: "المشاركة والسلوك والانضباط داخل القسم (4 نقاط)",
+  },
+  quiz1Score: {
+    key: "quiz1Score",
+    title: "استجواب 1",
+    subTitle: "/ 4",
+    category: "eval",
+    bgHeader: "bg-emerald-50/50",
+    textHeader: "text-emerald-700",
+    description: "الاستجواب الكتابي الأول (4 نقاط)",
+  },
+  homework1Score: {
+    key: "homework1Score",
+    title: "وظيفة 1",
+    subTitle: "/ 2",
+    category: "eval",
+    bgHeader: "bg-emerald-50/50",
+    textHeader: "text-emerald-700",
+    description: "الوظيفة المنزلية الأولى (نقطتان)",
+  },
+  quiz2Score: {
+    key: "quiz2Score",
+    title: "استجواب 2",
+    subTitle: "/ 4",
+    category: "eval",
+    bgHeader: "bg-emerald-50/50",
+    textHeader: "text-emerald-700",
+    description: "الاستجواب الكتابي الثاني (4 نقاط)",
+  },
+  homework2Score: {
+    key: "homework2Score",
+    title: "وظيفة 2",
+    subTitle: "/ 2",
+    category: "eval",
+    bgHeader: "bg-emerald-50/50",
+    textHeader: "text-emerald-700",
+    description: "الوظيفة المنزلية الثانية (نقطتان)",
+  },
+  notebook1Score: {
+    key: "notebook1Score",
+    title: "كراس 1",
+    subTitle: "/ 2",
+    category: "eval",
+    bgHeader: "bg-emerald-50/50",
+    textHeader: "text-emerald-700",
+    description: "مراقبة الكراس الأولى (نقطتان)",
+  },
+  notebook2Score: {
+    key: "notebook2Score",
+    title: "كراس 2",
+    subTitle: "/ 2",
+    category: "eval",
+    bgHeader: "bg-emerald-50/50",
+    textHeader: "text-emerald-700",
+    description: "مراقبة الكراس الثانية (نقطتان)",
+  },
+  bonusScore: {
+    key: "bonusScore",
+    title: "إضافي",
+    subTitle: "(+)",
+    category: "eval",
+    bgHeader: "bg-emerald-50/50",
+    textHeader: "text-purple-700",
+    description: "نقاط إضافية لحل الواجبات والمبادرات",
+  },
+  continuousScore: {
+    key: "continuousScore",
+    title: "التقويم",
+    subTitle: "/ 20",
+    category: "calc",
+    bgHeader: "border-l border-emerald-300 bg-emerald-100/90 text-emerald-950 font-black",
+    textHeader: "text-emerald-950 font-mono",
+    description: "مجموع التقويم المستمر المحسوب آلياً (من 20)",
+  },
+  test1Score: {
+    key: "test1Score",
+    title: "الفرض",
+    subTitle: "/ 20",
+    category: "test",
+    bgHeader: "bg-blue-50/40 text-blue-950 font-black",
+    textHeader: "text-blue-700",
+    description: "علامة الفرض الفصلي (من 20)",
+  },
+  continuousMonitoring: {
+    key: "continuousMonitoring",
+    title: "المراقبة",
+    subTitle: "(ف+ت)/2",
+    category: "calc",
+    bgHeader: "bg-blue-100/90 text-blue-950 font-black",
+    textHeader: "text-blue-800 font-mono",
+    description: "المراقبة المستمرة = (الفرض + التقويم) / 2",
+  },
+  examScore: {
+    key: "examScore",
+    title: "الاختبار",
+    subTitle: "/ 20",
+    category: "exam",
+    bgHeader: "bg-indigo-50/40 text-indigo-950 font-black",
+    textHeader: "text-indigo-700",
+    description: "علامة الاختبار الفصلي (من 20)",
+  },
+  termAverage: {
+    key: "termAverage",
+    title: "المعدل",
+    subTitle: "الفصلي",
+    category: "calc",
+    bgHeader: "bg-gradient-to-b from-amber-100 to-amber-200 text-amber-950 font-black",
+    textHeader: "text-amber-900 font-mono",
+    description: "المعدل الفصلي = (المراقبة + الاختبار * 2) / 3",
+  },
+};
 
 export const EVAL_COLS = [
   "behaviorScore",
@@ -148,6 +300,56 @@ export default function AdminGradesExcelPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [syncStatus, setSyncStatus] = useState<"synced" | "saving" | "unsaved" | "error">("synced");
+
+  // حالة ترتيب الأعمدة القابلة للتخصيص من قبل الأستاذ
+  const [columnOrder, setColumnOrder] = useState<string[]>([...DEFAULT_COLUMN_KEYS]);
+  const [showColModal, setShowColModal] = useState(false);
+
+  // استرجاع ترتيب الأعمدة المخصص للأستاذ من التخزين المحلي
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("math_gradebook_columns_order");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = parsed.filter((k: string) => COLUMN_DEFINITIONS[k]);
+          DEFAULT_COLUMN_KEYS.forEach((k) => {
+            if (!valid.includes(k)) valid.push(k);
+          });
+          setColumnOrder(valid);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // دالة نقل العمود خطوة لليمين أو اليسار وحفظ الترتيب
+  const moveColumn = (colKey: string, direction: "prev" | "next") => {
+    setColumnOrder((prev) => {
+      const idx = prev.indexOf(colKey);
+      if (idx === -1) return prev;
+      if (direction === "prev" && idx === 0) return prev;
+      if (direction === "next" && idx === prev.length - 1) return prev;
+
+      const targetIdx = direction === "prev" ? idx - 1 : idx + 1;
+      const next = [...prev];
+      const temp = next[idx];
+      next[idx] = next[targetIdx];
+      next[targetIdx] = temp;
+
+      try {
+        localStorage.setItem("math_gradebook_columns_order", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // استعادة الترتيب الافتراضي للأعمدة
+  const resetColumnOrder = () => {
+    setColumnOrder([...DEFAULT_COLUMN_KEYS]);
+    try {
+      localStorage.removeItem("math_gradebook_columns_order");
+    } catch {}
+  };
 
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const latestStudentsRef = useRef<StudentGradeRow[]>([]);
@@ -317,6 +519,16 @@ export default function AdminGradesExcelPage() {
     });
   };
 
+  // عند الخروج من الخلية (Blur)، نحفظ التعديلات فوراً إن وجدت
+  const handleCellBlur = () => {
+    if (isDirty && latestStudentsRef.current.length > 0) {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      performSave(latestStudentsRef.current);
+    }
+  };
+
   // تعيين عمود كامل بشرطة «—» (ليس الآن) أو إرجاعه فارغاً بنقرة واحدة لجميع الأعمدة
   const handleBulkSetColumn = (col: EvalColKey) => {
     setStudents((prev) => {
@@ -346,10 +558,10 @@ export default function AdminGradesExcelPage() {
     });
   };
 
-  // التنقل الذكي بالكيبورد (إكسل)
+  // التنقل الذكي بالكيبورد (إكسل) متوافق مع ترتيب الأعمدة الديناميكي
   const handleKeyDown = (e: React.KeyboardEvent, rowIdx: number, colIdx: number) => {
     const totalRows = filteredStudents.length;
-    const totalCols = EVAL_COLS.length;
+    const totalCols = columnOrder.length;
 
     let targetRow = rowIdx;
     let targetCol = colIdx;
@@ -361,14 +573,26 @@ export default function AdminGradesExcelPage() {
       e.preventDefault();
       if (rowIdx > 0) targetRow = rowIdx - 1;
     } else if (e.key === "ArrowLeft") {
-      if (colIdx < totalCols - 1) {
-        e.preventDefault();
-        targetCol = colIdx + 1;
+      let nextCol = colIdx + 1;
+      while (nextCol < totalCols) {
+        const meta = COLUMN_DEFINITIONS[columnOrder[nextCol]];
+        if (meta && meta.category !== "calc") {
+          targetCol = nextCol;
+          e.preventDefault();
+          break;
+        }
+        nextCol++;
       }
     } else if (e.key === "ArrowRight") {
-      if (colIdx > 0) {
-        e.preventDefault();
-        targetCol = colIdx - 1;
+      let prevCol = colIdx - 1;
+      while (prevCol >= 0) {
+        const meta = COLUMN_DEFINITIONS[columnOrder[prevCol]];
+        if (meta && meta.category !== "calc") {
+          targetCol = prevCol;
+          e.preventDefault();
+          break;
+        }
+        prevCol--;
       }
     }
 
@@ -611,6 +835,17 @@ export default function AdminGradesExcelPage() {
               )}
             </button>
 
+            {/* زر تخصيص وترتيب الأعمدة */}
+            <button
+              type="button"
+              onClick={() => setShowColModal(true)}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+              title="إعادة ترتيب أعمدة دفتر التنقيط كما تريد"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+              <span>ترتيب الأعمدة ⚙️</span>
+            </button>
+
             {/* تصدير إكسل */}
             <button
               onClick={handleExportExcel}
@@ -736,178 +971,63 @@ export default function AdminGradesExcelPage() {
                 </th>
                 <th className="py-2 px-2 border-l border-slate-200 w-16">الفوج</th>
 
-                {/* أعمدة التقويم المفصلة مع زر (-) للكل في كل عمود */}
-                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="المشاركة والانضباط داخل القسم (4 نقاط)">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">مشاركة</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-emerald-700 font-normal">/ 4</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("behaviorScore")}
-                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="الاستجواب الكتابي الأول (4 نقاط)">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">استجواب 1</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-emerald-700 font-normal">/ 4</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("quiz1Score")}
-                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="الوظيفة المنزلية الأولى (2 نقطتان)">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">وظيفة 1</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("homework1Score")}
-                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="الاستجواب الكتابي الثاني (4 نقاط)">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">استجواب 2</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-emerald-700 font-normal">/ 4</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("quiz2Score")}
-                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="الوظيفة المنزلية الثانية (2 نقطتان)">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">وظيفة 2</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("homework2Score")}
-                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="مراقبة الكراس 1 (2 نقطتان)">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">كراس 1</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("notebook1Score")}
-                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-1 w-16 bg-emerald-50/50" title="مراقبة الكراس 2 (2 نقطتان)">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">كراس 2</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-emerald-700 font-normal">/ 2</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("notebook2Score")}
-                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-1 w-14 bg-emerald-50/50" title="نقاط إضافية لحل الواجبات والمبادرات">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">إضافي</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-purple-700 font-normal">(+)</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("bonusScore")}
-                        className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-purple-200 text-slate-800 hover:text-purple-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-2 w-20 border-l border-emerald-300 bg-emerald-100/90 text-emerald-950 font-black">
-                  التقويم<br/><span className="text-[10px] font-mono">/ 20</span>
-                </th>
+                {/* الأعمدة المرتبة ديناميكياً بحسب رغبة الأستاذ */}
+                {columnOrder.map((colKey, colIdx) => {
+                  const meta = COLUMN_DEFINITIONS[colKey];
+                  if (!meta) return null;
+                  const isInputCol = meta.category === "eval" || meta.category === "test" || meta.category === "exam";
 
-                {/* الفرض، المراقبة، الاختبار، المعدل */}
-                <th className="py-2 px-1.5 w-20 bg-blue-50/40 text-blue-950 font-black" title="علامة الفرض الفصلي من 20">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">الفرض</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-blue-700 font-normal">/ 20</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("test1Score")}
-                        className="px-1 py-0.2 rounded bg-blue-200/80 hover:bg-blue-300 text-blue-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-2 w-24 bg-blue-100/90 text-blue-950 font-black" title="المراقبة المستمرة = (الفرض + التقويم) / 2">
-                  المراقبة<br/><span className="text-[10px] font-mono text-blue-800">(ف+ت)/2</span>
-                </th>
-                <th className="py-2 px-1.5 w-20 bg-indigo-50/40 text-indigo-950 font-black" title="علامة الاختبار الفصلي من 20">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="leading-tight">الاختبار</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-indigo-700 font-normal">/ 20</span>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSetColumn("examScore")}
-                        className="px-1 py-0.2 rounded bg-indigo-200/80 hover:bg-indigo-300 text-indigo-950 text-[9px] font-black cursor-pointer transition active:scale-95"
-                        title="تعيين (-) لجميع تلاميذ هذا العمود (أو إرجاعه فارغاً)"
-                      >
-                        - للكل
-                      </button>
-                    </div>
-                  </div>
-                </th>
-                <th className="py-2 px-2 w-24 bg-gradient-to-b from-amber-100 to-amber-200 text-amber-950 font-black">
-                  المعدل<br/><span className="text-[10px] font-mono text-amber-900">الفصلي</span>
-                </th>
+                  return (
+                    <th
+                      key={colKey}
+                      className={`py-2 px-1 w-16 ${meta.bgHeader}`}
+                      title={meta.description}
+                    >
+                      <div className="flex flex-col items-center gap-0.5">
+                        {/* أزرار تقديم وتأخير العمود */}
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => moveColumn(colKey, "prev")}
+                            disabled={colIdx === 0}
+                            className="p-0.5 rounded hover:bg-black/10 text-slate-500 hover:text-slate-900 disabled:opacity-20 cursor-pointer text-[10px] transition active:scale-90"
+                            title="نقل العمود خطوة لليمين ◀"
+                          >
+                            ◀
+                          </button>
+                          <span className="leading-tight font-black select-none whitespace-nowrap text-[11px]">
+                            {meta.title}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => moveColumn(colKey, "next")}
+                            disabled={colIdx === columnOrder.length - 1}
+                            className="p-0.5 rounded hover:bg-black/10 text-slate-500 hover:text-slate-900 disabled:opacity-20 cursor-pointer text-[10px] transition active:scale-90"
+                            title="نقل العمود خطوة لليسار ▶"
+                          >
+                            ▶
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <span className={`text-[10px] ${meta.textHeader} font-normal`}>
+                            {meta.subTitle}
+                          </span>
+                          {isInputCol && (
+                            <button
+                              type="button"
+                              onClick={() => handleBulkSetColumn(colKey as EvalColKey)}
+                              className="px-1 py-0.2 rounded bg-slate-200/80 hover:bg-emerald-200 text-slate-800 hover:text-emerald-950 text-[9px] font-black cursor-pointer transition active:scale-95"
+                              title="تعيين (-) للعمود كاملاً أو إرجاعه فارغاً"
+                            >
+                              - للكل
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
 
@@ -946,106 +1066,119 @@ export default function AdminGradesExcelPage() {
                         </span>
                       </td>
 
-                      {/* إدخال خلايا التقويم المفصلة */}
-                      {EVAL_COLS.slice(0, 8).map((colKey, colIdx) => {
+                      {/* عرض خلايا السطر بحسب ترتيب الأعمدة المختار من قبل الأستاذ */}
+                      {columnOrder.map((colKey, colIdx) => {
+                        const meta = COLUMN_DEFINITIONS[colKey];
+                        if (!meta) return null;
                         const cellKey = `cell_${rowIdx}_${colIdx}`;
-                        const val = (s as any)[colKey] ?? "";
-                        const isAbsent = val === "غ";
-                        const isPending = val === "—";
 
-                        return (
-                          <td key={colKey} className="p-0.5 bg-emerald-50/20">
-                            <input
-                              ref={(el) => {
-                                inputRefs.current[cellKey] = el;
-                              }}
-                              type="text"
-                              inputMode="decimal"
-                              value={val}
-                              onChange={(e) => handleCellChange(rowIdx, colKey, e.target.value)}
-                              onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
-                              onBlur={() => {
-                                if (isDirty && latestStudentsRef.current.length > 0) {
-                                  if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-                                  performSave(latestStudentsRef.current);
-                                }
-                              }}
-                              className={`w-full h-8 text-center text-xs font-mono font-bold rounded-lg transition outline-none border focus:ring-2 focus:ring-emerald-500/30 ${
-                                isAbsent
-                                  ? "bg-red-50 text-red-700 border-red-300 font-sans font-black"
-                                  : isPending
-                                  ? "bg-slate-100 text-slate-400 border-slate-200"
-                                  : val !== "" && val !== undefined
-                                  ? "bg-white text-slate-900 border-slate-200 font-black"
-                                  : "bg-white/60 text-slate-400 border-transparent hover:border-slate-200 focus:bg-white"
-                              }`}
-                            />
-                          </td>
-                        );
+                        // 1. أعمدة التقويم المستمر المفصلة القابلة للإدخال
+                        if (meta.category === "eval") {
+                          const val = (s as any)[colKey] ?? "";
+                          const isAbsent = val === "غ";
+                          const isPending = val === "—" || val === "-";
+
+                          return (
+                            <td key={colKey} className="p-0.5 bg-emerald-50/20">
+                              <input
+                                ref={(el) => {
+                                  inputRefs.current[cellKey] = el;
+                                }}
+                                type="text"
+                                inputMode="decimal"
+                                value={val}
+                                onChange={(e) => handleCellChange(rowIdx, colKey as EvalColKey, e.target.value)}
+                                onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
+                                onBlur={handleCellBlur}
+                                className={`w-full h-8 text-center text-xs font-mono font-bold rounded-lg transition outline-none border focus:ring-2 focus:ring-emerald-500/30 ${
+                                  isAbsent
+                                    ? "bg-red-50 text-red-700 border-red-300 font-sans font-black"
+                                    : isPending
+                                    ? "bg-slate-100 text-slate-400 border-slate-200"
+                                    : val !== "" && val !== undefined
+                                    ? "bg-white text-slate-900 border-slate-200 font-black"
+                                    : "bg-white/60 text-slate-400 border-transparent hover:border-slate-200 focus:bg-white"
+                                }`}
+                              />
+                            </td>
+                          );
+                        }
+
+                        // 2. علامة الفرض (20)
+                        if (colKey === "test1Score") {
+                          return (
+                            <td key={colKey} className="p-0.5 bg-blue-50/20">
+                              <input
+                                ref={(el) => {
+                                  inputRefs.current[cellKey] = el;
+                                }}
+                                type="text"
+                                inputMode="decimal"
+                                value={s.test1Score ?? ""}
+                                onChange={(e) => handleCellChange(rowIdx, "test1Score", e.target.value)}
+                                onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
+                                onBlur={handleCellBlur}
+                                placeholder="الفرض"
+                                className="w-full h-8 text-center text-xs font-mono font-black text-blue-950 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500/30 outline-none"
+                              />
+                            </td>
+                          );
+                        }
+
+                        // 3. علامة الاختبار (20)
+                        if (colKey === "examScore") {
+                          return (
+                            <td key={colKey} className="p-0.5 bg-indigo-50/20">
+                              <input
+                                ref={(el) => {
+                                  inputRefs.current[cellKey] = el;
+                                }}
+                                type="text"
+                                inputMode="decimal"
+                                value={s.examScore ?? ""}
+                                onChange={(e) => handleCellChange(rowIdx, "examScore", e.target.value)}
+                                onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
+                                onBlur={handleCellBlur}
+                                placeholder="اختبار"
+                                className="w-full h-8 text-center text-xs font-mono font-black text-indigo-950 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 outline-none"
+                              />
+                            </td>
+                          );
+                        }
+
+                        // 4. مجموع التقويم المحسوب آلياً (20)
+                        if (colKey === "continuousScore") {
+                          return (
+                            <td key={colKey} className="py-1.5 px-2 border-l border-emerald-300 bg-emerald-100/70 text-emerald-950 font-black text-xs font-mono">
+                              {s.continuousScore !== "" ? s.continuousScore : <span className="text-slate-300">-</span>}
+                            </td>
+                          );
+                        }
+
+                        // 5. المراقبة المستمرة = (الفرض + التقويم) / 2
+                        if (colKey === "continuousMonitoring") {
+                          return (
+                            <td key={colKey} className="py-1.5 px-2 bg-blue-100/70 text-blue-950 font-black text-xs font-mono">
+                              {s.continuousMonitoring !== "" ? (
+                                s.continuousMonitoring
+                              ) : (
+                                <span className="text-slate-300">-</span>
+                              )}
+                            </td>
+                          );
+                        }
+
+                        // 6. المعدل الفصلي المحسوب تلقائياً
+                        if (colKey === "termAverage") {
+                          return (
+                            <td key={colKey} className="py-1.5 px-2 bg-gradient-to-b from-amber-50 to-amber-100 text-amber-950 font-black text-sm font-mono">
+                              {s.termAverage !== "" ? s.termAverage : <span className="text-slate-300 text-xs">-</span>}
+                            </td>
+                          );
+                        }
+
+                        return null;
                       })}
-
-                      {/* مجموع التقويم المحسوب تلقائياً (من 20) */}
-                      <td className="py-1.5 px-2 border-l border-emerald-300 bg-emerald-100/70 text-emerald-950 font-black text-xs">
-                        {s.continuousScore !== "" ? s.continuousScore : <span className="text-slate-300">-</span>}
-                      </td>
-
-                      {/* الفرض (من 20) */}
-                      <td className="p-0.5 bg-blue-50/20">
-                        <input
-                          ref={(el) => {
-                            inputRefs.current[`cell_${rowIdx}_8`] = el;
-                          }}
-                          type="text"
-                          inputMode="decimal"
-                          value={s.test1Score ?? ""}
-                          onChange={(e) => handleCellChange(rowIdx, "test1Score", e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, rowIdx, 8)}
-                          onBlur={() => {
-                            if (isDirty && latestStudentsRef.current.length > 0) {
-                              if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-                              performSave(latestStudentsRef.current);
-                            }
-                          }}
-                          placeholder="الفرض"
-                          className="w-full h-8 text-center text-xs font-mono font-black text-blue-950 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500/30 outline-none"
-                        />
-                      </td>
-
-                      {/* المراقبة المستمرة = (الفرض + التقويم) / 2 */}
-                      <td className="py-1.5 px-2 bg-blue-100/70 text-blue-950 font-black text-xs">
-                        {s.continuousMonitoring !== "" ? (
-                          s.continuousMonitoring
-                        ) : (
-                          <span className="text-slate-300">-</span>
-                        )}
-                      </td>
-
-                      {/* الاختبار (من 20) */}
-                      <td className="p-0.5 bg-indigo-50/20">
-                        <input
-                          ref={(el) => {
-                            inputRefs.current[`cell_${rowIdx}_9`] = el;
-                          }}
-                          type="text"
-                          inputMode="decimal"
-                          value={s.examScore ?? ""}
-                          onChange={(e) => handleCellChange(rowIdx, "examScore", e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, rowIdx, 9)}
-                          onBlur={() => {
-                            if (isDirty && latestStudentsRef.current.length > 0) {
-                              if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-                              performSave(latestStudentsRef.current);
-                            }
-                          }}
-                          placeholder="اختبار"
-                          className="w-full h-8 text-center text-xs font-mono font-black text-indigo-950 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 outline-none"
-                        />
-                      </td>
-
-                      {/* المعدل الفصلي المحسوب تلقائياً */}
-                      <td className="py-1.5 px-2 bg-gradient-to-b from-amber-50 to-amber-100 text-amber-950 font-black text-sm">
-                        {s.termAverage !== "" ? s.termAverage : <span className="text-slate-300 text-xs">-</span>}
-                      </td>
                     </tr>
                   );
                 })
@@ -1054,6 +1187,103 @@ export default function AdminGradesExcelPage() {
           </table>
         </div>
       </div>
+      {/* ─── نافذة تخصيص وترتيب الأعمدة ─── */}
+      {showColModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                  <SlidersHorizontal className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">تخصيص وترتيب أعمدة دفتر التنقيط</h3>
+                  <p className="text-[11px] text-slate-500 font-bold">رتب الأعمدة حسب رغبتك باستخدام أزرار التقديم والتأخير</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowColModal(false)}
+                className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center text-xs font-black cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto py-3 space-y-1.5 flex-1 pr-1">
+              {columnOrder.map((colKey, idx) => {
+                const meta = COLUMN_DEFINITIONS[colKey];
+                if (!meta) return null;
+                const isCalc = meta.category === "calc";
+
+                return (
+                  <div
+                    key={colKey}
+                    className="flex items-center justify-between p-2.5 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-slate-200 text-slate-700 font-mono text-xs font-black flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-slate-900">{meta.title}</span>
+                          <span className="text-[10px] text-slate-500 font-normal">{meta.subTitle}</span>
+                          {isCalc ? (
+                            <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded">محسوب آلياً</span>
+                          ) : (
+                            <span className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.2 rounded">إدخال يدوي</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-bold line-clamp-1">{meta.description}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => moveColumn(colKey, "prev")}
+                        disabled={idx === 0}
+                        className="px-2 py-1 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-20 text-xs font-black cursor-pointer transition active:scale-95"
+                        title="تقديم للأعلى"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveColumn(colKey, "next")}
+                        disabled={idx === columnOrder.length - 1}
+                        className="px-2 py-1 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-20 text-xs font-black cursor-pointer transition active:scale-95"
+                        title="تأخير للأسفل"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={resetColumnOrder}
+                className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>استعادة الترتيب الافتراضي</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowColModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-black transition cursor-pointer active:scale-95"
+              >
+                تم واعتماد الترتيب ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
