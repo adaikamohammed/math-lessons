@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -13,24 +13,70 @@ import {
   Search,
   CheckCircle2,
   AlertCircle,
-  FileJson,
+  FileSpreadsheet,
   X,
   Calendar,
   Phone,
   BookOpen,
   Sparkles,
+  School,
+  Check,
+  Filter,
+  Eye,
+  FileUp,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { StudentRosterItem } from "@/lib/types";
 
-const CLASSES = ["الكل", "1م1", "1م2", "1م3", "2م3"];
+const DEFAULT_CLASSES = ["1م1", "1م2", "1م3", "2م3"];
+
+// دالة لمعالجة وتوحيد تواريخ الإكسل بمختلف الصيغ (Serial number, DD/MM/YYYY, YYYY-MM-DD)
+function parseExcelDate(val: any): string {
+  if (!val) return "";
+  if (typeof val === "number") {
+    try {
+      // Excel base date starts at 1899-12-30
+      const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(date.getUTCDate()).padStart(2, "0");
+      if (y > 1990 && y < 2030) return `${y}-${m}-${d}`;
+    } catch {
+      // fallback
+    }
+  }
+  const str = String(val).trim();
+  // صيغة DD/MM/YYYY أو DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (dmyMatch) {
+    const d = dmyMatch[1].padStart(2, "0");
+    const m = dmyMatch[2].padStart(2, "0");
+    const y = dmyMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+  // صيغة YYYY-MM-DD أو YYYY/MM/DD
+  const ymdMatch = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (ymdMatch) {
+    const y = ymdMatch[1];
+    const m = ymdMatch[2].padStart(2, "0");
+    const d = ymdMatch[3].padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return str;
+}
 
 export default function AdminStudentsPage() {
   const [roster, setRoster] = useState<StudentRosterItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedClass, setSelectedClass] = useState("الكل");
+  const [selectedClass, setSelectedClass] = useState("all");
   const [search, setSearch] = useState("");
+  const [subgroupFilter, setSubgroupFilter] = useState<"all" | "فوج 1" | "فوج 2">("all");
+  const [genderFilter, setGenderFilter] = useState<"all" | "M" | "F">("all");
 
-  // حالة إضافة / تعديل تلميذ
+  // تنبيهات الرسائل
+  const [alertMsg, setAlertMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  // حالة إضافة / تعديل تلميذ فردي
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentRosterItem | null>(null);
   const [studentName, setStudentName] = useState("");
@@ -38,16 +84,26 @@ export default function AdminStudentsPage() {
   const [groupName, setGroupName] = useState("فوج 1");
   const [birthDate, setBirthDate] = useState("");
   const [parentPhone, setParentPhone] = useState("");
-  const [gender, setGender] = useState("M");
+  const [gender, setGender] = useState<"M" | "F">("M");
+  const [isRepeater, setIsRepeater] = useState(false);
 
-  // حالة نافذة الاستيراد من جسور
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [importJsonText, setImportJsonText] = useState("");
+  // حالة نافذة معاينة واستيراد ملف Excel
+  const [showExcelModal, setShowExcelModal] = useState(false);
+  const [excelPreviewRows, setExcelPreviewRows] = useState<StudentRosterItem[]>([]);
+  const [excelFileName, setExcelFileName] = useState("");
+  const [importMode, setImportMode] = useState<"merge" | "replace">("merge");
   const [importLoading, setImportLoading] = useState(false);
-  const [importFeedback, setImportFeedback] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  // جلب قائمة التلاميذ
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // إظهار تنبيه مؤقت
+  const notify = (type: "ok" | "err", text: string) => {
+    setAlertMsg({ type, text });
+    setTimeout(() => setAlertMsg(null), 4500);
+  };
+
+  // جلب قائمة التلاميذ من السيرفر
   const fetchRoster = async () => {
     try {
       setLoading(true);
@@ -56,18 +112,20 @@ export default function AdminStudentsPage() {
       if (data.students) {
         setRoster(
           data.students.map((s: any) => ({
-            id: s.studentId,
+            id: s.studentId || s.id,
             studentName: s.studentName,
             className: s.className,
-            groupName: s.groupName,
-            birthDate: s.birthDate,
-            gender: s.gender,
+            groupName: s.groupName || "فوج 1",
+            birthDate: s.birthDate || "",
+            gender: s.gender === "ذكر" || s.gender === "M" ? "M" : "F",
+            isRepeater: Boolean(s.isRepeater),
             parentPhone: s.parentPhone || "",
           }))
         );
       }
     } catch (err) {
       console.error(err);
+      notify("err", "تعذر جلب بيانات التلاميذ من الخادم");
     } finally {
       setLoading(false);
     }
@@ -79,20 +137,328 @@ export default function AdminStudentsPage() {
 
   const normalizeClass = (c?: string) => (c ? c.replace(/\s+/g, "").trim() : "");
 
+  // قائمة جميع الأقسام المتاحة ديناميكياً
+  const availableClasses = useMemo(() => {
+    const set = new Set<string>(DEFAULT_CLASSES);
+    roster.forEach((s) => {
+      if (s.className) set.add(s.className.trim());
+    });
+    return Array.from(set);
+  }, [roster]);
+
+  // التلاميذ بعد الفلترة بالقسم، البحث، الفوج، والجنس
   const filteredRoster = useMemo(() => {
     return roster.filter((s) => {
       const matchCls =
-        selectedClass === "الكل" ||
+        selectedClass === "all" ||
         normalizeClass(s.className) === normalizeClass(selectedClass);
+
       const matchSearch =
+        !search.trim() ||
         s.studentName.toLowerCase().includes(search.toLowerCase()) ||
         (s.parentPhone && s.parentPhone.includes(search)) ||
         (s.birthDate && s.birthDate.includes(search));
-      return matchCls && matchSearch;
-    });
-  }, [roster, selectedClass, search]);
 
-  // حفظ تلميذ جديد أو تعديل
+      const matchSubgroup =
+        subgroupFilter === "all" || (s.groupName || "فوج 1") === subgroupFilter;
+
+      const studentGender = s.gender === "ذكر" || s.gender === "M" ? "M" : "F";
+      const matchGender = genderFilter === "all" || studentGender === genderFilter;
+
+      return matchCls && matchSearch && matchSubgroup && matchGender;
+    });
+  }, [roster, selectedClass, search, subgroupFilter, genderFilter]);
+
+  // إحصائيات القسم المختار أو الإجمالي
+  const stats = useMemo(() => {
+    const base =
+      selectedClass === "all"
+        ? roster
+        : roster.filter((s) => normalizeClass(s.className) === normalizeClass(selectedClass));
+
+    const total = base.length;
+    const male = base.filter((s) => s.gender === "M" || s.gender === "ذكر").length;
+    const female = total - male;
+    const g1 = base.filter((s) => (s.groupName || "فوج 1") === "فوج 1").length;
+    const g2 = base.filter((s) => (s.groupName || "فوج 1") === "فوج 2").length;
+    const repeaters = base.filter((s) => s.isRepeater).length;
+    const newStudents = total - repeaters;
+
+    return { total, male, female, g1, g2, repeaters, newStudents };
+  }, [roster, selectedClass]);
+
+  // معالجة قراءة ملف Excel محلياً في المتصفح
+  const handleProcessExcelBuffer = (buffer: ArrayBuffer, fileName: string) => {
+    try {
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        notify("err", "ملف الإكسل فارغ ولا يحتوي على أوراق عمل!");
+        return;
+      }
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+      if (!rawRows || rawRows.length === 0) {
+        notify("err", "لم يتم العثور على أي صفوف أو بيانات داخل ملف الإكسل!");
+        return;
+      }
+
+      // مطابقة الأعمدة بذكاء (الأسماء باللغة العربية والفرنسية والإنجليزية)
+      const parsedStudents: StudentRosterItem[] = [];
+
+      rawRows.forEach((row, idx) => {
+        // البحث عن حقل الاسم
+        const nameKey = Object.keys(row).find((k) => {
+          const lk = k.trim().toLowerCase();
+          return (
+            lk.includes("اسم") ||
+            lk.includes("لقب") ||
+            lk.includes("تلميذ") ||
+            lk === "name" ||
+            lk === "fullname" ||
+            lk === "nom"
+          );
+        });
+        const studentNameVal = nameKey ? String(row[nameKey]).trim() : "";
+        if (!studentNameVal) return;
+
+        // البحث عن حقل القسم
+        const classKey = Object.keys(row).find((k) => {
+          const lk = k.trim().toLowerCase();
+          return lk.includes("قسم") || lk.includes("فوج") || lk.includes("صف") || lk === "class" || lk === "classe";
+        });
+        let classVal = classKey ? String(row[classKey]).trim() : "";
+        if (!classVal) {
+          classVal = selectedClass !== "all" ? selectedClass : "1م1";
+        }
+
+        // البحث عن حقل الفوج الفرعي (فوج 1 / فوج 2)
+        const subgroupKey = Object.keys(row).find((k) => {
+          const lk = k.trim().toLowerCase();
+          return (
+            (lk.includes("فوج") && lk.includes("فرعي")) ||
+            lk.includes("مجموعة") ||
+            lk === "group" ||
+            lk === "subgroup" ||
+            lk === "groupe"
+          );
+        });
+        let groupVal: "فوج 1" | "فوج 2" = "فوج 1";
+        if (subgroupKey) {
+          const subText = String(row[subgroupKey]).trim();
+          if (subText.includes("2") || subText.includes("٢")) groupVal = "فوج 2";
+        }
+
+        // البحث عن حقل تاريخ الميلاد
+        const birthKey = Object.keys(row).find((k) => {
+          const lk = k.trim().toLowerCase();
+          return (
+            lk.includes("ميلاد") ||
+            lk.includes("تاريخ") ||
+            lk === "dob" ||
+            lk === "birthdate" ||
+            lk.includes("naissance")
+          );
+        });
+        const birthVal = birthKey ? parseExcelDate(row[birthKey]) : "";
+
+        // البحث عن حقل الجنس
+        const genderKey = Object.keys(row).find((k) => {
+          const lk = k.trim().toLowerCase();
+          return lk.includes("جنس") || lk.includes("نوع") || lk === "gender" || lk === "sexe" || lk === "sex";
+        });
+        let genderVal: "M" | "F" = "M";
+        if (genderKey) {
+          const gText = String(row[genderKey]).trim().toLowerCase();
+          if (gText.includes("أنثى") || gText.includes("بنت") || gText === "f" || gText === "female") {
+            genderVal = "F";
+          }
+        }
+
+        // البحث عن حقل الإعادة
+        const repeaterKey = Object.keys(row).find((k) => {
+          const lk = k.trim().toLowerCase();
+          return lk.includes("حالة") || lk.includes("معيد") || lk.includes("إعادة") || lk === "repeater" || lk === "redoublant";
+        });
+        let isRepeaterVal = false;
+        if (repeaterKey) {
+          const rText = String(row[repeaterKey]).trim().toLowerCase();
+          if (rText.includes("معيد") || rText === "نعم" || rText === "true" || rText === "1" || rText === "oui") {
+            isRepeaterVal = true;
+          }
+        }
+
+        // البحث عن حقل هاتف الولي
+        const phoneKey = Object.keys(row).find((k) => {
+          const lk = k.trim().toLowerCase();
+          return lk.includes("هاتف") || lk.includes("جوال") || lk === "phone" || lk === "tel" || lk === "telephone";
+        });
+        const phoneVal = phoneKey ? String(row[phoneKey]).trim() : "";
+
+        parsedStudents.push({
+          id: `excel_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+          studentName: studentNameVal,
+          className: classVal,
+          groupName: groupVal,
+          birthDate: birthVal,
+          gender: genderVal,
+          isRepeater: isRepeaterVal,
+          parentPhone: phoneVal,
+        });
+      });
+
+      if (parsedStudents.length === 0) {
+        notify("err", "لم يتم التعرف على أسماء التلاميذ في ملف الإكسل. يرجى مراجعة رؤوس الأعمدة!");
+        return;
+      }
+
+      setExcelPreviewRows(parsedStudents);
+      setExcelFileName(fileName);
+      setShowExcelModal(true);
+    } catch (err: any) {
+      console.error(err);
+      notify("err", `حدث خطأ أثناء قراءة ملف الإكسل: ${err.message || "تنسيق غير مدعوم"}`);
+    }
+  };
+
+  // رفع ملف عبر زر التصفح
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const buffer = event.target?.result as ArrayBuffer;
+      handleProcessExcelBuffer(buffer, file.name);
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  };
+
+  // دعم السحب والإفلات (Drag & Drop)
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const buffer = event.target?.result as ArrayBuffer;
+      handleProcessExcelBuffer(buffer, file.name);
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // تأكيد وحفظ بيانات ملف الإكسل في قاعدة البيانات
+  const handleConfirmExcelImport = async () => {
+    if (excelPreviewRows.length === 0) return;
+    setImportLoading(true);
+
+    try {
+      const res = await fetch("/api/students/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentsList: excelPreviewRows,
+          mode: importMode,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل حفظ بيانات الإكسل");
+
+      notify("ok", `🎉 تم استيراد وحفظ ${excelPreviewRows.length} تلميذاً بنجاح في قاعدة البيانات!`);
+      setShowExcelModal(false);
+      setExcelPreviewRows([]);
+      fetchRoster();
+    } catch (err: any) {
+      notify("err", err.message || "حدث خطأ أثناء الحفظ");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // تنزيل نموذج إكسل فارغ جاهز للتسجيل
+  const handleDownloadBlankTemplate = () => {
+    const sampleData = [
+      {
+        "الرقم": 1,
+        "الاسم واللقب": "محمد بن أحمد",
+        "القسم": "1م1",
+        "الفوج الفرعي": "فوج 1",
+        "تاريخ الميلاد": "2012-05-14",
+        "الجنس": "ذكر",
+        "الحالة": "جديد",
+        "هاتف الولي": "0661234567",
+        "ملاحظات": "",
+      },
+      {
+        "الرقم": 2,
+        "الاسم واللقب": "فاطمة الزهراء علي",
+        "القسم": "1م1",
+        "الفوج الفرعي": "فوج 2",
+        "تاريخ الميلاد": "2012-09-21",
+        "الجنس": "أنثى",
+        "الحالة": "جديد",
+        "هاتف الولي": "0669876543",
+        "ملاحظات": "",
+      },
+      {
+        "الرقم": 3,
+        "الاسم واللقب": "أمين باهي",
+        "القسم": "1م2",
+        "الفوج الفرعي": "فوج 1",
+        "تاريخ الميلاد": "2011-11-03",
+        "الجنس": "ذكر",
+        "الحالة": "معيد",
+        "هاتف الولي": "0665554433",
+        "ملاحظات": "تلميذ معيد",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "قائمة التلاميذ");
+    XLSX.writeFile(workbook, "نموذج_تسجيل_التلاميذ_موقع_الرياضيات.xlsx");
+  };
+
+  // تصدير القائمة الحالية كملف Excel
+  const handleExportCurrentRosterExcel = () => {
+    const target =
+      selectedClass === "all"
+        ? roster
+        : roster.filter((s) => normalizeClass(s.className) === normalizeClass(selectedClass));
+
+    if (target.length === 0) {
+      notify("err", "لا يوجد تلاميذ لتصديرهم في هذا الفوج!");
+      return;
+    }
+
+    const exportRows = target.map((s, idx) => ({
+      "الرقم": idx + 1,
+      "الاسم واللقب": s.studentName,
+      "القسم": s.className,
+      "الفوج الفرعي": s.groupName || "فوج 1",
+      "تاريخ الميلاد": s.birthDate || "",
+      "الجنس": s.gender === "M" || s.gender === "ذكر" ? "ذكر" : "أنثى",
+      "الحالة": s.isRepeater ? "معيد" : "جديد",
+      "هاتف الولي": s.parentPhone || "",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    const sheetName = selectedClass === "all" ? "جميع التلاميذ" : `فوج ${selectedClass}`;
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.substring(0, 31));
+
+    const fileName =
+      selectedClass === "all"
+        ? `قائمة_جميع_التلاميذ_${new Date().toISOString().slice(0, 10)}.xlsx`
+        : `قائمة_تلاميذ_${selectedClass}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+    XLSX.writeFile(workbook, fileName);
+    notify("ok", `تم تحميل ملف الإكسل بنجاح: ${fileName}`);
+  };
+
+  // حفظ تلميذ يدوي فردي
   const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim()) return;
@@ -105,6 +471,7 @@ export default function AdminStudentsPage() {
       birthDate: birthDate.trim(),
       parentPhone: parentPhone.trim(),
       gender: gender as any,
+      isRepeater,
     };
 
     try {
@@ -121,9 +488,11 @@ export default function AdminStudentsPage() {
         setEditingStudent(null);
         resetForm();
         fetchRoster();
+        notify("ok", "تم حفظ بيانات التلميذ بنجاح");
       }
     } catch (err) {
       console.error(err);
+      notify("err", "فشل حفظ التلميذ");
     }
   };
 
@@ -134,12 +503,13 @@ export default function AdminStudentsPage() {
     setGroupName(s.groupName || "فوج 1");
     setBirthDate(s.birthDate || "");
     setParentPhone(s.parentPhone || "");
-    setGender(s.gender || "M");
+    setGender(s.gender === "ذكر" || s.gender === "M" ? "M" : "F");
+    setIsRepeater(Boolean(s.isRepeater));
     setShowAddModal(true);
   };
 
   const handleDelete = async (s: StudentRosterItem) => {
-    if (!confirm(`هل أنت متأكد من حذف التلميذ "${s.studentName}" من الفوج؟`)) return;
+    if (!confirm(`هل أنت متأكد من حذف التلميذ "${s.studentName}" من القائمة؟`)) return;
 
     const updated = roster.filter((item) => item.id !== s.id);
     setRoster(updated);
@@ -152,337 +522,623 @@ export default function AdminStudentsPage() {
           mode: "replace",
         }),
       });
+      notify("ok", `تم حذف التلميذ ${s.studentName}`);
     } catch (err) {
       console.error(err);
+      notify("err", "فشل الحذف");
     }
   };
 
   const resetForm = () => {
     setStudentName("");
-    setClassName("1م1");
+    setClassName(selectedClass !== "all" ? selectedClass : "1م1");
     setGroupName("فوج 1");
     setBirthDate("");
     setParentPhone("");
     setGender("M");
-  };
-
-  // استيراد من جسور
-  const handleImportSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setImportError(null);
-    setImportFeedback(null);
-    if (!importJsonText.trim()) {
-      setImportError("يرجى لصق نص ملف JSON الخاص بموقع جسور أولاً");
-      return;
-    }
-
-    setImportLoading(true);
-    try {
-      const res = await fetch("/api/students/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rawJson: importJsonText,
-          mode: "merge",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "فشل الاستيراد");
-
-      setImportFeedback(data.message || "تم استيراد التلاميذ بنجاح!");
-      fetchRoster();
-      setTimeout(() => {
-        setShowImportModal(false);
-        setImportJsonText("");
-        setImportFeedback(null);
-      }, 1500);
-    } catch (err: any) {
-      setImportError(err.message || "حدث خطأ أثناء الاستيراد");
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  // رفع ملف JSON من الجهاز
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      setImportJsonText(content);
-    };
-    reader.readAsText(file);
-  };
-
-  // تصدير نسخة احتياطية
-  const handleExport = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(roster, null, 2));
-    const downloadAnchor = document.createElement("a");
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `students_roster_${new Date().toISOString().slice(0, 10)}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+    setIsRepeater(false);
   };
 
   return (
-    <div className="pb-16 pt-3 fade-up space-y-4 max-w-6xl mx-auto">
-      {/* رأس الصفحة وزر الرجوع */}
-      <div className="flex items-center gap-3 bg-white p-3.5 rounded-2xl border border-emerald-100 shadow-2xs">
-        <Link
-          href="/admin"
-          className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 hover:bg-emerald-100 active:scale-95 transition shrink-0"
-          aria-label="الرجوع للوحة التحكم"
+    <div className="pb-16 pt-3 fade-up space-y-4 max-w-6xl mx-auto px-2 sm:px-4" dir="rtl">
+      {/* مدخل رفع ملف الإكسل المخفي */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx, .xls, .csv"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
+      {/* شريط الإشعارات والتنبيهات */}
+      {alertMsg && (
+        <div
+          className={`p-3.5 rounded-2xl text-xs font-black flex items-center justify-between gap-2 border animate-in fade-in duration-200 shadow-xs ${
+            alertMsg.type === "ok"
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+              : "bg-red-50 text-red-700 border-red-200"
+          }`}
         >
-          <ArrowRight className="w-5 h-5" />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-base font-black text-slate-900 truncate">
-              إدارة الأفواج وقوائم التلاميذ
-            </h1>
-            <span className="text-[11px] bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-full border border-emerald-200">
-              {roster.length} تلميذاً 👥
-            </span>
+          <div className="flex items-center gap-2">
+            {alertMsg.type === "ok" ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+            )}
+            <span>{alertMsg.text}</span>
           </div>
-          <p className="text-[11px] text-slate-500 font-bold truncate">
-            الأستاذ محمد عدايكة — متوسطة المجاهد باهي علي
-          </p>
+          <button onClick={() => setAlertMsg(null)} className="p-1 hover:opacity-70">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
+      )}
 
-        {/* أزرار الإجراءات السريعة */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white hover:from-emerald-700 hover:to-teal-800 text-xs font-black flex items-center gap-1.5 shadow-xs transition active:scale-95"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="hidden sm:inline">استيراد من جسور</span>
-          </button>
+      {/* ─── رأس الصفحة المطور مع أزرار الإكسل البارزة ─── */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin"
+              className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 hover:bg-emerald-100 active:scale-95 transition shrink-0"
+              title="الرجوع للوحة التحكم"
+            >
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-black text-slate-900">
+                  إدارة الأفواج وقوائم التلاميذ
+                </h1>
+                <span className="text-[11px] bg-emerald-100 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  {roster.length} تلميذ 👥
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-bold">
+                الأستاذ محمد عدايكة — متوسطة المجاهد باهي علي — الوادي
+              </p>
+            </div>
+          </div>
 
-          <button
-            onClick={handleExport}
-            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-black flex items-center gap-1.5 transition active:scale-95"
-          >
-            <Download className="w-4 h-4 text-slate-500" />
-            <span className="hidden sm:inline">تصدير</span>
-          </button>
+          {/* أزرار الإجراءات الرئيسية الملونة */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* زر رفع ملف الإكسل البارز جداً */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-emerald-500/20"
+              title="اضغط لرفع ملف Excel أو CSV لقائمة تلاميذك مباشرة"
+            >
+              <FileUp className="w-4 h-4 text-emerald-200" />
+              <span>📥 رفع ملف Excel للتلاميذ</span>
+            </button>
 
-          <button
-            onClick={() => {
-              resetForm();
-              setEditingStudent(null);
-              setShowAddModal(true);
-            }}
-            className="px-3 py-2 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-200 hover:bg-emerald-200 text-xs font-black flex items-center gap-1.5 transition active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>إضافة تلميذ</span>
-          </button>
+            {/* زر تنزيل نموذج فارغ للتسجيل */}
+            <button
+              onClick={handleDownloadBlankTemplate}
+              type="button"
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="تنزيل نموذج Excel فارغ معبأ بالعناوين النموذجية لتسجيل التلاميذ"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span>نموذج Excel فارغ</span>
+            </button>
+
+            {/* زر تصدير القائمة الحالية */}
+            <button
+              onClick={handleExportCurrentRosterExcel}
+              type="button"
+              className="px-3 py-2 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="تصدير التلاميذ الحاليين إلى ملف Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-teal-600" />
+              <span>تصدير Excel 📊</span>
+            </button>
+
+            {/* زر إضافة تلميذ يدوي */}
+            <button
+              onClick={() => {
+                resetForm();
+                setEditingStudent(null);
+                setShowAddModal(true);
+              }}
+              type="button"
+              className="px-3 py-2 rounded-xl bg-slate-900 text-white hover:bg-black text-xs font-black flex items-center gap-1.5 transition active:scale-95"
+            >
+              <Plus className="w-4 h-4 text-amber-300" />
+              <span>إضافة تلميذ</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* شريط الفلترة والبحث */}
-      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        {/* اختيار الفوج */}
-        <div className="flex gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
-          {CLASSES.map((cls) => (
-            <button
-              key={cls}
-              onClick={() => setSelectedClass(cls)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition border shrink-0 ${
-                selectedClass === cls
-                  ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
-                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+      {/* ─── محدد الأفواج والتبويبات البارزة ─── */}
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <School className="w-4 h-4 text-emerald-700" />
+            <h2 className="text-xs sm:text-sm font-black text-slate-900">
+              اختر الفوج لعرض وتعديل تلاميذه وتفويجهم:
+            </h2>
+          </div>
+        </div>
+
+        {/* تبويبات الأفواج */}
+        <div className="flex items-center gap-2 flex-wrap pt-1">
+          {/* زر جميع الأقسام */}
+          <button
+            onClick={() => setSelectedClass("all")}
+            className={`px-3.5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-2xs ${
+              selectedClass === "all"
+                ? "bg-slate-900 text-white ring-2 ring-slate-800/40 shadow-sm scale-102"
+                : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>جميع الأقسام</span>
+            <span
+              className={`text-[11px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                selectedClass === "all" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"
               }`}
             >
-              {cls}
-            </button>
-          ))}
-        </div>
+              {roster.length}
+            </span>
+          </button>
 
-        {/* خانة البحث السريع */}
-        <div className="relative w-full sm:w-72">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="بحث بالاسم أو تاريخ الميلاد..."
-            className="w-full h-10 pr-9 pl-3 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition outline-none"
-          />
-          <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+          {/* تبويبات الأقسام الفردية */}
+          {availableClasses.map((cls) => {
+            const count = roster.filter(
+              (s) => normalizeClass(s.className) === normalizeClass(cls)
+            ).length;
+            const isSelected = selectedClass === cls;
+            return (
+              <button
+                key={cls}
+                onClick={() => setSelectedClass(cls)}
+                className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-2xs ${
+                  isSelected
+                    ? "bg-gradient-to-r from-emerald-800 to-teal-800 text-white ring-2 ring-emerald-500/40 shadow-sm scale-102"
+                    : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <School className={`w-3.5 h-3.5 ${isSelected ? "text-amber-300" : "text-emerald-700"}`} />
+                <span>فوج {cls}</span>
+                <span
+                  className={`text-[11px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                    isSelected ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"
+                  }`}
+                >
+                  {count} تلميذ
+                </span>
+                {isSelected && <Check className="w-3.5 h-3.5 text-amber-300" />}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* جدول التلاميذ */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-black border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-3 w-12 text-center">#</th>
-                <th className="py-3 px-3">اسم ولقب التلميذ</th>
-                <th className="py-3 px-3">القسم</th>
-                <th className="py-3 px-3">الفوج الفرعي</th>
-                <th className="py-3 px-3">تاريخ الميلاد (كود الولي)</th>
-                <th className="py-3 px-3">هاتف الولي</th>
-                <th className="py-3 px-3 text-center w-24">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
-                    جاري تحميل قائمة التلاميذ...
-                  </td>
-                </tr>
-              ) : filteredRoster.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
-                    لا يوجد تلاميذ مطابقون في هذا القسم. اضغط على «استيراد من جسور» لإدراجهم بنقرة واحدة!
-                  </td>
-                </tr>
-              ) : (
-                filteredRoster.map((s, idx) => (
-                  <tr key={s.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
-                    <td className="py-2.5 px-3 font-black text-slate-900">{s.studentName}</td>
-                    <td className="py-2.5 px-3">
-                      <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 font-black border border-emerald-200 text-[11px]">
-                        {s.className}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 font-bold text-slate-600">{s.groupName || "فوج 1"}</td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-700">
-                      {s.birthDate || <span className="text-slate-300 font-sans">غير مسجل</span>}
-                    </td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-600">
-                      {s.parentPhone || <span className="text-slate-300 font-sans">—</span>}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => handleEdit(s)}
-                          className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 flex items-center justify-center transition active:scale-95"
-                          title="تعديل"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(s)}
-                          className="w-7 h-7 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition active:scale-95"
-                          title="حذف"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+      {/* ─── بطاقة الجدول مع الإحصائيات الملونة والبحث ─── */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* شريط الإحصائيات الملونة الدقيقة (مطابق لطلب الأستاذ) */}
+        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/70 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
+              <h3 className="text-sm sm:text-base font-black text-slate-900">
+                {selectedClass === "all" ? (
+                  "قائمة جميع التلاميذ في كافة الأفواج"
+                ) : (
+                  <span>
+                    قائمة وتوثيق تلاميذ: <strong className="text-emerald-800 font-black">فوج {selectedClass}</strong>
+                  </span>
+                )}
+              </h3>
+            </div>
+
+            {/* شارات الإحصائيات الملونة */}
+            <div className="flex items-center gap-2 text-xs font-bold flex-wrap pt-0.5">
+              <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-xl border border-slate-200 font-bold">
+                الإجمالي: <strong className="text-slate-900 font-mono font-black">{stats.total}</strong>
+              </span>
+              <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-1 rounded-xl font-bold">
+                👦 ذكور: <strong>{stats.male}</strong>
+              </span>
+              <span className="bg-pink-50 text-pink-800 border border-pink-200 px-2.5 py-1 rounded-xl font-bold">
+                👧 بنات: <strong>{stats.female}</strong>
+              </span>
+              <span className="bg-purple-50 text-purple-900 border border-purple-200 px-2.5 py-1 rounded-xl font-bold">
+                👥 فوج 1: <strong>{stats.g1}</strong>
+              </span>
+              <span className="bg-amber-50 text-amber-950 border border-amber-200 px-2.5 py-1 rounded-xl font-bold">
+                👥 فوج 2: <strong>{stats.g2}</strong>
+              </span>
+              <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-xl font-bold">
+                جدد: <strong>{stats.newStudents}</strong>
+              </span>
+              {stats.repeaters > 0 && (
+                <span className="bg-red-50 text-red-700 border border-red-300 px-2.5 py-1 rounded-xl font-black">
+                  🔁 معيدون: <strong>{stats.repeaters}</strong>
+                </span>
               )}
-            </tbody>
-          </table>
+            </div>
+          </div>
+
+          {/* فلاتر سريعة للبحث والتفويج */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* فلتر الفوج الفرعي */}
+            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5 text-xs font-bold">
+              <button
+                onClick={() => setSubgroupFilter("all")}
+                className={`px-2 py-1 rounded-lg transition ${
+                  subgroupFilter === "all" ? "bg-slate-900 text-white font-black" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                الكل
+              </button>
+              <button
+                onClick={() => setSubgroupFilter("فوج 1")}
+                className={`px-2 py-1 rounded-lg transition ${
+                  subgroupFilter === "فوج 1" ? "bg-purple-700 text-white font-black" : "text-slate-600 hover:text-purple-800"
+                }`}
+              >
+                فوج 1
+              </button>
+              <button
+                onClick={() => setSubgroupFilter("فوج 2")}
+                className={`px-2 py-1 rounded-lg transition ${
+                  subgroupFilter === "فوج 2" ? "bg-amber-700 text-white font-black" : "text-slate-600 hover:text-amber-800"
+                }`}
+              >
+                فوج 2
+              </button>
+            </div>
+
+            {/* خانة البحث */}
+            <div className="relative w-full sm:w-64">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="بحث بالاسم أو تاريخ الميلاد..."
+                className="w-full h-9 pr-8 pl-3 text-xs font-bold bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition outline-none"
+              />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute left-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* ─── منطقة الإفلات السريع إذا كان الفوج فارغاً ─── */}
+        {filteredRoster.length === 0 && !loading && (
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            className={`m-6 p-8 rounded-3xl border-2 border-dashed text-center transition-all ${
+              isDragOver
+                ? "border-emerald-500 bg-emerald-50/50 scale-[1.01]"
+                : "border-slate-300 bg-slate-50/50 hover:bg-slate-50"
+            }`}
+          >
+            <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+              <FileUp className="w-8 h-8" />
+            </div>
+            <h3 className="text-sm font-black text-slate-900 mb-1">
+              لا توجد أسماء تلاميذ معروضة في هذا الفوج حالياً
+            </h3>
+            <p className="text-xs text-slate-500 font-bold max-w-md mx-auto mb-4">
+              اسحب وأفلت ملف إكسل (XLSX / XLS / CSV) هنا مباشرة، أو اضغط على الزر أدناه لتصفح ملف التلاميذ من جهازك
+            </p>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                type="button"
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition active:scale-95 flex items-center gap-2"
+              >
+                <FileUp className="w-4 h-4" />
+                <span>اختيار ملف Excel من جهازك</span>
+              </button>
+              <button
+                onClick={handleDownloadBlankTemplate}
+                type="button"
+                className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-100 transition flex items-center gap-1.5"
+              >
+                <Download className="w-4 h-4 text-slate-500" />
+                <span>تحميل نموذج فارغ للتعبئة</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── جدول قائمة التلاميذ المطور ─── */}
+        {filteredRoster.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className="bg-slate-100/80 text-slate-600 font-black border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-3.5 w-12 text-center">#</th>
+                  <th className="py-3 px-3.5">اسم ولقب التلميذ</th>
+                  <th className="py-3 px-3.5">القسم</th>
+                  <th className="py-3 px-3.5">الفوج الفرعي</th>
+                  <th className="py-3 px-3.5">تاريخ الميلاد (رمز دخول الولي 🔑)</th>
+                  <th className="py-3 px-3.5">الجنس</th>
+                  <th className="py-3 px-3.5">الحالة</th>
+                  <th className="py-3 px-3.5">هاتف الولي</th>
+                  <th className="py-3 px-3.5 text-center w-24">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredRoster.map((s, idx) => {
+                  const isMale = s.gender === "M" || s.gender === "ذكر";
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50/80 transition group">
+                      <td className="py-2.5 px-3.5 text-center font-mono font-bold text-slate-400">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2.5 px-3.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
+                              isMale ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"
+                            }`}
+                          >
+                            {isMale ? "👦" : "👧"}
+                          </span>
+                          <span className="font-black text-slate-900 group-hover:text-emerald-800 transition">
+                            {s.studentName}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3.5">
+                        <span className="inline-block px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold font-mono">
+                          {s.className}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3.5">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-lg font-bold text-[11px] ${
+                            (s.groupName || "فوج 1") === "فوج 1"
+                              ? "bg-purple-50 text-purple-800 border border-purple-200"
+                              : "bg-amber-50 text-amber-900 border border-amber-200"
+                          }`}
+                        >
+                          {s.groupName || "فوج 1"}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3.5">
+                        {s.birthDate ? (
+                          <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                            {s.birthDate}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">غير محدد</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3.5">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                            isMale ? "text-blue-700 bg-blue-50" : "text-pink-700 bg-pink-50"
+                          }`}
+                        >
+                          {isMale ? "ذكر" : "أنثى"}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3.5">
+                        {s.isRepeater ? (
+                          <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-black bg-red-50 text-red-700 border border-red-200">
+                            معيد
+                          </span>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700">
+                            جديد
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3.5 font-mono text-slate-600">
+                        {s.parentPhone ? (
+                          <a
+                            href={`tel:${s.parentPhone}`}
+                            className="hover:text-emerald-700 hover:underline flex items-center gap-1"
+                          >
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            <span>{s.parentPhone}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3.5 text-center">
+                        <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition">
+                          <button
+                            onClick={() => handleEdit(s)}
+                            className="p-1.5 rounded-lg text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition"
+                            title="تعديل بيانات التلميذ"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(s)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
+                            title="حذف من الفوج"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* نافذة استيراد ملف جسور (JSON) */}
-      {showImportModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 fade-up">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 space-y-4">
+      {/* ─── نافذة معاينة وتأكيد استيراد ملف Excel ─── */}
+      {showExcelModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                  <FileJson className="w-4 h-4" />
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <FileSpreadsheet className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-black text-slate-900">
-                  استيراد قوائم التلاميذ من موقع جسور
-                </h3>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-slate-900">
+                    معاينة استيراد ملف Excel
+                  </h3>
+                  <p className="text-xs text-slate-500 font-bold truncate max-w-xs sm:max-w-md">
+                    الملف: <span className="font-mono text-emerald-700">{excelFileName}</span>
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setShowImportModal(false)}
-                className="w-8 h-8 rounded-xl bg-slate-50 text-slate-400 hover:text-slate-600 flex items-center justify-center"
+                onClick={() => setShowExcelModal(false)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-500 leading-relaxed font-medium">
-              يمكنك رفع ملف JSON المُصدّر من موقع جسور مباشرة، أو نسخ ولصق محتواه في المربع أدناه. سيقوم النظام فوراً بتوزيع التلاميذ على أقسامهم (1م1، 1م2، 1م3، 2م3) وحفظ تواريخ الميلاد.
-            </p>
-
-            <form onSubmit={handleImportSubmit} className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  اختيار ملف من جهازك:
-                </label>
-                <input
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={handleFileUpload}
-                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
-                />
+            {/* ملخص البيانات المقروءة */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-slate-500 block text-[11px] font-bold">التلاميذ المكتشفون</span>
+                <strong className="text-emerald-700 text-base font-mono font-black">
+                  {excelPreviewRows.length}
+                </strong>
               </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  أو الصق نص الـ JSON هنا:
-                </label>
-                <textarea
-                  rows={6}
-                  value={importJsonText}
-                  onChange={(e) => setImportJsonText(e.target.value)}
-                  placeholder='الصق كود JSON هنا... مثلا: [{"studentName": "...", "className": "1م1", "birthDate": "2013-05-14"}]'
-                  className="w-full p-3 font-mono text-[11px] bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition outline-none"
-                />
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-slate-500 block text-[11px] font-bold">الأقسام المكتشفة</span>
+                <strong className="text-slate-800 text-xs font-mono font-black">
+                  {Array.from(new Set(excelPreviewRows.map((r) => r.className))).join("، ") || "افتراضي"}
+                </strong>
               </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-slate-500 block text-[11px] font-bold">ذكور / إناث</span>
+                <strong className="text-blue-700 text-xs font-bold">
+                  {excelPreviewRows.filter((r) => r.gender === "M").length} ذ /{" "}
+                  {excelPreviewRows.filter((r) => r.gender === "F").length} أ
+                </strong>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-slate-500 block text-[11px] font-bold">فوج 1 / 2</span>
+                <strong className="text-purple-700 text-xs font-bold">
+                  {excelPreviewRows.filter((r) => r.groupName === "فوج 1").length} ف1 /{" "}
+                  {excelPreviewRows.filter((r) => r.groupName === "فوج 2").length} ف2
+                </strong>
+              </div>
+            </div>
 
-              {importError && (
-                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>{importError}</span>
+            {/* وضع الاستيراد */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold">
+              <span className="text-slate-700">طريقة الحفظ في الموقع:</span>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="merge"
+                    checked={importMode === "merge"}
+                    onChange={() => setImportMode("merge")}
+                    className="accent-emerald-600"
+                  />
+                  <span>دمج وتحديث (مستحسن)</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer text-red-700">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="replace"
+                    checked={importMode === "replace"}
+                    onChange={() => setImportMode("replace")}
+                    className="accent-red-600"
+                  />
+                  <span>استبدال الكل</span>
+                </label>
+              </div>
+            </div>
+
+            {/* جدول عينة من الأسطر */}
+            <div className="flex-1 overflow-y-auto border border-slate-200 rounded-2xl">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0">
+                  <tr>
+                    <th className="py-2 px-3">الاسم واللقب</th>
+                    <th className="py-2 px-3">القسم</th>
+                    <th className="py-2 px-3">الفوج</th>
+                    <th className="py-2 px-3">تاريخ الميلاد</th>
+                    <th className="py-2 px-3">الجنس</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {excelPreviewRows.slice(0, 10).map((r, i) => (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="py-2 px-3 font-bold text-slate-900">{r.studentName}</td>
+                      <td className="py-2 px-3 font-mono">{r.className}</td>
+                      <td className="py-2 px-3">{r.groupName}</td>
+                      <td className="py-2 px-3 font-mono text-slate-600">{r.birthDate || "-"}</td>
+                      <td className="py-2 px-3">{r.gender === "M" ? "ذكر" : "أنثى"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {excelPreviewRows.length > 10 && (
+                <div className="py-2 text-center text-[11px] font-bold text-slate-500 bg-slate-50 border-t border-slate-100">
+                  + {excelPreviewRows.length - 10} تلميذاً إضافياً سيتم استيرادهم أيضاً
                 </div>
               )}
+            </div>
 
-              {importFeedback && (
-                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>{importFeedback}</span>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowImportModal(false)}
-                  className="flex-1 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  disabled={importLoading}
-                  className="flex-1 h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs shadow-xs transition disabled:opacity-60"
-                >
-                  {importLoading ? "جاري الاستيراد..." : "بدء الاستيراد والحفظ"}
-                </button>
-              </div>
-            </form>
+            {/* أزرار التأكيد */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowExcelModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={importLoading}
+                onClick={handleConfirmExcelImport}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition shadow-xs flex items-center gap-2 disabled:opacity-50"
+              >
+                {importLoading ? (
+                  <span>جاري الاستيراد والحفظ...</span>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>تأكيد استيراد {excelPreviewRows.length} تلميذاً الآن</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* نافذة إضافة / تعديل تلميذ */}
+      {/* ─── نافذة إضافة / تعديل تلميذ فردي ─── */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 fade-up">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-black text-slate-900">
-                {editingStudent ? "تعديل بيانات التلميذ" : "إضافة تلميذ جديد للفوج"}
+              <h3 className="text-sm sm:text-base font-black text-slate-900">
+                {editingStudent ? "تعديل بيانات التلميذ" : "إضافة تلميذ جديد"}
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="w-8 h-8 rounded-xl bg-slate-50 text-slate-400 hover:text-slate-600 flex items-center justify-center"
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -490,93 +1146,102 @@ export default function AdminStudentsPage() {
 
             <form onSubmit={handleSaveStudent} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">اسم ولقب التلميذ:</label>
+                <label className="block font-black text-slate-700 mb-1">الاسم واللقب *</label>
                 <input
                   type="text"
                   required
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
-                  placeholder="مثال: رحماني مرام"
-                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-bold"
+                  placeholder="مثال: محمد بن أحمد"
+                  className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">القسم:</label>
-                  <select
+                  <label className="block font-black text-slate-700 mb-1">القسم</label>
+                  <input
+                    type="text"
                     value={className}
                     onChange={(e) => setClassName(e.target.value)}
-                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-bold"
-                  >
-                    {CLASSES.filter((c) => c !== "الكل").map((cls) => (
-                      <option key={cls} value={cls}>
-                        {cls}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="مثال: 1م1"
+                    className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
+                  />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الفوج الفرعي:</label>
+                  <label className="block font-black text-slate-700 mb-1">الفوج الفرعي</label>
                   <select
                     value={groupName}
                     onChange={(e) => setGroupName(e.target.value)}
-                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-bold"
+                    className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
                   >
                     <option value="فوج 1">فوج 1</option>
                     <option value="فوج 2">فوج 2</option>
-                    <option value="القسم كامل">القسم كامل</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">تاريخ الميلاد (كود استعلام الولي):</label>
+                <label className="block font-black text-slate-700 mb-1">
+                  تاريخ الميلاد (رمز دخول الولي 🔑)
+                </label>
                 <input
                   type="date"
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-bold"
+                  className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">هاتف الولي:</label>
-                  <input
-                    type="tel"
-                    value={parentPhone}
-                    onChange={(e) => setParentPhone(e.target.value)}
-                    placeholder="0661..."
-                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">الجنس:</label>
+                  <label className="block font-black text-slate-700 mb-1">الجنس</label>
                   <select
                     value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-bold"
+                    onChange={(e) => setGender(e.target.value as "M" | "F")}
+                    className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
                   >
                     <option value="M">ذكر 👦</option>
                     <option value="F">أنثى 👧</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block font-black text-slate-700 mb-1">الحالة</label>
+                  <select
+                    value={isRepeater ? "yes" : "no"}
+                    onChange={(e) => setIsRepeater(e.target.value === "yes")}
+                    className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
+                  >
+                    <option value="no">جديد</option>
+                    <option value="yes">معيد 🔁</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div>
+                <label className="block font-black text-slate-700 mb-1">هاتف الولي (اختياري)</label>
+                <input
+                  type="tel"
+                  value={parentPhone}
+                  onChange={(e) => setParentPhone(e.target.value)}
+                  placeholder="0661234567"
+                  className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black transition"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-xs transition"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black transition shadow-xs"
                 >
-                  حفظ البيانات
+                  حفظ التلميذ
                 </button>
               </div>
             </form>
