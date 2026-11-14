@@ -1301,76 +1301,32 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </Link>
         </div>
 
-        {/* المنظومة المتطورة: إدارة التلاميذ، التقويم المستمر، دفتر التنقيط، وفضاء الأولياء */}
-        <div className="pt-2 border-t border-slate-100 space-y-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-            {/* 1. إدارة وتوثيق التلاميذ */}
-            <Link
-              href="/admin/students"
-              className="p-3 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-xs hover:shadow-md transition flex items-center gap-2.5 group"
-            >
-              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                <Users className="w-5 h-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-black truncate flex items-center gap-1">
-                  <span>إدارة التلاميذ والأفواج</span>
-                  <span className="text-[10px] bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded font-black">Excel</span>
+        {/* بطاقة التقييم الميداني السريع المستقل (مخصصة للهاتف أثناء الحصة) */}
+        <div className="pt-2 border-t border-slate-100">
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-3 rounded-2xl text-white shadow-sm flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg font-black shrink-0">
+                ⚡
+              </span>
+              <div>
+                <div className="text-xs font-black flex items-center gap-1.5">
+                  <span>دفتر التقييم الميداني السريع (صفحة مستقلة للهاتف)</span>
+                  <span className="bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded text-[10px] font-black">
+                    جديد 🚀
+                  </span>
                 </div>
-                <p className="text-[10px] text-emerald-100 truncate">تواريخ الميلاد (كود الولي) وبطاقات QR</p>
+                <p className="text-[11px] text-emerald-100 font-medium">
+                  تفقد الكراريس والواجبات الدورية (8 دروس + 8 واجبات + سلوك + نشاط) مع حساب المعدل التلقائي
+                </p>
               </div>
-            </Link>
+            </div>
 
-            {/* 2. دفتر التقويم المستمر */}
-            <Link
-              href="/eval/continuous"
-              className="p-3 rounded-2xl bg-gradient-to-br from-teal-700 to-emerald-800 text-white shadow-xs hover:shadow-md transition flex items-center gap-2.5 group"
-            >
-              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                <ClipboardCheck className="w-5 h-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-black truncate flex items-center gap-1">
-                  <span>دفتر التقويم المستمر</span>
-                  <span className="text-[10px] bg-emerald-300 text-slate-900 px-1.5 py-0.2 rounded font-black">20ن</span>
-                </div>
-                <p className="text-[10px] text-emerald-100 truncate">سلوك، كراس، وظائف، استجوابات</p>
-              </div>
-            </Link>
-
-            {/* 3. دفتر التنقيط الفصلي */}
             <Link
               href="/eval"
-              className="p-3 rounded-2xl bg-gradient-to-br from-blue-700 to-indigo-800 text-white shadow-xs hover:shadow-md transition flex items-center gap-2.5 group"
+              className="py-1.5 px-3.5 rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-black shrink-0 flex items-center gap-1.5 shadow-sm transition active:scale-95"
             >
-              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                <Scale className="w-5 h-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-black truncate flex items-center gap-1">
-                  <span>دفتر التنقيط الفصلي</span>
-                  <span className="text-[10px] bg-sky-300 text-slate-900 px-1.5 py-0.2 rounded font-black">رسمي</span>
-                </div>
-                <p className="text-[10px] text-blue-100 truncate">التقويم، الفروض، الاختبارات والمعدلات</p>
-              </div>
-            </Link>
-
-            {/* 4. فضاء الأولياء */}
-            <Link
-              href="/parent"
-              target="_blank"
-              className="p-3 rounded-2xl bg-gradient-to-br from-amber-600 to-orange-700 text-white shadow-xs hover:shadow-md transition flex items-center gap-2.5 group"
-            >
-              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                <HeartHandshake className="w-5 h-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-black truncate flex items-center gap-1">
-                  <span>فضاء الأولياء المباشر</span>
-                  <ExternalLink className="w-3 h-3 text-amber-200" />
-                </div>
-                <p className="text-[10px] text-amber-100 truncate">استعلام الولي بتاريخ الميلاد</p>
-              </div>
+              <span>فتح دفتر التقييم السريع</span>
+              <ExternalLink className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>

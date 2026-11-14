@@ -137,85 +137,45 @@ export function TeacherAccess() {
                   <span>تم تسجيل الدخول بنجاح! اختر وجهتك:</span>
                 </div>
 
-                {/* 1. إدارة وتوثيق التلاميذ والأفواج */}
+                {/* خيار 1: دفتر التقييم الميداني السريع للهاتف */}
                 <Link
-                  href="/admin/students"
+                  href="/eval"
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 p-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white hover:opacity-95 transition shadow-sm group"
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white hover:opacity-95 transition shadow-sm group"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-base font-black shrink-0">
-                    👥
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-black flex items-center gap-1.5">
-                      <span>إدارة وتوثيق التلاميذ والأفواج</span>
-                      <span className="bg-amber-400 text-slate-900 px-1 py-0.2 rounded text-[9px] font-black">Excel</span>
-                    </div>
-                    <p className="text-[10px] text-emerald-100 mt-0.5 truncate">
-                      تواريخ الميلاد ككود سري للولي وبطاقات QR
-                    </p>
-                  </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-emerald-200 group-hover:text-white transition" />
-                </Link>
-
-                {/* 2. دفتر التقويم المستمر */}
-                <Link
-                  href="/eval/continuous"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 p-2.5 rounded-2xl bg-gradient-to-r from-teal-700 to-emerald-800 text-white hover:opacity-95 transition shadow-sm group"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-base font-black shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-lg font-black shrink-0">
                     ⚡
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-black flex items-center gap-1.5">
-                      <span>دفتر التقويم المستمر المفصل</span>
-                      <span className="bg-emerald-300 text-slate-900 px-1 py-0.2 rounded text-[9px] font-black">20ن</span>
+                      <span>دفتر التقييم الميداني السريع</span>
+                      <span className="bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded text-[9px] font-black">
+                        للهاتف 📱
+                      </span>
                     </div>
-                    <p className="text-[10px] text-emerald-100 mt-0.5 truncate">
-                      سلوك، كراس، وظائف، استجوابات وطباعة PDF
+                    <p className="text-[10px] text-emerald-100 mt-0.5 line-clamp-1">
+                      تفقد الكراريس والواجبات والمعدلات التلقائية
                     </p>
                   </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-emerald-200 group-hover:text-white transition" />
+                  <ExternalLink className="w-4 h-4 text-emerald-200 group-hover:text-white transition" />
                 </Link>
 
-                {/* 3. دفتر التنقيط الفصلي والمعدلات */}
-                <Link
-                  href="/eval"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 p-2.5 rounded-2xl bg-gradient-to-r from-blue-700 to-indigo-800 text-white hover:opacity-95 transition shadow-sm group"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-base font-black shrink-0">
-                    📊
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-black flex items-center gap-1.5">
-                      <span>دفتر التنقيط الفصلي الرسمي</span>
-                      <span className="bg-sky-300 text-slate-900 px-1 py-0.2 rounded text-[9px] font-black">رسمي</span>
-                    </div>
-                    <p className="text-[10px] text-blue-100 mt-0.5 truncate">
-                      الفروض، الاختبارات، المعدلات والنسب
-                    </p>
-                  </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-blue-200 group-hover:text-white transition" />
-                </Link>
-
-                {/* 4. لوحة الإدارة الكاملة للدروس */}
+                {/* خيار 2: لوحة التحكم الكاملة */}
                 <Link
                   href="/admin"
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 p-2.5 rounded-2xl bg-slate-900 text-white hover:bg-slate-800 transition shadow-sm group"
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-slate-900 text-white hover:bg-slate-800 transition shadow-sm group"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-                    <Settings className="w-4 h-4 text-emerald-400" />
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                    <Settings className="w-5 h-5 text-emerald-400" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-black">لوحة التحكم الكاملة</div>
-                    <p className="text-[10px] text-slate-300 mt-0.5 truncate">
+                    <p className="text-[10px] text-slate-300 mt-0.5 line-clamp-1">
                       رفع الدروس وصور السبورة وحلول الواجبات والخصومات
                     </p>
                   </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition" />
+                  <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-white transition" />
                 </Link>
               </div>
             )}

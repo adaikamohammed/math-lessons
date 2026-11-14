@@ -377,7 +377,7 @@ export async function GET() {
     const osMap: Record<string, number> = {};
     const browserMap: Record<string, number> = {};
 
-    const allDevices = Object.values(knownDevices) as KnownDeviceSummary[];
+    const allDevices = Object.values(knownDevices);
     for (const dev of allDevices) {
       if (dev.deviceType === "mobile") deviceTypes.mobile++;
       else if (dev.deviceType === "tablet") deviceTypes.tablet++;
