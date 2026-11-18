@@ -29,8 +29,10 @@ import {
   ChevronRight,
   Search,
   Check,
+  BarChart3,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import GradesStatsDashboard from "@/components/grades/GradesStatsDashboard";
 
 const CLASSES = ["1م1", "1م2", "1م3", "2م3"] as const;
 
@@ -423,6 +425,25 @@ export const QUICK_CHIPS_MAP: Record<string, QuickChip[]> = {
 
 export default function AdminGradesExcelPage() {
   const [selectedClass, setSelectedClass] = useState<string>("1م1");
+  const [activeMainTab, setActiveMainTab] = useState<"gradebook" | "stats">("gradebook");
+
+  // دعم بارامترات الرابط ?tab=stats&class=1م1&trimester=1
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "stats") {
+        setActiveMainTab("stats");
+      }
+      const cls = params.get("class");
+      if (cls && (CLASSES as readonly string[]).includes(cls)) {
+        setSelectedClass(cls);
+      }
+      const tri = Number(params.get("trimester"));
+      if (tri === 1 || tri === 2 || tri === 3) {
+        setTrimester(tri as any);
+      }
+    }
+  }, []);
   const [trimester, setTrimester] = useState<1 | 2 | 3>(1);
   const [students, setStudents] = useState<StudentGradeRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1032,9 +1053,56 @@ export default function AdminGradesExcelPage() {
             </button>
           </div>
         </div>
+
+        {/* شريط التبويبات الرئيسي: التبديل بين دفتر الرصد ومركز الإحصائيات */}
+        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 print:hidden">
+          <button
+            type="button"
+            onClick={() => setActiveMainTab("gradebook")}
+            className={`px-4 py-2 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              activeMainTab === "gradebook"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>دفتر رصد العلامات (جدول / بطاقات)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMainTab("stats")}
+            className={`px-4 py-2 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              activeMainTab === "stats"
+                ? "bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-xs"
+                : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>مركز الإحصائيات والتحليل البياني</span>
+            <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.2 rounded-full">
+              جديد
+            </span>
+          </button>
+        </div>
       </div>
 
-      {/* ─── محدد الأفواج والفصول والفلاتر ─── */}
+      {/* لوحة الإحصائيات والتحليل البياني المستقلة */}
+      {activeMainTab === "stats" && (
+        <GradesStatsDashboard
+          currentClass={selectedClass}
+          currentTrimester={trimester}
+          students={students}
+          availableClasses={Array.from(CLASSES)}
+          onClassChange={(cls) => setSelectedClass(cls)}
+          onTrimesterChange={(tri) => setTrimester(tri)}
+          onBackToGradebook={() => setActiveMainTab("gradebook")}
+        />
+      )}
+
+      {/* حاوية دفتر الرصد والعلامات (تُخفى عند فتح الإحصائيات مع الحفاظ على حالتها) */}
+      <div className={activeMainTab === "stats" ? "hidden" : "space-y-4"}>
+        {/* ─── محدد الأفواج والفصول والفلاتر ─── */}
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* اختيار الفوج */}
@@ -1688,6 +1756,8 @@ export default function AdminGradesExcelPage() {
         </div>
       </div>
       )}
+
+      </div>
 
       {/* ─── نافذة تخصيص وترتيب الأعمدة ─── */}
       {showColModal && (

@@ -1354,6 +1354,27 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </Link>
 
           <Link
+            href="/admin/grades?tab=stats"
+            className="p-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 hover:border-emerald-300 text-emerald-950 flex items-center justify-between gap-2 transition group shadow-2xs active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-xs">
+                📊
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs font-black text-slate-900 group-hover:text-emerald-700 transition truncate flex items-center gap-1.5">
+                  <span>مركز الإحصائيات والتحليل البياني</span>
+                  <span className="text-[9px] bg-amber-500 text-white font-black px-1.5 py-0.2 rounded-full">جديد</span>
+                </div>
+                <div className="text-[10px] text-slate-500 font-medium truncate">
+                  تحليل الفروض والاختبارات، نسب النجاح والشرائح، ومقارنة الأفواج
+                </div>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-emerald-600 shrink-0" />
+          </Link>
+
+          <Link
             href="/admin/grades"
             className="p-3 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 hover:border-blue-300 text-blue-950 flex items-center justify-between gap-2 transition group shadow-2xs active:scale-[0.99]"
           >
