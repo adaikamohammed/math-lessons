@@ -15,13 +15,15 @@ function StatsContent() {
   const [trimester, setTrimester] = useState<1 | 2 | 3>(initialTrimester);
 
   return (
-    <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4" dir="rtl">
-      <GradesStatsDashboard
-        currentClass={selectedClass}
-        currentTrimester={trimester}
-        onClassChange={(c) => setSelectedClass(c)}
-        onTrimesterChange={(t) => setTrimester(t)}
-      />
+    <div className="min-h-screen bg-slate-50 text-slate-900" dir="rtl">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4">
+        <GradesStatsDashboard
+          currentClass={selectedClass}
+          currentTrimester={trimester}
+          onClassChange={(c) => setSelectedClass(c)}
+          onTrimesterChange={(t) => setTrimester(t)}
+        />
+      </div>
     </div>
   );
 }
@@ -30,7 +32,7 @@ export default function AdminGradesStatsPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="flex items-center justify-center min-h-[50vh] bg-white">
           <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
         </div>
       }
