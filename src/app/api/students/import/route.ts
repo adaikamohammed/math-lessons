@@ -119,23 +119,52 @@ export async function POST(req: NextRequest) {
 
       const existingIndex = currentRoster.findIndex(
         (s) =>
-          normalizeArabic(s.studentName) === normName &&
-          normalizeClass(s.className) === normCls
+          (raw.id && s.id === raw.id) ||
+          (normalizeArabic(s.studentName) === normName &&
+           normalizeClass(s.className) === normCls)
       );
 
       if (existingIndex >= 0) {
-        // تحديث البيانات الإضافية كتاريخ الميلاد أو الهاتف
+        // تحديث بيانات التلميذ بالكامل مع الاسم والفوج
         const existing = currentRoster[existingIndex];
+        const oldName = existing.studentName;
+        const oldCls = existing.className;
+
         currentRoster[existingIndex] = {
           ...existing,
-          birthDate: birthDate || existing.birthDate,
-          groupName: groupName || existing.groupName,
-          gender: gender || existing.gender,
-          isRepeater: isRepeater ?? existing.isRepeater,
-          parentPhone: parentPhone || existing.parentPhone,
-          notes: notes || existing.notes,
+          id: existing.id || raw.id,
+          studentName: name,
+          className: normCls,
+          groupName: (groupName || existing.groupName || "فوج 1") as any,
+          birthDate: birthDate !== undefined ? birthDate : existing.birthDate,
+          gender: (gender || existing.gender || "M") as any,
+          isRepeater: isRepeater !== undefined ? isRepeater : existing.isRepeater,
+          parentPhone: parentPhone !== undefined ? parentPhone : existing.parentPhone,
+          notes: notes !== undefined ? notes : existing.notes,
         };
         updatedStudentsCount++;
+
+        // تحديث سجلات التقييم والنقاط إن تغير الاسم أو القسم
+        if (oldName !== name || oldCls !== normCls) {
+          (currentData.evaluations || []).forEach((e) => {
+            if (
+              (e.studentName || "").trim().toLowerCase() === oldName.trim().toLowerCase() &&
+              normalizeClass(e.className) === normalizeClass(oldCls)
+            ) {
+              e.studentName = name;
+              e.className = normCls;
+            }
+          });
+          currentGrades.forEach((g) => {
+            if (
+              (g.studentName || "").trim().toLowerCase() === oldName.trim().toLowerCase() &&
+              normalizeClass(g.className) === normalizeClass(oldCls)
+            ) {
+              g.studentName = name;
+              g.className = normCls;
+            }
+          });
+        }
       } else {
         // إضافة تلميذ جديد
         const newStudent: StudentRosterItem = {
@@ -236,6 +265,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `تم بنجاح استيراد ${addedStudentsCount} تلميذاً جديداً، وتحديث ${updatedStudentsCount} تلميذاً، ومزامنة ${addedGradesCount} سجلاً للنقاط.`,
+      roster: currentData.studentRoster,
       stats: {
         totalRoster: currentRoster.length,
         addedStudentsCount,

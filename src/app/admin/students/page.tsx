@@ -152,10 +152,12 @@ export default function AdminStudentsPage() {
   };
 
   // جلب قائمة التلاميذ وتوحيد أسماء الأفواج تلقائياً
-  const fetchRoster = async () => {
+  const fetchRoster = async (options?: { quiet?: boolean }) => {
     try {
-      setLoading(true);
-      const res = await fetch("/api/grades?className=&trimester=1");
+      if (!options?.quiet) setLoading(true);
+      const res = await fetch(`/api/grades?className=&trimester=1&_t=${Date.now()}`, {
+        cache: "no-store",
+      });
       const data = await res.json();
       if (data.students) {
         let hasUnnormalized = false;
@@ -189,9 +191,9 @@ export default function AdminStudentsPage() {
       }
     } catch (err) {
       console.error(err);
-      notify("err", "تعذر جلب بيانات التلاميذ من الخادم");
+      if (!options?.quiet) notify("err", "تعذر جلب بيانات التلاميذ من الخادم");
     } finally {
-      setLoading(false);
+      if (!options?.quiet) setLoading(false);
     }
   };
 
@@ -309,13 +311,17 @@ export default function AdminStudentsPage() {
           mode: "replace",
         }),
       });
-      if (!res.ok) throw new Error("فشل الحفظ على السيرفر");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل الحفظ على السيرفر");
+      if (Array.isArray(data.roster)) {
+        setRoster(data.roster);
+      }
       notify("ok", msgSuccess);
       clearSelection();
     } catch (err: any) {
       console.error(err);
       notify("err", err.message || "حدث خطأ أثناء الحفظ");
-      fetchRoster(); // إعادة التحميل عند الخطأ
+      fetchRoster({ quiet: true }); // إعادة التحميل بهدوء عند الخطأ
     } finally {
       setSaving(false);
     }
@@ -763,22 +769,44 @@ export default function AdminStudentsPage() {
     notify("ok", `تم تحميل ملف الإكسل بنجاح: ${fileName}`);
   };
 
-  // حفظ تلميذ يدوي فردي
+  // حفظ تلميذ يدوي فردي (مع تحديث فوري سريع في الواجهة بدون تأخير)
   const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim()) return;
 
+    const targetClass = normalizeClassName(className);
+    const targetGroup = groupName;
+    const targetGender = gender;
+    const targetBirth = birthDate.trim();
+    const targetPhone = parentPhone.trim();
+    const targetName = studentName.trim();
+    const isEditMode = Boolean(editingStudent);
+
     const studentPayload: StudentRosterItem = {
       id: editingStudent ? editingStudent.id : `rst_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      studentName: studentName.trim(),
-      className: normalizeClassName(className),
-      groupName: groupName as any,
-      birthDate: birthDate.trim(),
-      parentPhone: parentPhone.trim(),
-      gender: gender as any,
+      studentName: targetName,
+      className: targetClass,
+      groupName: targetGroup as any,
+      birthDate: targetBirth,
+      parentPhone: targetPhone,
+      gender: targetGender as any,
       isRepeater,
     };
 
+    // 1. تحديث تفاؤلي فوري في الواجهة (Instant Optimistic UI Update) - 0 ثانية انتظار!
+    if (editingStudent) {
+      setRoster((prev) => prev.map((s) => (s.id === editingStudent.id ? studentPayload : s)));
+    } else {
+      setRoster((prev) => [...prev, studentPayload]);
+    }
+
+    // إغلاق النافذة وتصفير النموذج فوراً
+    setShowAddModal(false);
+    setEditingStudent(null);
+    resetForm();
+    notify("ok", isEditMode ? "تم تعديل بيانات التلميذ بنجاح ✅" : "تمت إضافة التلميذ بنجاح ✅");
+
+    // 2. الحفظ الفعلي على السيرفر في الخلفية
     try {
       const res = await fetch("/api/students/import", {
         method: "POST",
@@ -788,16 +816,17 @@ export default function AdminStudentsPage() {
           mode: "merge",
         }),
       });
-      if (res.ok) {
-        setShowAddModal(false);
-        setEditingStudent(null);
-        resetForm();
-        fetchRoster();
-        notify("ok", "تم حفظ بيانات التلميذ بنجاح");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "فشل حفظ التلميذ على الخادم");
       }
-    } catch (err) {
+      if (Array.isArray(data.roster)) {
+        setRoster(data.roster);
+      }
+    } catch (err: any) {
       console.error(err);
-      notify("err", "فشل حفظ التلميذ");
+      notify("err", err.message || "حدث خطأ أثناء حفظ التلميذ، يرجى المحاولة مرة أخرى");
+      fetchRoster({ quiet: true });
     }
   };
 
@@ -816,8 +845,11 @@ export default function AdminStudentsPage() {
   const handleDelete = async (s: StudentRosterItem) => {
     if (!confirm(`هل أنت متأكد من حذف التلميذ "${s.studentName}" من القائمة؟`)) return;
 
+    // حذف فوري سريع في الواجهة
     const updated = roster.filter((item) => item.id !== s.id);
-    await saveUpdatedRoster(updated, `تم حذف التلميذ ${s.studentName}`);
+    setRoster(updated);
+
+    await saveUpdatedRoster(updated, `تم حذف التلميذ ${s.studentName} بنجاح 🗑️`);
   };
 
   const resetForm = () => {

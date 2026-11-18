@@ -116,6 +116,11 @@ const FIXED_BLOB_DB_URL = "https://zcvevxcbfufx3f96.public.blob.vercel-storage.c
 
 // ----------------- قراءة بيانات الدروس -----------------
 export async function getLessonsData(): Promise<LessonsData> {
+  // كاش ذاكرة فوري لتفادي تأخير كاش الـ CDN بعد الحفظ المباشر
+  if (memoryCache && Date.now() - memoryCache.timestamp < 30000) {
+    return JSON.parse(JSON.stringify(memoryCache.data));
+  }
+
   const token = getBlobToken();
 
   if (token) {
@@ -197,6 +202,8 @@ export async function getLessonsData(): Promise<LessonsData> {
 
 // ----------------- حفظ بيانات الدروس -----------------
 async function executeSave(data: LessonsData): Promise<void> {
+  synchronizeStudents(data);
+  memoryCache = { data: JSON.parse(JSON.stringify(data)), timestamp: Date.now() };
   // دمج وقائي صارم لمنع فقدان الدروس أو التلاميذ عند حدوث أي خطأ في الكاش
   try {
     const existing = await getLessonsData();
@@ -263,6 +270,8 @@ async function executeSave(data: LessonsData): Promise<void> {
 }
 
 export function saveLessonsData(data: LessonsData): Promise<void> {
+  synchronizeStudents(data);
+  memoryCache = { data: JSON.parse(JSON.stringify(data)), timestamp: Date.now() };
   const next = writeQueue.then(() => executeSave(data));
   writeQueue = next.catch(() => {});
   return next;
