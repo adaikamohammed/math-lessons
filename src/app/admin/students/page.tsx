@@ -34,6 +34,9 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Zap,
+  Save,
+  RotateCcw,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { StudentRosterItem } from "@/lib/types";
@@ -114,6 +117,11 @@ export default function AdminStudentsPage() {
     const [genderFilter, setGenderFilter] = useState<"all" | "M" | "F">("all");
   const [sortAlphabetical, setSortAlphabetical] = useState<"none" | "asc" | "desc">("none");
 
+  // ─── وضع التعديل السريع المباشر في الجدول (Inline Batch Edit Mode) ───
+  const [isBatchEditMode, setIsBatchEditMode] = useState(false);
+  const [batchDraft, setBatchDraft] = useState<Record<string, StudentRosterItem>>({});
+  const [batchDirtyIds, setBatchDirtyIds] = useState<Set<string>>(new Set());
+
   // التحديد المتعدد (Bulk Selection)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -142,6 +150,17 @@ export default function AdminStudentsPage() {
   const [importMode, setImportMode] = useState<"merge" | "replace">("merge");
   const [importLoading, setImportLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // قفل تمرير خلفية الصفحة عندما تكون أي نافذة منبثقة مفتوحة لتظهر أمام الأستاذ مباشرة
+  useEffect(() => {
+    if (showAddModal || showMoveModal || showExcelModal) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [showAddModal, showMoveModal, showExcelModal]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -296,6 +315,96 @@ export default function AdminStudentsPage() {
 
   const clearSelection = () => {
     setSelectedIds(new Set());
+  };
+
+  // ─── دوال وضع التعديل السريع المباشر لجميع التلاميذ ───
+  const handleToggleBatchEdit = () => {
+    if (!isBatchEditMode) {
+      const draft: Record<string, StudentRosterItem> = {};
+      roster.forEach((s) => {
+        draft[s.id] = { ...s };
+      });
+      setBatchDraft(draft);
+      setBatchDirtyIds(new Set());
+      setIsBatchEditMode(true);
+      notify("ok", "⚡ تم تفعيل وضع التعديل السريع! يمكنك الآن كتابة تواريخ الميلاد وتعديل البيانات مباشرة في الجدول ثم الضغط على «حفظ»");
+    } else {
+      if (batchDirtyIds.size > 0) {
+        if (!confirm(`⚠️ لديك ${batchDirtyIds.size} تلميذ تم تعديل بياناتهم. هل تريد حقاً الخروج وإلغاء هذه التعديلات غير المحفوظة؟`)) {
+          return;
+        }
+      }
+      setIsBatchEditMode(false);
+      setBatchDraft({});
+      setBatchDirtyIds(new Set());
+    }
+  };
+
+  const handleCancelBatchEdit = () => {
+    if (batchDirtyIds.size > 0) {
+      if (!confirm(`هل أنت متأكد من إلغاء التعديلات على ${batchDirtyIds.size} تلميذاً؟`)) return;
+    }
+    setIsBatchEditMode(false);
+    setBatchDraft({});
+    setBatchDirtyIds(new Set());
+  };
+
+  const handleUpdateBatchField = (id: string, field: keyof StudentRosterItem, value: any) => {
+    setBatchDraft((prev) => {
+      const current = prev[id] || roster.find((s) => s.id === id);
+      if (!current) return prev;
+      return {
+        ...prev,
+        [id]: {
+          ...current,
+          [field]: value,
+        },
+      };
+    });
+    setBatchDirtyIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
+
+  const handleSaveBatchEdits = async () => {
+    setSaving(true);
+    const updatedList = roster.map((s) => batchDraft[s.id] || s);
+    const count = batchDirtyIds.size;
+
+    await saveUpdatedRoster(
+      updatedList,
+      `🎉 تم بنجاح حفظ وتحديث بيانات وتواريخ ميلاد ${count > 0 ? count : "جميع"} التلاميذ دفعة واحدة في قاعدة البيانات!`
+    );
+    setIsBatchEditMode(false);
+    setBatchDraft({});
+    setBatchDirtyIds(new Set());
+  };
+
+  const handleBatchFillYear = (year: string) => {
+    const nextDraft = { ...batchDraft };
+    const nextDirty = new Set(batchDirtyIds);
+    let filled = 0;
+
+    sortedRoster.forEach((s) => {
+      const current = nextDraft[s.id] || { ...s };
+      if (!current.birthDate) {
+        current.birthDate = `${year}-01-01`;
+        nextDraft[s.id] = current;
+        nextDirty.add(s.id);
+        filled++;
+      }
+    });
+
+    if (filled === 0) {
+      notify("err", "جميع التلاميذ المعروضين لديهم تواريخ ميلاد مسجلة بالفعل!");
+      return;
+    }
+
+    setBatchDraft(nextDraft);
+    setBatchDirtyIds(nextDirty);
+    notify("ok", `تم تعبئة سنة ${year} مبدئياً لـ ${filled} تلميذاً! يمكنك الآن ضبط اليوم والشهر وحفظ الكل بنقرة واحدة.`);
   };
 
   // حفظ التعديلات الجماعية على السيرفر
@@ -962,6 +1071,21 @@ export default function AdminStudentsPage() {
               <span>تصدير Excel 📊</span>
             </button>
 
+            {/* زر وضع التعديل السريع الشامل */}
+            <button
+              onClick={handleToggleBatchEdit}
+              type="button"
+              className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm ${
+                isBatchEditMode
+                  ? "bg-amber-500 hover:bg-amber-600 text-slate-950 ring-2 ring-amber-400"
+                  : "bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white ring-2 ring-emerald-500/20"
+              }`}
+              title="تعديل تواريخ الميلاد والأسماء والأفواج مباشرة في الجدول وحفظها بنقرة واحدة"
+            >
+              <Zap className={`w-4 h-4 ${isBatchEditMode ? "text-slate-950 fill-current animate-bounce" : "text-amber-300"}`} />
+              <span>{isBatchEditMode ? "إنهاء التعديل السريع ✕" : "⚡ تعديل سريع للكل (تواريخ الميلاد)"}</span>
+            </button>
+
             {/* زر إضافة تلميذ يدوي */}
             <button
               onClick={() => {
@@ -1213,6 +1337,85 @@ export default function AdminStudentsPage() {
           </div>
         </div>
 
+        {/* ─── شريط تنبيه وتحكم وضع التعديل السريع المباشر ─── */}
+        {isBatchEditMode && (
+          <div className="m-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-400 shadow-sm flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-xs shrink-0">
+                <Zap className="w-5 h-5 fill-current text-amber-300" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-black text-slate-900">
+                    وضع التعديل السريع الشامل مفعل ⚡
+                  </h4>
+                  <span className="text-[11px] bg-emerald-200 text-emerald-900 font-mono font-black px-2.5 py-0.5 rounded-full border border-emerald-300">
+                    تم تعديل {batchDirtyIds.size} تلميذ
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 font-bold">
+                  اكتب تواريخ الميلاد والأسماء مباشرة في خانات الجدول أدناه ثم اضغط «حفظ جميع التعديلات دفعة واحدة».
+                </p>
+              </div>
+            </div>
+
+            {/* أزرار الحفظ والإلغاء وتعبئة السنة */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="hidden sm:flex items-center gap-1 bg-white border border-emerald-200 rounded-xl p-1 text-[11px] font-bold">
+                <span className="text-slate-500 px-1">سنة افتراضية:</span>
+                <button
+                  type="button"
+                  onClick={() => handleBatchFillYear("2012")}
+                  className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition cursor-pointer"
+                  title="تعبئة 2012-01-01 للتلاميذ الذين ليس لديهم تاريخ ميلاد"
+                >
+                  2012
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBatchFillYear("2011")}
+                  className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition cursor-pointer"
+                  title="تعبئة 2011-01-01 للتلاميذ الذين ليس لديهم تاريخ ميلاد"
+                >
+                  2011
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBatchFillYear("2013")}
+                  className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition cursor-pointer"
+                  title="تعبئة 2013-01-01 للتلاميذ الذين ليس لديهم تاريخ ميلاد"
+                >
+                  2013
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCancelBatchEdit}
+                className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer"
+              >
+                إلغاء
+              </button>
+
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleSaveBatchEdits}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                {saving ? (
+                  <span>جاري الحفظ...</span>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>حفظ جميع التعديلات دفعة واحدة 💾</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ─── منطقة الإفلات السريع إذا كان الفوج فارغاً ─── */}
         {filteredRoster.length === 0 && !loading && (
           <div
@@ -1258,59 +1461,227 @@ export default function AdminStudentsPage() {
           </div>
         )}
 
-        {/* ─── جدول قائمة التلاميذ مع التحديد المتعدد ─── */}
+        {/* ─── جدول قائمة التلاميذ مع التحديد المتعدد والتعديل السريع ─── */}
         {filteredRoster.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
               <thead className="bg-slate-100/90 text-slate-700 font-black border-b border-slate-200">
                 <tr>
-                  {/* مربع اختيار الكل */}
+                  {/* مربع اختيار الكل أو الترقيم */}
                   <th className="py-3 px-3 w-10 text-center">
-                    <button
-                      type="button"
-                      onClick={toggleSelectAllVisible}
-                      className="text-slate-600 hover:text-emerald-700 transition"
-                      title={isAllVisibleSelected ? "إلغاء تحديد الكل" : "تحديد الكل"}
-                    >
-                      {isAllVisibleSelected ? (
-                        <CheckSquare className="w-4 h-4 text-emerald-600" />
-                      ) : (
-                        <Square className="w-4 h-4 text-slate-400" />
-                      )}
-                    </button>
+                    {!isBatchEditMode ? (
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllVisible}
+                        className="text-slate-600 hover:text-emerald-700 transition"
+                        title={isAllVisibleSelected ? "إلغاء تحديد الكل" : "تحديد الكل"}
+                      >
+                        {isAllVisibleSelected ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400" />
+                        )}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-mono text-slate-500">#</span>
+                    )}
                   </th>
-                  <th className="py-3 px-2 w-10 text-center">#</th>
+                  <th className="py-3 px-2 w-10 text-center">
+                    {isBatchEditMode ? "الحالة" : "#"}
+                  </th>
                   <th
-    onClick={() => {
-      setSortAlphabetical((prev) => (prev === "asc" ? "desc" : "asc"));
-    }}
-    className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/80 transition select-none"
-    title="انقر هنا للترتيب الأبجدي"
-  >
-    <div className="flex items-center gap-1.5">
-      <span>اسم ولقب التلميذ</span>
-      <ArrowUpDown className="w-3 h-3 text-slate-400 group-hover:text-slate-600" />
-      {sortAlphabetical === "asc" && (
-        <span className="text-[10px] text-emerald-700 font-black bg-emerald-100 px-1 rounded">أ-ي</span>
-      )}
-      {sortAlphabetical === "desc" && (
-        <span className="text-[10px] text-teal-700 font-black bg-teal-100 px-1 rounded">ي-أ</span>
-      )}
-    </div>
-  </th>
+                    onClick={() => {
+                      if (!isBatchEditMode) {
+                        setSortAlphabetical((prev) => (prev === "asc" ? "desc" : "asc"));
+                      }
+                    }}
+                    className={`py-3 px-3.5 select-none ${!isBatchEditMode ? "cursor-pointer hover:bg-slate-200/80 transition" : ""}`}
+                    title={!isBatchEditMode ? "انقر هنا للترتيب الأبجدي" : ""}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>اسم ولقب التلميذ</span>
+                      {!isBatchEditMode && (
+                        <>
+                          <ArrowUpDown className="w-3 h-3 text-slate-400 group-hover:text-slate-600" />
+                          {sortAlphabetical === "asc" && (
+                            <span className="text-[10px] text-emerald-700 font-black bg-emerald-100 px-1 rounded">أ-ي</span>
+                          )}
+                          {sortAlphabetical === "desc" && (
+                            <span className="text-[10px] text-teal-700 font-black bg-teal-100 px-1 rounded">ي-أ</span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </th>
                   <th className="py-3 px-3.5">القسم</th>
                   <th className="py-3 px-3.5">الفوج الفرعي</th>
-                  <th className="py-3 px-3.5">تاريخ الميلاد (رمز دخول الولي 🔑)</th>
+                  <th className="py-3 px-3.5">
+                    <span className="flex items-center gap-1">
+                      <span>تاريخ الميلاد (رمز دخول الولي 🔑)</span>
+                      {isBatchEditMode && (
+                        <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.2 rounded-md animate-pulse">
+                          مباشر ⚡
+                        </span>
+                      )}
+                    </span>
+                  </th>
                   <th className="py-3 px-3.5">الجنس</th>
                   <th className="py-3 px-3.5">الحالة</th>
                   <th className="py-3 px-3.5">هاتف الولي</th>
-                  <th className="py-3 px-3.5 text-center w-24">إجراءات</th>
+                  <th className="py-3 px-3.5 text-center w-24">
+                    {isBatchEditMode ? "حالة التعديل" : "إجراءات"}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sortedRoster.map((s, idx) => {
-                  const isMale = s.gender === "M" || s.gender === "ذكر";
                   const isSelected = selectedIds.has(s.id);
+
+                  if (isBatchEditMode) {
+                    const cur = batchDraft[s.id] || s;
+                    const isMale = cur.gender === "M" || cur.gender === "ذكر";
+                    const isDirty = batchDirtyIds.has(s.id);
+
+                    return (
+                      <tr
+                        key={s.id}
+                        className={`transition ${
+                          isDirty
+                            ? "bg-amber-50/80 hover:bg-amber-100/80 border-r-4 border-r-amber-500"
+                            : "hover:bg-slate-50/80"
+                        }`}
+                      >
+                        <td className="py-2 px-3 text-center">
+                          <span className="text-[11px] font-mono font-bold text-slate-500">
+                            {idx + 1}
+                          </span>
+                        </td>
+                        <td className="py-2 px-1 text-center w-10">
+                          {isDirty ? (
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 block mx-auto animate-pulse" title="تم تعديل هذا التلميذ" />
+                          ) : (
+                            <span className="text-slate-300 text-[11px]">✓</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2.5 min-w-[200px]">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateBatchField(s.id, "gender", isMale ? "F" : "M")}
+                              className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 cursor-pointer transition hover:scale-110 active:scale-95 ${
+                                isMale ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"
+                              }`}
+                              title="اضغط لتغيير الجنس (ذكر ↔ أنثى)"
+                            >
+                              {isMale ? "👦" : "👧"}
+                            </button>
+                            <input
+                              type="text"
+                              value={cur.studentName}
+                              onChange={(e) => handleUpdateBatchField(s.id, "studentName", e.target.value)}
+                              className="h-8.5 px-2.5 font-black text-xs text-slate-900 bg-white border border-slate-300 rounded-xl focus:border-emerald-600 focus:ring-2 focus:ring-emerald-400/20 outline-none w-full"
+                              placeholder="الاسم واللقب..."
+                            />
+                          </div>
+                        </td>
+                        <td className="py-2 px-2 w-24">
+                          <select
+                            value={cur.className}
+                            onChange={(e) => handleUpdateBatchField(s.id, "className", e.target.value as TeacherClass)}
+                            className="h-8.5 px-2 font-mono font-bold text-xs text-emerald-800 bg-emerald-50/80 border border-emerald-300 rounded-xl focus:bg-white focus:border-emerald-600 outline-none w-full cursor-pointer"
+                          >
+                            {TEACHER_CLASSES.map((cls) => (
+                              <option key={cls} value={cls}>
+                                فوج {cls}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-2 w-24">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateBatchField(s.id, "groupName", (cur.groupName || "فوج 1") === "فوج 1" ? "فوج 2" : "فوج 1")}
+                            className={`w-full py-1.5 px-2 rounded-xl text-xs font-black transition cursor-pointer active:scale-95 border ${
+                              (cur.groupName || "فوج 1") === "فوج 1"
+                                ? "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200"
+                                : "bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200"
+                            }`}
+                            title="اضغط للتبديل الفوري بين فوج 1 وفوج 2"
+                          >
+                            {cur.groupName || "فوج 1"} ⇄
+                          </button>
+                        </td>
+                        <td className="py-2 px-2 min-w-[150px]">
+                          <div className="relative">
+                            <input
+                              type="date"
+                              value={cur.birthDate || ""}
+                              onChange={(e) => handleUpdateBatchField(s.id, "birthDate", e.target.value)}
+                              className={`h-8.5 px-2.5 rounded-xl font-mono font-black text-xs text-center border-2 transition outline-none w-full ${
+                                cur.birthDate
+                                  ? "bg-emerald-50/90 border-emerald-500 text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-400"
+                                  : "bg-amber-50 border-amber-400 text-amber-950 focus:bg-white focus:ring-2 focus:ring-amber-400 shadow-inner"
+                              }`}
+                              title="تاريخ الميلاد (رمز دخول الولي 🔑)"
+                            />
+                            {!cur.birthDate && (
+                              <span className="absolute -top-1.5 -right-1 text-[9px] bg-amber-500 text-slate-950 px-1 rounded-full font-black pointer-events-none">
+                                مطلوب 🔑
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 px-2 w-24">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateBatchField(s.id, "gender", isMale ? "F" : "M")}
+                            className={`w-full py-1.5 px-2 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 border ${
+                              isMale
+                                ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                                : "bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100"
+                            }`}
+                          >
+                            {isMale ? "ذكر 👦" : "أنثى 👧"}
+                          </button>
+                        </td>
+                        <td className="py-2 px-2 w-24">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateBatchField(s.id, "isRepeater", !cur.isRepeater)}
+                            className={`w-full py-1.5 px-2 rounded-xl text-xs font-black transition cursor-pointer active:scale-95 border ${
+                              cur.isRepeater
+                                ? "bg-red-100 text-red-800 border-red-300 hover:bg-red-200"
+                                : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                            }`}
+                          >
+                            {cur.isRepeater ? "🔁 معيد" : "جديد ✅"}
+                          </button>
+                        </td>
+                        <td className="py-2 px-2 w-32">
+                          <input
+                            type="tel"
+                            value={cur.parentPhone || ""}
+                            onChange={(e) => handleUpdateBatchField(s.id, "parentPhone", e.target.value)}
+                            placeholder="0661234567"
+                            className="h-8.5 px-2 bg-white border border-slate-300 rounded-xl font-mono text-xs focus:border-emerald-600 outline-none w-full text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-2 text-center w-20">
+                          {isDirty ? (
+                            <span className="inline-block text-[10px] bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-full border border-emerald-300">
+                              مُعدَّل ✨
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-bold">
+                              جاهز
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  const isMale = s.gender === "M" || s.gender === "ذكر";
                   return (
                     <tr
                       key={s.id}
@@ -1387,13 +1758,21 @@ export default function AdminStudentsPage() {
                           {s.groupName || "فوج 1"} ⇄
                         </button>
                       </td>
-                      <td className="py-2.5 px-3.5">
+                      <td
+                        className="py-2.5 px-3.5 cursor-pointer group/cell"
+                        onClick={handleToggleBatchEdit}
+                        title="انقر لتفعيل التعديل السريع وتعديل تاريخ الميلاد مباشرة ⚡"
+                      >
                         {s.birthDate ? (
-                          <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                            {s.birthDate}
+                          <span className="font-mono font-bold text-slate-800 bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200 group-hover/cell:border-emerald-500 transition inline-flex items-center gap-1">
+                            <span>{s.birthDate}</span>
+                            <span className="text-[10px] opacity-50 group-hover/cell:opacity-100">✏️</span>
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic">غير محدد</span>
+                          <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-300 font-bold group-hover/cell:border-amber-500 transition inline-flex items-center gap-1 shadow-2xs">
+                            <span className="italic">غير محدد</span>
+                            <span className="text-[10px]">✏️ تعيين</span>
+                          </span>
                         )}
                       </td>
                       <td className="py-2.5 px-3.5">
@@ -1435,7 +1814,7 @@ export default function AdminStudentsPage() {
                             type="button"
                             onClick={() => handleMoveStudent(s.id, "up")}
                             disabled={idx === 0 || saving}
-                            className="p-1 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-20 transition"
+                            className="p-1 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-20 transition cursor-pointer"
                             title="تقديم التلميذ لأعلى ⬆"
                           >
                             <ArrowUp className="w-3.5 h-3.5" />
@@ -1444,21 +1823,21 @@ export default function AdminStudentsPage() {
                             type="button"
                             onClick={() => handleMoveStudent(s.id, "down")}
                             disabled={idx === sortedRoster.length - 1 || saving}
-                            className="p-1 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-20 transition"
+                            className="p-1 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-20 transition cursor-pointer"
                             title="تأخير التلميذ لأسفل ⬇"
                           >
                             <ArrowDown className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleEdit(s)}
-                            className="p-1.5 rounded-lg text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition"
+                            className="p-1.5 rounded-lg text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition cursor-pointer"
                             title="تعديل بيانات التلميذ"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDelete(s)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
+                            className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition cursor-pointer"
                             title="حذف من الفوج"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1474,8 +1853,56 @@ export default function AdminStudentsPage() {
         )}
       </div>
 
+      {/* ─── شريط الحفظ العائم الثابت بأسفل الشاشة أثناء التعديل السريع ─── */}
+      {isBatchEditMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-2xl w-[94%] bg-slate-900/95 backdrop-blur-md text-white p-3 sm:p-4 rounded-3xl shadow-2xl border-2 border-emerald-500/70 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black">
+              <Zap className="w-5 h-5 fill-current" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-black text-white">
+                وضع التعديل السريع نشط ⚡
+              </h4>
+              <p className="text-[11px] text-slate-300 font-bold">
+                {batchDirtyIds.size > 0 ? (
+                  <span>تم تعديل بيانات <strong className="text-emerald-400 font-mono font-black">{batchDirtyIds.size}</strong> تلميذ</span>
+                ) : (
+                  <span>عدّل تواريخ الميلاد في الجدول واضغط حفظ</span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCancelBatchEdit}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
+            >
+              إلغاء
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleSaveBatchEdits}
+              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition shadow-lg flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+            >
+              {saving ? (
+                <span>جاري الحفظ...</span>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>حفظ جميع التعديلات دفعة واحدة 💾</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─── شريط العمليات الجماعية العائم (Bulk Actions Floating Bar) ─── */}
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && !isBatchEditMode && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-4xl w-[94%] bg-slate-900/95 backdrop-blur-md text-white p-3 sm:p-4 rounded-3xl shadow-2xl border border-slate-700 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="flex items-center gap-2">
             <span className="bg-emerald-500 text-slate-900 font-mono font-black text-xs px-2.5 py-1 rounded-xl">
@@ -1583,9 +2010,10 @@ export default function AdminStudentsPage() {
 
       {/* ─── نافذة النقل الجماعي للأفواج (Move Modal) ─── */}
       {showMoveModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <ArrowRightLeft className="w-4 h-4" />
@@ -1595,39 +2023,44 @@ export default function AdminStudentsPage() {
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setShowMoveModal(false)}
-                className="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"
+                className="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer transition"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 font-bold">
-              سيتم نقل <strong className="text-emerald-700 font-mono font-black">{selectedIds.size} تلميذاً</strong> محدداً إلى الفوج المختار:
-            </p>
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+              <p className="text-xs text-slate-600 font-bold">
+                سيتم نقل <strong className="text-emerald-700 font-mono font-black">{selectedIds.size} تلميذاً</strong> محدداً إلى الفوج المختار:
+              </p>
 
-            <div className="grid grid-cols-2 gap-2">
-              {TEACHER_CLASSES.map((cls) => (
-                <button
-                  key={cls}
-                  type="button"
-                  onClick={() => setTargetMoveClass(cls)}
-                  className={`p-3 rounded-2xl border text-center transition font-black text-xs cursor-pointer ${
-                    targetMoveClass === cls
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                      : "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
-                  }`}
-                >
-                  فوج {cls}
-                </button>
-              ))}
+              <div className="grid grid-cols-2 gap-2">
+                {TEACHER_CLASSES.map((cls) => (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setTargetMoveClass(cls)}
+                    className={`p-3 rounded-2xl border text-center transition font-black text-xs cursor-pointer ${
+                      targetMoveClass === cls
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                        : "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    فوج {cls}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            {/* Fixed Footer */}
+            <div className="flex items-center justify-end gap-2 p-3 sm:px-5 sm:py-3.5 border-t border-slate-100 bg-slate-50 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowMoveModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
               >
                 إلغاء
               </button>
@@ -1635,7 +2068,7 @@ export default function AdminStudentsPage() {
                 type="button"
                 disabled={saving}
                 onClick={handleBulkMoveClass}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer active:scale-95"
               >
                 <Check className="w-4 h-4" />
                 <span>تأكيد النقل إلى فوج {targetMoveClass}</span>
@@ -1647,9 +2080,10 @@ export default function AdminStudentsPage() {
 
       {/* ─── نافذة معاينة وتأكيد استيراد ملف Excel ─── */}
       {showExcelModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
                   <FileSpreadsheet className="w-5 h-5" />
@@ -1664,109 +2098,113 @@ export default function AdminStudentsPage() {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowExcelModal(false)}
-                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition"
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* ملخص البيانات المقروءة */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-slate-500 block text-[11px] font-bold">التلاميذ المكتشفون</span>
-                <strong className="text-emerald-700 text-base font-mono font-black">
-                  {excelPreviewRows.length}
-                </strong>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-slate-500 block text-[11px] font-bold">الأقسام المكتشفة</span>
-                <strong className="text-slate-800 text-xs font-mono font-black">
-                  {Array.from(new Set(excelPreviewRows.map((r) => r.className))).join("، ") || "1م1"}
-                </strong>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-slate-500 block text-[11px] font-bold">ذكور / إناث</span>
-                <strong className="text-blue-700 text-xs font-bold">
-                  {excelPreviewRows.filter((r) => r.gender === "M").length} ذ /{" "}
-                  {excelPreviewRows.filter((r) => r.gender === "F").length} أ
-                </strong>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-slate-500 block text-[11px] font-bold">فوج 1 / 2</span>
-                <strong className="text-purple-700 text-xs font-bold">
-                  {excelPreviewRows.filter((r) => r.groupName === "فوج 1").length} ف1 /{" "}
-                  {excelPreviewRows.filter((r) => r.groupName === "فوج 2").length} ف2
-                </strong>
-              </div>
-            </div>
-
-            {/* وضع الاستيراد */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold">
-              <span className="text-slate-700">طريقة الحفظ في الموقع:</span>
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="importMode"
-                    value="merge"
-                    checked={importMode === "merge"}
-                    onChange={() => setImportMode("merge")}
-                    className="accent-emerald-600"
-                  />
-                  <span>دمج وتحديث (مستحسن)</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-red-700">
-                  <input
-                    type="radio"
-                    name="importMode"
-                    value="replace"
-                    checked={importMode === "replace"}
-                    onChange={() => setImportMode("replace")}
-                    className="accent-red-600"
-                  />
-                  <span>استبدال الكل</span>
-                </label>
-              </div>
-            </div>
-
-            {/* جدول عينة من الأسطر */}
-            <div className="flex-1 overflow-y-auto border border-slate-200 rounded-2xl">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0">
-                  <tr>
-                    <th className="py-2 px-3">الاسم واللقب</th>
-                    <th className="py-2 px-3">القسم</th>
-                    <th className="py-2 px-3">الفوج</th>
-                    <th className="py-2 px-3">تاريخ الميلاد</th>
-                    <th className="py-2 px-3">الجنس</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {excelPreviewRows.slice(0, 10).map((r, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
-                      <td className="py-2 px-3 font-bold text-slate-900">{r.studentName}</td>
-                      <td className="py-2 px-3 font-mono">{r.className}</td>
-                      <td className="py-2 px-3">{r.groupName}</td>
-                      <td className="py-2 px-3 font-mono text-slate-600">{r.birthDate || "-"}</td>
-                      <td className="py-2 px-3">{r.gender === "M" ? "ذكر" : "أنثى"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {excelPreviewRows.length > 10 && (
-                <div className="py-2 text-center text-[11px] font-bold text-slate-500 bg-slate-50 border-t border-slate-100">
-                  + {excelPreviewRows.length - 10} تلميذاً إضافياً سيتم استيرادهم أيضاً
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+              {/* ملخص البيانات المقروءة */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-slate-500 block text-[11px] font-bold">التلاميذ المكتشفون</span>
+                  <strong className="text-emerald-700 text-base font-mono font-black">
+                    {excelPreviewRows.length}
+                  </strong>
                 </div>
-              )}
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-slate-500 block text-[11px] font-bold">الأقسام المكتشفة</span>
+                  <strong className="text-slate-800 text-xs font-mono font-black">
+                    {Array.from(new Set(excelPreviewRows.map((r) => r.className))).join("، ") || "1م1"}
+                  </strong>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-slate-500 block text-[11px] font-bold">ذكور / إناث</span>
+                  <strong className="text-blue-700 text-xs font-bold">
+                    {excelPreviewRows.filter((r) => r.gender === "M").length} ذ /{" "}
+                    {excelPreviewRows.filter((r) => r.gender === "F").length} أ
+                  </strong>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-slate-500 block text-[11px] font-bold">فوج 1 / 2</span>
+                  <strong className="text-purple-700 text-xs font-bold">
+                    {excelPreviewRows.filter((r) => r.groupName === "فوج 1").length} ف1 /{" "}
+                    {excelPreviewRows.filter((r) => r.groupName === "فوج 2").length} ف2
+                  </strong>
+                </div>
+              </div>
+
+              {/* وضع الاستيراد */}
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold">
+                <span className="text-slate-700">طريقة الحفظ في الموقع:</span>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="merge"
+                      checked={importMode === "merge"}
+                      onChange={() => setImportMode("merge")}
+                      className="accent-emerald-600 cursor-pointer"
+                    />
+                    <span>دمج وتحديث (مستحسن)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-red-700">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="replace"
+                      checked={importMode === "replace"}
+                      onChange={() => setImportMode("replace")}
+                      className="accent-red-600 cursor-pointer"
+                    />
+                    <span>استبدال الكل</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* جدول عينة من الأسطر */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-52 overflow-y-auto">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0">
+                    <tr>
+                      <th className="py-2 px-3">الاسم واللقب</th>
+                      <th className="py-2 px-3">القسم</th>
+                      <th className="py-2 px-3">الفوج</th>
+                      <th className="py-2 px-3">تاريخ الميلاد</th>
+                      <th className="py-2 px-3">الجنس</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {excelPreviewRows.slice(0, 10).map((r, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="py-2 px-3 font-bold text-slate-900">{r.studentName}</td>
+                        <td className="py-2 px-3 font-mono">{r.className}</td>
+                        <td className="py-2 px-3">{r.groupName}</td>
+                        <td className="py-2 px-3 font-mono text-slate-600">{r.birthDate || "-"}</td>
+                        <td className="py-2 px-3">{r.gender === "M" ? "ذكر" : "أنثى"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {excelPreviewRows.length > 10 && (
+                  <div className="py-2 text-center text-[11px] font-bold text-slate-500 bg-slate-50 border-t border-slate-100">
+                    + {excelPreviewRows.length - 10} تلميذاً إضافياً سيتم استيرادهم أيضاً
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* أزرار التأكيد */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            {/* Fixed Footer */}
+            <div className="flex items-center justify-end gap-2 p-3 sm:px-5 sm:py-3.5 border-t border-slate-100 bg-slate-50 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowExcelModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
               >
                 إلغاء
               </button>
@@ -1774,7 +2212,7 @@ export default function AdminStudentsPage() {
                 type="button"
                 disabled={importLoading}
                 onClick={handleConfirmExcelImport}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition shadow-xs flex items-center gap-2 disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition shadow-xs flex items-center gap-2 disabled:opacity-50 cursor-pointer active:scale-95"
               >
                 {importLoading ? (
                   <span>جاري الاستيراد والحفظ...</span>
@@ -1792,21 +2230,30 @@ export default function AdminStudentsPage() {
 
       {/* ─── نافذة إضافة / تعديل تلميذ فردي ─── */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm sm:text-base font-black text-slate-900">
-                {editingStudent ? "تعديل بيانات التلميذ" : "إضافة تلميذ جديد"}
-              </h3>
+        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header (ثابت بأعلى النافذة) */}
+            <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-slate-900">
+                  {editingStudent ? "تعديل بيانات التلميذ" : "إضافة تلميذ جديد"}
+                </h3>
+              </div>
               <button
+                type="button"
                 onClick={() => setShowAddModal(false)}
-                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition"
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition cursor-pointer"
+                title="إغلاق النافذة"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveStudent} className="space-y-3 text-xs">
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleSaveStudent} id="studentModalForm" className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
               <div>
                 <label className="block font-black text-slate-700 mb-1">الاسم واللقب *</label>
                 <input
@@ -1815,7 +2262,7 @@ export default function AdminStudentsPage() {
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
                   placeholder="مثال: محمد بن أحمد"
-                  className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
+                  className="w-full h-9 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
                 />
               </div>
 
@@ -1825,7 +2272,7 @@ export default function AdminStudentsPage() {
                   <select
                     value={className}
                     onChange={(e) => setClassName(e.target.value as TeacherClass)}
-                    className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
+                    className="w-full h-9 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
                   >
                     {TEACHER_CLASSES.map((c) => (
                       <option key={c} value={c}>
@@ -1839,7 +2286,7 @@ export default function AdminStudentsPage() {
                   <select
                     value={groupName}
                     onChange={(e) => setGroupName(e.target.value as "فوج 1" | "فوج 2")}
-                    className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
+                    className="w-full h-9 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
                   >
                     <option value="فوج 1">فوج 1</option>
                     <option value="فوج 2">فوج 2</option>
@@ -1848,14 +2295,19 @@ export default function AdminStudentsPage() {
               </div>
 
               <div>
-                <label className="block font-black text-slate-700 mb-1">
-                  تاريخ الميلاد (رمز دخول الولي 🔑)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-black text-slate-700">
+                    تاريخ الميلاد (رمز دخول الولي 🔑)
+                  </label>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
+                    يوم / شهر / سنة
+                  </span>
+                </div>
                 <input
                   type="date"
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
+                  className="w-full h-9 px-3 font-bold bg-emerald-50/50 border border-emerald-300 rounded-xl focus:bg-white focus:border-emerald-600 outline-none font-mono text-slate-900"
                 />
               </div>
 
@@ -1865,7 +2317,7 @@ export default function AdminStudentsPage() {
                   <select
                     value={gender}
                     onChange={(e) => setGender(e.target.value as "M" | "F")}
-                    className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
+                    className="w-full h-9 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
                   >
                     <option value="M">ذكر 👦</option>
                     <option value="F">أنثى 👧</option>
@@ -1876,7 +2328,7 @@ export default function AdminStudentsPage() {
                   <select
                     value={isRepeater ? "yes" : "no"}
                     onChange={(e) => setIsRepeater(e.target.value === "yes")}
-                    className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
+                    className="w-full h-9 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none"
                   >
                     <option value="no">جديد</option>
                     <option value="yes">معيد 🔁</option>
@@ -1891,26 +2343,29 @@ export default function AdminStudentsPage() {
                   value={parentPhone}
                   onChange={(e) => setParentPhone(e.target.value)}
                   placeholder="0661234567"
-                  className="w-full h-10 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
+                  className="w-full h-9 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
                 />
               </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black transition shadow-xs"
-                >
-                  حفظ التلميذ
-                </button>
-              </div>
             </form>
+
+            {/* Fixed Footer (ثابت بأسفل النافذة ومباشرة أمام المستخدم) */}
+            <div className="flex items-center justify-end gap-2 p-3 sm:px-5 sm:py-3.5 border-t border-slate-100 bg-slate-50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition text-xs cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                form="studentModalForm"
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black transition shadow-xs text-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Check className="w-4 h-4" />
+                <span>{editingStudent ? "حفظ بيانات التلميذ" : "إضافة التلميذ"}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
