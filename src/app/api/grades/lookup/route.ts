@@ -23,6 +23,20 @@ function normalizeBirthDate(raw?: string): string {
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
 
+  // صيغة 8 أرقام متصلة DDMMYYYY (مثال: 30092012)
+  const raw8Match = cleaned.match(/^(\d{2})(\d{2})(\d{4})$/);
+  if (raw8Match) {
+    const [_, d, m, y] = raw8Match;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  // صيغة 8 أرقام متصلة YYYYMMDD (مثال: 20120930)
+  const rawIso8Match = cleaned.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (rawIso8Match) {
+    const [_, y, m, d] = rawIso8Match;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
   return cleaned;
 }
 

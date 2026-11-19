@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -101,6 +101,83 @@ export default function GradesLookupPage() {
   // حالة محاكي وتجربة النقاط التفاعلية للتلميذ والولي
   const [simScores, setSimScores] = useState<Record<string, string | number>>({});
   const [showExplanation, setShowExplanation] = useState(false);
+
+  // مرجع حقل التاريخ المخفي للرزنامة البديلة
+  const hiddenDateInputRef = useRef<HTMLInputElement | null>(null);
+
+  // معالجة وتنسيق كتابة تاريخ الميلاد تلقائياً (الكتابة السريعة الفورية 8 أرقام متتالية)
+  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (!raw.trim()) {
+      setBirthDate("");
+      return;
+    }
+
+    // استخراج الأرقام فقط (حد أقصى 8 أرقام: يومان + شهران + 4 للعام)
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    if (!digits) {
+      setBirthDate("");
+      return;
+    }
+
+    let formatted = "";
+    if (digits.length <= 2) {
+      formatted = digits;
+    } else if (digits.length <= 4) {
+      formatted = `${digits.slice(0, 2)} / ${digits.slice(2)}`;
+    } else {
+      formatted = `${digits.slice(0, 2)} / ${digits.slice(2, 4)} / ${digits.slice(4)}`;
+    }
+
+    setBirthDate(formatted);
+  };
+
+  // دعم مسح السلاش بسلاسة عند الضغط على Backspace
+  const handleBirthDateKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      const input = e.currentTarget;
+      const selStart = input.selectionStart;
+      const selEnd = input.selectionEnd;
+      if (selStart === selEnd && selStart === birthDate.length) {
+        if (birthDate.endsWith(" / ")) {
+          e.preventDefault();
+          const digits = birthDate.replace(/\D/g, "");
+          const nextDigits = digits.slice(0, -1);
+          let formatted = "";
+          if (nextDigits.length <= 2) formatted = nextDigits;
+          else if (nextDigits.length <= 4) formatted = `${nextDigits.slice(0, 2)} / ${nextDigits.slice(2)}`;
+          else formatted = `${nextDigits.slice(0, 2)} / ${nextDigits.slice(2, 4)} / ${nextDigits.slice(4)}`;
+          setBirthDate(formatted);
+        }
+      }
+    }
+  };
+
+  // دعم اللصق الذكي (إذا كان المنسوخ YYYY-MM-DD أو DD-MM-YYYY)
+  const handleBirthDatePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData("text").trim();
+    const isoMatch = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (isoMatch) {
+      e.preventDefault();
+      const [_, y, m, d] = isoMatch;
+      setBirthDate(`${d.padStart(2, "0")} / ${m.padStart(2, "0")} / ${y}`);
+      return;
+    }
+  };
+
+  // أزرار سريعة للأعوام الأكثر شيوعاً في المتوسط
+  const handleQuickYear = (year: string) => {
+    const digits = birthDate.replace(/\D/g, "");
+    if (digits.length >= 4) {
+      const day = digits.slice(0, 2);
+      const month = digits.slice(2, 4);
+      setBirthDate(`${day} / ${month} / ${year}`);
+    } else if (digits.length >= 2) {
+      setBirthDate(`${digits.slice(0, 2)} / 01 / ${year}`);
+    } else {
+      setBirthDate(`01 / 01 / ${year}`);
+    }
+  };
 
   // جلب قائمة تلاميذ القسم المختار
   // جلب قائمة أسماء تلاميذ القسم المختار (متاح لجميع الزوار عبر endpoint الاستعلام العام)
@@ -564,17 +641,92 @@ export default function GradesLookupPage() {
               </div>
             </div>
 
-            {/* تاريخ الميلاد */}
+            {/* تاريخ الميلاد الذكي والفوري */}
             <div className="space-y-1.5">
-              <label className="text-xs font-black text-slate-700 block">
-                3. تاريخ الميلاد (الرمز السري):
-              </label>
-              <input
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                className="w-full h-11 px-3 text-xs font-black bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none font-mono"
-              />
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-slate-700 block">
+                  3. تاريخ الميلاد (الرمز السري):
+                </label>
+                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
+                  اكتب 8 أرقام متتالية ⚡
+                </span>
+              </div>
+
+              {/* حقل إدخال التاريخ الذكي التلقائي */}
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={birthDate}
+                  onChange={handleBirthDateChange}
+                  onKeyDown={handleBirthDateKeyDown}
+                  onPaste={handleBirthDatePaste}
+                  placeholder="مثال: 30 / 09 / 2012"
+                  maxLength={14}
+                  className="w-full h-11 pr-3 pl-16 text-xs font-black bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:bg-white outline-none font-mono tracking-wider transition"
+                />
+
+                {/* زر التقويم ومسح الحقل في يسار الحقل */}
+                <div className="absolute left-2 top-2 flex items-center gap-1">
+                  {birthDate && (
+                    <button
+                      type="button"
+                      onClick={() => setBirthDate("")}
+                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                      title="مسح التاريخ"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (hiddenDateInputRef.current) {
+                        if ("showPicker" in HTMLInputElement.prototype) {
+                          hiddenDateInputRef.current.showPicker();
+                        } else {
+                          hiddenDateInputRef.current.click();
+                        }
+                      }
+                    }}
+                    className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition cursor-pointer shadow-2xs"
+                    title="فتح الرزنامة لاختيار التاريخ"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* حقل تاريخ مخفي لدعم الرزنامة الأصلية لمن يرغب بها */}
+                <input
+                  ref={hiddenDateInputRef}
+                  type="date"
+                  tabIndex={-1}
+                  className="sr-only"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      const [y, m, d] = val.split("-");
+                      setBirthDate(`${d} / ${m} / ${y}`);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* أزرار سريعة للأعوام الأكثر شيوعاً في المتوسط */}
+              <div className="flex items-center gap-1 pt-0.5 flex-wrap">
+                <span className="text-[10px] text-slate-400 font-bold ml-1">سنوات سريعة:</span>
+                {["2012", "2013", "2014", "2011", "2010"].map((yr) => (
+                  <button
+                    key={yr}
+                    type="button"
+                    onClick={() => handleQuickYear(yr)}
+                    className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 font-mono text-[10px] font-bold transition cursor-pointer border border-slate-200/60 active:scale-95"
+                    title={`اختيار سنة ${yr}`}
+                  >
+                    {yr}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
