@@ -26,6 +26,9 @@ import {
   Info,
   X,
   HeartHandshake,
+  Share2,
+  LayoutGrid,
+  Table as TableIcon,
 } from "lucide-react";
 
 const CLASSES = ["1م1", "1م2", "1م3", "2م3"];
@@ -101,9 +104,28 @@ export default function GradesLookupPage() {
   // حالة محاكي وتجربة النقاط التفاعلية للتلميذ والولي
   const [simScores, setSimScores] = useState<Record<string, string | number>>({});
   const [showExplanation, setShowExplanation] = useState(false);
+  const [parentViewMode, setParentViewMode] = useState<"cards" | "table">("cards");
 
   // مرجع حقل التاريخ المخفي للرزنامة البديلة
   const hiddenDateInputRef = useRef<HTMLInputElement | null>(null);
+
+  // مشاركة كشف النقاط عبر واتساب
+  const handleShareWhatsApp = () => {
+    if (!result || !calculatedSim) return;
+    const name = result.student.studentName;
+    const cls = result.student.className;
+    const tri = result.trimester;
+    const cont = calculatedSim.continuousScore !== null ? `${calculatedSim.continuousScore} / 20` : "قيد الرصد";
+    const test = simScores.test1Score ? `${simScores.test1Score} / 20` : "قيد الرصد";
+    const mon = calculatedSim.continuousMonitoring !== null ? `${calculatedSim.continuousMonitoring} / 20` : "قيد الرصد";
+    const avg = calculatedSim.termAverage !== null ? `${calculatedSim.termAverage} / 20` : "معلق للاختبار";
+    const notes = result.grade?.appreciation ? `\n💬 ملاحظة الأستاذ: ${result.grade.appreciation}` : "";
+
+    const text = `السلام عليكم ورحمة الله 🌸\nنتائج مادة الرياضيات — متوسطة المجاهد باهي علي:\n👤 التلميذ(ة): ${name} (${cls})\n📅 الفصل الدراسي: ${tri}\n📝 مجموع التقويم: ${cont}\n📊 الفرض المحروس: ${test}\n📈 المراقبة المستمرة: ${mon}\n🏆 المعدل الفصلي: ${avg}${notes}\n\n🔗 رابط المنصة للاطلاع والمحاكاة التفاعلية:\nhttps://math-lessons-eta.vercel.app/grades`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
+  };
 
   // معالجة وتنسيق كتابة تاريخ الميلاد تلقائياً (الكتابة السريعة الفورية 8 أرقام متتالية)
   const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -848,16 +870,28 @@ export default function GradesLookupPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 print:hidden">
+            <div className="flex items-center gap-2 print:hidden flex-wrap">
               <button
+                type="button"
+                onClick={handleShareWhatsApp}
+                className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 active:scale-95 transition cursor-pointer shadow-xs"
+                title="مشاركة كشف النقاط عبر واتساب"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>مشاركة واتساب 📱</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShowExplanation(!showExplanation)}
                 className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
               >
                 <HelpCircle className="w-3.5 h-3.5 text-indigo-600" />
-                <span>شرح طريقة الحساب</span>
+                <span>طريقة الحساب</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => window.print()}
                 className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-black flex items-center gap-1.5 active:scale-95 transition cursor-pointer"
               >
@@ -894,6 +928,19 @@ export default function GradesLookupPage() {
               </span>
             </div>
           </div>
+
+          {/* ─── بطاقة توجيه وملاحظة الأستاذ للولي ─── */}
+          {result.grade?.appreciation && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-teal-50 via-emerald-50 to-white border-2 border-teal-300 shadow-2xs space-y-1.5 animate-in fade-in">
+              <div className="flex items-center gap-2 text-teal-950 font-black text-xs sm:text-sm">
+                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>💬 ملاحظة وتوجيه الأستاذ محمد عدايكة للتلميذ وولي أمره:</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-800 font-bold leading-relaxed pr-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                "{result.grade.appreciation}"
+              </p>
+            </div>
+          )}
 
           {/* ─── شريط المحاكي التفاعلي والتلميح للتلميذ والولي ─── */}
           <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-300/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 print:hidden">
@@ -949,226 +996,456 @@ export default function GradesLookupPage() {
             </div>
           )}
 
-          {/* ─── جدول أعمدة التقويم المستمر التفاعلي ─── */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-                <h3 className="text-xs sm:text-sm font-black text-slate-900">
-                  تفاصيل بطاقة التقويم المستمر (المجموع من 20 نقطة):
-                </h3>
-              </div>
-              <span className="text-[11px] text-slate-400 font-bold hidden sm:inline">
-                يمكنك الضغط وتعديل أي خانة لتجربة الحساب
-              </span>
+          {/* ─── محدد نمط العرض للأولياء: بطاقات ذكية vs جدول مدمج ─── */}
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 print:hidden">
+            <span className="text-xs font-black text-slate-700">طريقة عرض علامات التقويم:</span>
+            <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setParentViewMode("cards")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                  parentViewMode === "cards"
+                    ? "bg-emerald-700 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>بطاقات ذكية 📱</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setParentViewMode("table")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                  parentViewMode === "table"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                <span>جدول مدمج 📊</span>
+              </button>
             </div>
-
-            <div className="overflow-x-auto border border-emerald-200 rounded-2xl shadow-2xs">
-              <table className="w-full text-center text-xs">
-                <thead className="bg-emerald-50 text-emerald-950 font-black border-b border-emerald-200 text-[11px]" style={{ fontFamily: "'Cairo', sans-serif" }}>
-                  <tr>
-                    <th className="py-2.5 px-2">المشاركة والسلوك</th>
-                    <th className="py-2.5 px-2">استجواب 1</th>
-                    <th className="py-2.5 px-2">وظيفة 1</th>
-                    <th className="py-2.5 px-2">استجواب 2</th>
-                    <th className="py-2.5 px-2">وظيفة 2</th>
-                    <th className="py-2.5 px-2">كراس 1</th>
-                    <th className="py-2.5 px-2">كراس 2</th>
-                    <th className="py-2.5 px-2 text-purple-900">نقاط إضافية (+)</th>
-                    <th className="py-2.5 px-3 bg-emerald-200/90 text-emerald-950 font-black border-r border-emerald-300">
-                      مجموع التقويم
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-emerald-50 font-bold">
-                  <tr>
-                    {/* المشاركة (4) */}
-                    <td className="p-1.5">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={simScores.behaviorScore ?? ""}
-                          onChange={(e) => handleSimChange("behaviorScore", e.target.value)}
-                          min="0"
-                          max={COLUMN_MAX_LIMITS.behaviorScore}
-                          title="الحد الأقصى: 4 نقاط"
-                          placeholder="قيد الرصد"
-                          className={`w-14 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
-                            simScores.behaviorScore === "غ" || simScores.behaviorScore === "غياب"
-                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
-                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
-                          }`}
-                        />
-                        <span className="text-[10px] text-slate-400 font-mono">/ 4</span>
-                      </div>
-                    </td>
-
-                    {/* استجواب 1 (4) */}
-                    <td className="p-1.5">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={simScores.quiz1Score ?? ""}
-                          onChange={(e) => handleSimChange("quiz1Score", e.target.value)}
-                          min="0"
-                          max={COLUMN_MAX_LIMITS.quiz1Score}
-                          title="الحد الأقصى: 4 نقاط"
-                          placeholder="قيد الرصد"
-                          className={`w-14 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
-                            simScores.quiz1Score === "غ" || simScores.quiz1Score === "غياب"
-                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
-                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
-                          }`}
-                        />
-                        <span className="text-[10px] text-slate-400 font-mono">/ 4</span>
-                      </div>
-                    </td>
-
-                    {/* وظيفة 1 (2) */}
-                    <td className="p-1.5">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={simScores.homework1Score ?? ""}
-                          onChange={(e) => handleSimChange("homework1Score", e.target.value)}
-                          min="0"
-                          max={COLUMN_MAX_LIMITS.homework1Score}
-                          title="الحد الأقصى: نقطتان"
-                          placeholder="قيد الرصد"
-                          className={`w-14 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
-                            simScores.homework1Score === "غ" || simScores.homework1Score === "غياب"
-                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
-                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
-                          }`}
-                        />
-                        <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
-                      </div>
-                    </td>
-
-                    {/* استجواب 2 (4) */}
-                    <td className="p-1.5">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={simScores.quiz2Score ?? ""}
-                          onChange={(e) => handleSimChange("quiz2Score", e.target.value)}
-                          min="0"
-                          max={COLUMN_MAX_LIMITS.quiz2Score}
-                          title="الحد الأقصى: 4 نقاط"
-                          placeholder="لم يقوّم بعد"
-                          className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
-                            simScores.quiz2Score === "غ" || simScores.quiz2Score === "غياب"
-                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
-                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
-                          }`}
-                        />
-                        <span className="text-[10px] text-slate-400 font-mono">/ 4</span>
-                      </div>
-                    </td>
-
-                    {/* وظيفة 2 (2) */}
-                    <td className="p-1.5">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={simScores.homework2Score ?? ""}
-                          onChange={(e) => handleSimChange("homework2Score", e.target.value)}
-                          min="0"
-                          max={COLUMN_MAX_LIMITS.homework2Score}
-                          title="الحد الأقصى: نقطتان"
-                          placeholder="لم يقوّم بعد"
-                          className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
-                            simScores.homework2Score === "غ" || simScores.homework2Score === "غياب"
-                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
-                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
-                          }`}
-                        />
-                        <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
-                      </div>
-                    </td>
-
-                    {/* كراس 1 (2) */}
-                    <td className="p-1.5">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={simScores.notebook1Score ?? ""}
-                          onChange={(e) => handleSimChange("notebook1Score", e.target.value)}
-                          min="0"
-                          max={COLUMN_MAX_LIMITS.notebook1Score}
-                          title="الحد الأقصى: نقطتان"
-                          placeholder="لم يقوّم بعد"
-                          className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
-                            simScores.notebook1Score === "غ" || simScores.notebook1Score === "غياب"
-                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
-                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
-                          }`}
-                        />
-                        <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
-                      </div>
-                    </td>
-
-                    {/* كراس 2 (2) */}
-                    <td className="p-1.5">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={simScores.notebook2Score ?? ""}
-                          onChange={(e) => handleSimChange("notebook2Score", e.target.value)}
-                          min="0"
-                          max={COLUMN_MAX_LIMITS.notebook2Score}
-                          title="الحد الأقصى: نقطتان"
-                          placeholder="لم يقوّم بعد"
-                          className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
-                            simScores.notebook2Score === "غ" || simScores.notebook2Score === "غياب"
-                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
-                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
-                          }`}
-                        />
-                        <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
-                      </div>
-                    </td>
-
-                    {/* نقاط إضافية (+) */}
-                    <td className="p-1.5">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={simScores.bonusScore ?? ""}
-                          onChange={(e) => handleSimChange("bonusScore", e.target.value)}
-                          min="0"
-                          max={COLUMN_MAX_LIMITS.bonusScore}
-                          title="الحد الأقصى: 5 نقاط"
-                          placeholder="+"
-                          className="w-12 h-8 text-center text-xs font-mono font-black text-purple-700 bg-purple-50/60 hover:bg-white focus:bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500/30 outline-none transition"
-                        />
-                        <span className="text-[10px] text-purple-600 font-mono">بونص</span>
-                      </div>
-                    </td>
-
-                    {/* مجموع التقويم المحسوب آلياً */}
-                    <td className="py-2.5 px-3 bg-emerald-100/70 border-r border-emerald-300">
-                      <span className="text-lg font-mono font-black text-emerald-950 block">
-                        {calculatedSim.continuousScore !== null ? calculatedSim.continuousScore : "-"}
-                      </span>
-                      <span className="text-[10px] text-emerald-700 block font-bold">من 20 نقطة</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="text-[11px] text-slate-400 font-bold text-center">
-              * الخانات المكتوب فيها «لم يقوّم بعد» هي عناصر لم يتم تقييمها بعد في القسم، ولا تخصم أي نقطة من حق التلميذ.
-            </p>
           </div>
+
+          {/* 1. نمط البطاقات الذكية الواضحة للجوال */}
+          {parentViewMode === "cards" ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-700" />
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900">
+                    بطاقات عناصر التقويم المستمر (8 عناصر تفصيلية):
+                  </h3>
+                </div>
+                <span className="text-[11px] text-slate-400 font-bold hidden sm:inline">
+                  اضغط على أي خانة لتجربة الحساب
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {/* 1. المشاركة والسلوك */}
+                <div className="bg-white p-3.5 rounded-2xl border-2 border-emerald-100 hover:border-emerald-300 transition shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800">المشاركة والسلوك</span>
+                    <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded">/ 4</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={simScores.behaviorScore ?? ""}
+                      onChange={(e) => handleSimChange("behaviorScore", e.target.value)}
+                      placeholder="قيد الرصد"
+                      className={`w-full h-10 text-center text-base font-mono font-black rounded-xl border transition outline-none ${
+                        simScores.behaviorScore === "غ"
+                          ? "bg-red-50 text-red-700 border-red-300 font-sans"
+                          : "bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-bold block text-center">الانضباط والتفاعل بالقسم</span>
+                </div>
+
+                {/* 2. استجواب 1 */}
+                <div className="bg-white p-3.5 rounded-2xl border-2 border-emerald-100 hover:border-emerald-300 transition shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800">استجواب 1</span>
+                    <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded">/ 4</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={simScores.quiz1Score ?? ""}
+                      onChange={(e) => handleSimChange("quiz1Score", e.target.value)}
+                      placeholder="قيد الرصد"
+                      className={`w-full h-10 text-center text-base font-mono font-black rounded-xl border transition outline-none ${
+                        simScores.quiz1Score === "غ"
+                          ? "bg-red-50 text-red-700 border-red-300 font-sans"
+                          : "bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-bold block text-center">استجواب كتابي فجائي 1</span>
+                </div>
+
+                {/* 3. وظيفة 1 */}
+                <div className="bg-white p-3.5 rounded-2xl border-2 border-emerald-100 hover:border-emerald-300 transition shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800">وظيفة 1</span>
+                    <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded">/ 2</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={simScores.homework1Score ?? ""}
+                      onChange={(e) => handleSimChange("homework1Score", e.target.value)}
+                      placeholder="قيد الرصد"
+                      className={`w-full h-10 text-center text-base font-mono font-black rounded-xl border transition outline-none ${
+                        simScores.homework1Score === "غ"
+                          ? "bg-red-50 text-red-700 border-red-300 font-sans"
+                          : "bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-bold block text-center">وظيفة منزلية أولى</span>
+                </div>
+
+                {/* 4. استجواب 2 */}
+                <div className="bg-white p-3.5 rounded-2xl border-2 border-emerald-100 hover:border-emerald-300 transition shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800">استجواب 2</span>
+                    <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded">/ 4</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={simScores.quiz2Score ?? ""}
+                      onChange={(e) => handleSimChange("quiz2Score", e.target.value)}
+                      placeholder="لم يقوّم بعد"
+                      className={`w-full h-10 text-center text-base font-mono font-black rounded-xl border transition outline-none ${
+                        simScores.quiz2Score === "غ"
+                          ? "bg-red-50 text-red-700 border-red-300 font-sans"
+                          : "bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-bold block text-center">استجواب كتابي ثانٍ</span>
+                </div>
+
+                {/* 5. وظيفة 2 */}
+                <div className="bg-white p-3.5 rounded-2xl border-2 border-emerald-100 hover:border-emerald-300 transition shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800">وظيفة 2</span>
+                    <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded">/ 2</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={simScores.homework2Score ?? ""}
+                      onChange={(e) => handleSimChange("homework2Score", e.target.value)}
+                      placeholder="لم يقوّم بعد"
+                      className={`w-full h-10 text-center text-base font-mono font-black rounded-xl border transition outline-none ${
+                        simScores.homework2Score === "غ"
+                          ? "bg-red-50 text-red-700 border-red-300 font-sans"
+                          : "bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-bold block text-center">وظيفة منزلية ثانية</span>
+                </div>
+
+                {/* 6. كراس 1 */}
+                <div className="bg-white p-3.5 rounded-2xl border-2 border-emerald-100 hover:border-emerald-300 transition shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800">كراس 1</span>
+                    <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded">/ 2</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={simScores.notebook1Score ?? ""}
+                      onChange={(e) => handleSimChange("notebook1Score", e.target.value)}
+                      placeholder="لم يقوّم بعد"
+                      className={`w-full h-10 text-center text-base font-mono font-black rounded-xl border transition outline-none ${
+                        simScores.notebook1Score === "غ"
+                          ? "bg-red-50 text-red-700 border-red-300 font-sans"
+                          : "bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-bold block text-center">مراقبة الكراس الأولى</span>
+                </div>
+
+                {/* 7. كراس 2 */}
+                <div className="bg-white p-3.5 rounded-2xl border-2 border-emerald-100 hover:border-emerald-300 transition shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800">كراس 2</span>
+                    <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded">/ 2</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={simScores.notebook2Score ?? ""}
+                      onChange={(e) => handleSimChange("notebook2Score", e.target.value)}
+                      placeholder="لم يقوّم بعد"
+                      className={`w-full h-10 text-center text-base font-mono font-black rounded-xl border transition outline-none ${
+                        simScores.notebook2Score === "غ"
+                          ? "bg-red-50 text-red-700 border-red-300 font-sans"
+                          : "bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-bold block text-center">مراقبة الكراس الثانية</span>
+                </div>
+
+                {/* 8. نقاط إضافية (بونص) */}
+                <div className="bg-purple-50/50 p-3.5 rounded-2xl border-2 border-purple-200 hover:border-purple-300 transition shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-purple-950">نقاط إضافية</span>
+                    <span className="text-[10px] font-mono font-bold bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded">(+)</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={simScores.bonusScore ?? ""}
+                      onChange={(e) => handleSimChange("bonusScore", e.target.value)}
+                      placeholder="+"
+                      className="w-full h-10 text-center text-base font-mono font-black rounded-xl border border-purple-200 bg-white text-purple-900 outline-none focus:border-purple-500 transition"
+                    />
+                  </div>
+                  <span className="text-[10px] text-purple-700 font-bold block text-center">بونص الواجبات والمبادرة</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* 2. نمط الجدول المدمج مع المعايير */
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900">
+                    تفاصيل بطاقة التقويم المستمر (المجموع من 20 نقطة):
+                  </h3>
+                </div>
+                <span className="text-[11px] text-slate-400 font-bold hidden sm:inline">
+                  يمكنك الضغط وتعديل أي خانة لتجربة الحساب
+                </span>
+              </div>
+
+              <div className="overflow-x-auto border border-emerald-200 rounded-2xl shadow-2xs">
+                <table className="w-full text-center text-xs">
+                  <thead className="bg-emerald-50 text-emerald-950 font-black border-b border-emerald-200 text-[11px]" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                    <tr>
+                      <th className="py-2.5 px-2">المشاركة والسلوك</th>
+                      <th className="py-2.5 px-2">استجواب 1</th>
+                      <th className="py-2.5 px-2">وظيفة 1</th>
+                      <th className="py-2.5 px-2">استجواب 2</th>
+                      <th className="py-2.5 px-2">وظيفة 2</th>
+                      <th className="py-2.5 px-2">كراس 1</th>
+                      <th className="py-2.5 px-2">كراس 2</th>
+                      <th className="py-2.5 px-2 text-purple-900">نقاط إضافية (+)</th>
+                      <th className="py-2.5 px-3 bg-emerald-200/90 text-emerald-950 font-black border-r border-emerald-300">
+                        مجموع التقويم
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-emerald-50 font-bold">
+                    <tr>
+                      {/* المشاركة (4) */}
+                      <td className="p-1.5">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={simScores.behaviorScore ?? ""}
+                            onChange={(e) => handleSimChange("behaviorScore", e.target.value)}
+                            min="0"
+                            max={COLUMN_MAX_LIMITS.behaviorScore}
+                            title="الحد الأقصى: 4 نقاط"
+                            placeholder="قيد الرصد"
+                            className={`w-14 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                              simScores.behaviorScore === "غ" || simScores.behaviorScore === "غياب"
+                                ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                                : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                            }`}
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono">/ 4</span>
+                        </div>
+                      </td>
+
+                      {/* استجواب 1 (4) */}
+                      <td className="p-1.5">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={simScores.quiz1Score ?? ""}
+                            onChange={(e) => handleSimChange("quiz1Score", e.target.value)}
+                            min="0"
+                            max={COLUMN_MAX_LIMITS.quiz1Score}
+                            title="الحد الأقصى: 4 نقاط"
+                            placeholder="قيد الرصد"
+                            className={`w-14 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                              simScores.quiz1Score === "غ" || simScores.quiz1Score === "غياب"
+                                ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                                : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                            }`}
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono">/ 4</span>
+                        </div>
+                      </td>
+
+                      {/* وظيفة 1 (2) */}
+                      <td className="p-1.5">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={simScores.homework1Score ?? ""}
+                            onChange={(e) => handleSimChange("homework1Score", e.target.value)}
+                            min="0"
+                            max={COLUMN_MAX_LIMITS.homework1Score}
+                            title="الحد الأقصى: نقطتان"
+                            placeholder="قيد الرصد"
+                            className={`w-14 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                              simScores.homework1Score === "غ" || simScores.homework1Score === "غياب"
+                                ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                                : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                            }`}
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
+                        </div>
+                      </td>
+
+                      {/* استجواب 2 (4) */}
+                      <td className="p-1.5">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={simScores.quiz2Score ?? ""}
+                            onChange={(e) => handleSimChange("quiz2Score", e.target.value)}
+                            min="0"
+                            max={COLUMN_MAX_LIMITS.quiz2Score}
+                            title="الحد الأقصى: 4 نقاط"
+                            placeholder="لم يقوّم بعد"
+                            className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                              simScores.quiz2Score === "غ" || simScores.quiz2Score === "غياب"
+                                ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                                : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                            }`}
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono">/ 4</span>
+                        </div>
+                      </td>
+
+                      {/* وظيفة 2 (2) */}
+                      <td className="p-1.5">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={simScores.homework2Score ?? ""}
+                            onChange={(e) => handleSimChange("homework2Score", e.target.value)}
+                            min="0"
+                            max={COLUMN_MAX_LIMITS.homework2Score}
+                            title="الحد الأقصى: نقطتان"
+                            placeholder="لم يقوّم بعد"
+                            className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                              simScores.homework2Score === "غ" || simScores.homework2Score === "غياب"
+                                ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                                : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                            }`}
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
+                        </div>
+                      </td>
+
+                      {/* كراس 1 (2) */}
+                      <td className="p-1.5">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={simScores.notebook1Score ?? ""}
+                            onChange={(e) => handleSimChange("notebook1Score", e.target.value)}
+                            min="0"
+                            max={COLUMN_MAX_LIMITS.notebook1Score}
+                            title="الحد الأقصى: نقطتان"
+                            placeholder="لم يقوّم بعد"
+                            className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                              simScores.notebook1Score === "غ" || simScores.notebook1Score === "غياب"
+                                ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                                : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                            }`}
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
+                        </div>
+                      </td>
+
+                      {/* كراس 2 (2) */}
+                      <td className="p-1.5">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={simScores.notebook2Score ?? ""}
+                            onChange={(e) => handleSimChange("notebook2Score", e.target.value)}
+                            min="0"
+                            max={COLUMN_MAX_LIMITS.notebook2Score}
+                            title="الحد الأقصى: نقطتان"
+                            placeholder="لم يقوّم بعد"
+                            className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                              simScores.notebook2Score === "غ" || simScores.notebook2Score === "غياب"
+                                ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                                : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                            }`}
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
+                        </div>
+                      </td>
+
+                      {/* نقاط إضافية (+) */}
+                      <td className="p-1.5">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={simScores.bonusScore ?? ""}
+                            onChange={(e) => handleSimChange("bonusScore", e.target.value)}
+                            min="0"
+                            max={COLUMN_MAX_LIMITS.bonusScore}
+                            title="الحد الأقصى: 5 نقاط"
+                            placeholder="+"
+                            className="w-12 h-8 text-center text-xs font-mono font-black text-purple-700 bg-purple-50/60 hover:bg-white focus:bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500/30 outline-none transition"
+                          />
+                          <span className="text-[10px] text-purple-600 font-mono">بونص</span>
+                        </div>
+                      </td>
+
+                      {/* مجموع التقويم المحسوب آلياً */}
+                      <td className="py-2.5 px-3 bg-emerald-100/70 border-r border-emerald-300">
+                        <span className="text-lg font-mono font-black text-emerald-950 block">
+                          {calculatedSim.continuousScore !== null ? calculatedSim.continuousScore : "-"}
+                        </span>
+                        <span className="text-[10px] text-emerald-700 block font-bold">من 20 نقطة</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-slate-400 font-bold text-center">
+                * الخانات المكتوب فيها «لم يقوّم بعد» هي عناصر لم يتم تقييمها بعد في القسم، ولا تخصم أي نقطة من حق التلميذ.
+              </p>
+            </div>
+          )}
 
           {/* ─── بطاقات الفرض والمراقبة والاختبار مع إمكانية التعديل ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">

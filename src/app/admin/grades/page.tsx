@@ -30,9 +30,11 @@ import {
   Search,
   Check,
   BarChart3,
+  Printer,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import GradesStatsDashboard from "@/components/grades/GradesStatsDashboard";
+import OfficialMinistryPdfModal from "@/components/grades/OfficialMinistryPdfModal";
 
 const CLASSES = ["1م1", "1م2", "1م3", "2م3"] as const;
 
@@ -60,6 +62,7 @@ export const DEFAULT_COLUMN_KEYS = [
   "continuousMonitoring",
   "examScore",
   "termAverage",
+  "appreciation",
 ] as const;
 
 export const COLUMN_DEFINITIONS: Record<string, ColumnMeta> = {
@@ -180,6 +183,15 @@ export const COLUMN_DEFINITIONS: Record<string, ColumnMeta> = {
     textHeader: "text-amber-900 font-mono",
     description: "المعدل الفصلي = (المراقبة + الاختبار * 2) / 3",
   },
+  appreciation: {
+    key: "appreciation",
+    title: "ملاحظة الأستاذ",
+    subTitle: "توجيه للولي",
+    category: "eval",
+    bgHeader: "bg-teal-50/90 text-teal-950 font-black",
+    textHeader: "text-teal-800",
+    description: "ملاحظة وتوجيه الأستاذ الفردية لكل تلميذ وتظهر مباشرة للولي في كشف النقاط",
+  },
 };
 
 export const EVAL_COLS = [
@@ -193,6 +205,7 @@ export const EVAL_COLS = [
   "bonusScore",
   "test1Score",
   "examScore",
+  "appreciation",
 ] as const;
 
 export type EvalColKey = (typeof EVAL_COLS)[number];
@@ -428,6 +441,15 @@ export const QUICK_CHIPS_MAP: Record<string, QuickChip[]> = {
     { label: "غ", val: "غ" },
     { label: "—", val: "—" },
   ],
+
+  // ملاحظات وتوجيهات الأستاذ السريعة
+  appreciation: [
+    { label: "🌟 ممتاز", val: "ممتاز جداً، واصل التألق والاجتهاد" },
+    { label: "👏 مشجع", val: "نتائج مشجعة ومستوى طيب، بمزيد من الجد ستحقق الأفضل" },
+    { label: "📖 يحتاج تركيز", val: "تلميذ منضبط، يحتاج لمزيد من التركيز والمراجعة المستمرة" },
+    { label: "⚠️ تنبيه متابعة", val: "تراجع في النتائج، نرجو المتابعة الحثيثة في البيت وتدارك النقائص" },
+    { label: "✍️ غياب معوض", val: "غياب مبرر، سيتم تعويض الاستجواب/الوظيفة قريباً إن شاء الله" },
+  ],
 };
 
 export default function AdminGradesExcelPage() {
@@ -462,6 +484,8 @@ export default function AdminGradesExcelPage() {
   // حالة ترتيب الأعمدة القابلة للتخصيص من قبل الأستاذ
   const [columnOrder, setColumnOrder] = useState<string[]>([...DEFAULT_COLUMN_KEYS]);
   const [showColModal, setShowColModal] = useState(false);
+  const [showMinistryModal, setShowMinistryModal] = useState(false);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   // استرجاع ترتيب الأعمدة المخصص للأستاذ من التخزين المحلي
   useEffect(() => {
@@ -617,6 +641,22 @@ export default function AdminGradesExcelPage() {
         : next.findIndex((s) => s.studentId === studentIdentifier);
       if (rowIdx === -1 || rowIdx >= next.length) return prev;
       const row = { ...next[rowIdx] };
+
+      // إذا كان التعديل في عمود الملاحظات والتوجيه
+      if ((col as string) === "appreciation") {
+        row.appreciation = val;
+        next[rowIdx] = row;
+        latestStudentsRef.current = next;
+        setIsDirty(true);
+        setSyncStatus("unsaved");
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
+        autoSaveTimerRef.current = setTimeout(() => {
+          performSave(next);
+        }, 1000);
+        return next;
+      }
 
       // قبول الحروف الخاصة: غ (غائب)، — (ليس الآن)، أو الأرقام
       // دعم الفواصل العربية والفرنسية (0,5 -> 0.5)
@@ -1053,10 +1093,21 @@ export default function AdminGradesExcelPage() {
             <button
               onClick={handleExportExcel}
               type="button"
-              className="px-3 py-2 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
+              className="px-3 py-2 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-teal-600" />
               <span>تصدير Excel</span>
+            </button>
+
+            {/* زر طباعة كشف الوزارة الرسمي (PDF) */}
+            <button
+              onClick={() => setShowMinistryModal(true)}
+              type="button"
+              className="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 text-xs font-black transition flex items-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
+              title="تصدير وطباعة كشف النقاط الرسمي للوزارة بصيغة PDF على ورق A4 عرضي"
+            >
+              <Printer className="w-3.5 h-3.5 text-emerald-700" />
+              <span>كشف الوزارة الرسمي (PDF)</span>
             </button>
           </div>
         </div>
@@ -1445,7 +1496,7 @@ export default function AdminGradesExcelPage() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
                           {columnOrder.map((colKey) => {
                             const meta = COLUMN_DEFINITIONS[colKey];
-                            if (!meta || meta.category === "calc") return null;
+                            if (!meta || meta.category === "calc" || colKey === "appreciation") return null;
 
                             const val = (s as any)[colKey] ?? "";
                             const isAbsent = val === "غ";
@@ -1511,6 +1562,45 @@ export default function AdminGradesExcelPage() {
                             );
                           })}
                         </div>
+
+                        {/* حقل ملاحظات وتوجيهات الأستاذ الفردية لكل تلميذ */}
+                        <div className="mt-3 p-3 bg-teal-50/70 rounded-2xl border border-teal-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-teal-950 flex items-center gap-1.5" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                              <Sparkles className="w-3.5 h-3.5 text-teal-700" />
+                              <span>ملاحظة وتوجيه الأستاذ (تظهر للولي في كشف النقاط):</span>
+                            </span>
+                            <span className="text-[10px] text-teal-700 font-bold">حفظ فوري ⚡</span>
+                          </div>
+
+                          <input
+                            type="text"
+                            value={s.appreciation || ""}
+                            onChange={(e) => handleCellChange(s.studentId, "appreciation" as any, e.target.value)}
+                            onBlur={handleCellBlur}
+                            placeholder="اكتب ملاحظة أو توجيهاً للتلميذ وولي أمره..."
+                            className="w-full h-9 px-3 text-xs font-bold text-slate-800 bg-white border border-teal-200 rounded-xl focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none"
+                            style={{ fontFamily: "'Cairo', sans-serif" }}
+                          />
+
+                          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                            <span className="text-[10px] text-slate-500 font-bold ml-1">توجيهات سريعة:</span>
+                            {(QUICK_CHIPS_MAP.appreciation || []).map((chip) => (
+                              <button
+                                key={chip.label}
+                                type="button"
+                                onClick={() => handleCellChange(s.studentId, "appreciation" as any, chip.val)}
+                                className={`px-2 py-1 rounded-lg border text-[10px] font-black transition cursor-pointer active:scale-95 shadow-2xs ${
+                                  s.appreciation === chip.val
+                                    ? "bg-teal-700 text-white border-teal-800"
+                                    : "bg-white border-teal-200 hover:bg-teal-100 text-teal-900"
+                                }`}
+                              >
+                                {chip.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1523,25 +1613,93 @@ export default function AdminGradesExcelPage() {
 
       {/* ─── جدول الإكسل المتكامل ─── */}
       {viewMode === "table" && (
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-0">
+        {/* شريط أدوات التمرير والانتقال السريع بين أقسام الجدول */}
+        <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-black text-slate-500 ml-1">انتقال سريع:</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (tableScrollRef.current) {
+                  tableScrollRef.current.scrollTo({ left: 0, behavior: "smooth" });
+                }
+              }}
+              className="px-2.5 py-1 rounded-xl bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-950 font-bold text-xs transition cursor-pointer shadow-2xs flex items-center gap-1"
+            >
+              <span>📝 التقويم المستمر</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (tableScrollRef.current) {
+                  tableScrollRef.current.scrollBy({ left: -450, behavior: "smooth" });
+                }
+              }}
+              className="px-2.5 py-1 rounded-xl bg-white border border-blue-300 hover:bg-blue-50 text-blue-950 font-bold text-xs transition cursor-pointer shadow-2xs flex items-center gap-1"
+            >
+              <span>📊 الفرض والمراقبة</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (tableScrollRef.current) {
+                  tableScrollRef.current.scrollBy({ left: -1000, behavior: "smooth" });
+                }
+              }}
+              className="px-2.5 py-1 rounded-xl bg-white border border-amber-300 hover:bg-amber-50 text-amber-950 font-bold text-xs transition cursor-pointer shadow-2xs flex items-center gap-1"
+            >
+              <span>🏆 المعدل والملاحظات</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 text-slate-500">
+            <span className="text-[11px] font-bold ml-1 hidden sm:inline">تمرير أفقي:</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (tableScrollRef.current) {
+                  tableScrollRef.current.scrollBy({ left: 200, behavior: "smooth" });
+                }
+              }}
+              className="p-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition cursor-pointer shadow-2xs"
+              title="تمرير لليمين"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (tableScrollRef.current) {
+                  tableScrollRef.current.scrollBy({ left: -200, behavior: "smooth" });
+                }
+              }}
+              className="p-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition cursor-pointer shadow-2xs"
+              title="تمرير لليسار"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div ref={tableScrollRef} className="overflow-x-auto relative">
           <table className="w-full text-center text-xs border-collapse">
             {/* الرأس العلوي مع تصنيف الأعمدة */}
             <thead>
               <tr className="bg-slate-100 text-slate-700 font-black border-b border-slate-200 text-[11px]">
-                <th colSpan={3} className="py-2.5 px-2 border-l border-slate-200 bg-slate-100">
-                  بيانات التلميذ
+                <th colSpan={3} className="py-2.5 px-2 border-l border-slate-200 bg-slate-100 sticky right-0 z-30 shadow-[-3px_0_4px_-1px_rgba(0,0,0,0.08)]">
+                  بيانات التلميذ (مثبتة 📌)
                 </th>
-                <th colSpan={9} className="py-2.5 px-2 border-l border-emerald-200 bg-emerald-50/80 text-emerald-950 font-black">
+                <th colSpan={8} className="py-2.5 px-2 border-l border-emerald-200 bg-emerald-50/80 text-emerald-950 font-black">
                   📝 أعمدة التقويم المستمر (المجموع: 20 نقطة)
                 </th>
-                <th colSpan={4} className="py-2.5 px-2 bg-blue-50/80 text-blue-950 font-black">
-                  📊 الفرض والاختبار والمعدل الفصلي
+                <th colSpan={5} className="py-2.5 px-2 bg-blue-50/80 text-blue-950 font-black">
+                  📊 الفرض والاختبار والمعدل وملاحظة الأستاذ
                 </th>
               </tr>
               <tr className="bg-slate-50 text-slate-700 font-black border-b border-slate-200 text-[11px]" style={{ fontFamily: "'Cairo', sans-serif" }}>
-                <th className="py-2 px-1 w-8">#</th>
-                <th className="py-2 px-3 text-right min-w-[160px] font-black text-slate-900">
+                <th className="py-2 px-1 w-8 sticky right-0 z-30 bg-slate-100">#</th>
+                <th className="py-2 px-3 text-right min-w-[170px] font-black text-slate-900 sticky right-8 z-30 bg-slate-100 shadow-[-3px_0_4px_-1px_rgba(0,0,0,0.08)] border-l-2 border-slate-300">
                   اسم ولقب التلميذ
                 </th>
                 <th className="py-2 px-2 border-l border-slate-200 w-16">الفوج</th>
@@ -1623,14 +1781,14 @@ export default function AdminGradesExcelPage() {
               ) : (
                 filteredStudents.map((s, rowIdx) => {
                   return (
-                    <tr key={s.studentId} className="hover:bg-slate-50 transition">
-                      <td className="py-1.5 px-1 text-slate-400 text-[11px]">{rowIdx + 1}</td>
+                    <tr key={s.studentId} className="group hover:bg-slate-50 transition">
+                      <td className="py-1.5 px-1 text-slate-400 text-[11px] sticky right-0 z-20 bg-white group-hover:bg-slate-50">{rowIdx + 1}</td>
                       <td
-    className="py-1.5 px-3 text-right font-black text-slate-900 whitespace-nowrap text-xs sm:text-sm tracking-normal"
-    style={{ fontFamily: "'Cairo', sans-serif" }}
-  >
-    {s.studentName}
-  </td>
+                        className="py-1.5 px-3 text-right font-black text-slate-900 whitespace-nowrap text-xs sm:text-sm tracking-normal sticky right-8 z-20 bg-white group-hover:bg-slate-50 shadow-[-3px_0_4px_-1px_rgba(0,0,0,0.08)] border-l-2 border-slate-300"
+                        style={{ fontFamily: "'Cairo', sans-serif" }}
+                      >
+                        {s.studentName}
+                      </td>
                       <td className="py-1.5 px-2 border-l border-slate-200 font-sans text-[11px] text-slate-500">
                         <span
                           className={`px-1.5 py-0.5 rounded ${
@@ -1646,6 +1804,40 @@ export default function AdminGradesExcelPage() {
                         const meta = COLUMN_DEFINITIONS[colKey];
                         if (!meta) return null;
                         const cellKey = `cell_${rowIdx}_${colIdx}`;
+
+                        // عمود ملاحظات وتوجيهات الأستاذ للولي والتلميذ
+                        if (colKey === "appreciation") {
+                          const val = s.appreciation || "";
+                          const chips = QUICK_CHIPS_MAP.appreciation || [];
+                          return (
+                            <td key={colKey} className="p-1 min-w-[240px] max-w-[320px] bg-teal-50/20 text-right border-l border-slate-200">
+                              <div className="flex flex-col gap-1">
+                                <input
+                                  type="text"
+                                  value={val}
+                                  onChange={(e) => handleCellChange(s.studentId, "appreciation" as any, e.target.value)}
+                                  onBlur={handleCellBlur}
+                                  placeholder="ملاحظة للولي..."
+                                  className="w-full h-8 px-2 text-xs font-bold text-slate-800 bg-white border border-teal-200 rounded-lg outline-none focus:ring-2 focus:ring-teal-500/30"
+                                  style={{ fontFamily: "'Cairo', sans-serif" }}
+                                />
+                                <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+                                  {chips.map((chip) => (
+                                    <button
+                                      key={chip.label}
+                                      type="button"
+                                      onClick={() => handleCellChange(s.studentId, "appreciation" as any, chip.val)}
+                                      className="px-1.5 py-0.5 rounded bg-teal-100/80 hover:bg-teal-200 text-teal-950 text-[9px] font-black whitespace-nowrap transition cursor-pointer active:scale-95 shadow-2xs"
+                                      title={chip.val}
+                                    >
+                                      {chip.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        }
 
                         // 1. أعمدة التقويم المستمر المفصلة القابلة للإدخال
                         if (meta.category === "eval") {
@@ -1888,6 +2080,17 @@ export default function AdminGradesExcelPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ─── نافذة كشف النقاط الرسمي للوزارة (A4 Landscape PDF) ─── */}
+      {showMinistryModal && (
+        <OfficialMinistryPdfModal
+          isOpen={showMinistryModal}
+          onClose={() => setShowMinistryModal(false)}
+          classNameTitle={selectedClass}
+          trimester={trimester}
+          students={students}
+        />
       )}
     </div>
   );

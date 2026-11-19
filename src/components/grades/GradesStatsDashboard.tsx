@@ -1649,10 +1649,187 @@ export default function GradesStatsDashboard({
       )}
 
       {/* ══════════════════════════════════════════════════════════ */}
-      {/* ─── نمط 3: الترتيب العام لجميع الأقسام (ALL CLASSES OVERVIEW) ─── */}
+      {/* ─── نمط 3: المقارنة المتزامنة والترتيب العام لجميع الأفواج (4 أقسام في شاشة واحدة) ─── */}
       {/* ══════════════════════════════════════════════════════════ */}
       {mode === "all" && (
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* ─── بطاقات المقارنة المتزامنة للأفواج الـ 4 ─── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-500" />
+                <h3 className="text-sm sm:text-base font-black text-slate-900" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                  المقارنة المتزامنة لجميع الأفواج (4 أقسام في شاشة واحدة)
+                </h3>
+              </div>
+              <span className="text-xs font-bold text-slate-500 font-mono">
+                {currentEvalMeta.label} • الفصل {trimester}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              {allClassStatsList.map((item, idx) => {
+                const medals = ["🥇", "🥈", "🥉", "🎖️"];
+                const rankLabels = ["الفوج المتصدر 🏆", "المرتبة الثانية", "المرتبة الثالثة", "المرتبة الرابعة"];
+                const isLeader = idx === 0;
+
+                return (
+                  <div
+                    key={item.className}
+                    className={`bg-white rounded-3xl p-4 sm:p-5 border-2 transition shadow-xs flex flex-col justify-between ${
+                      isLeader
+                        ? "border-amber-400 bg-gradient-to-b from-amber-50/40 via-white to-white ring-2 ring-amber-400/20"
+                        : "border-slate-200 hover:border-emerald-300"
+                    }`}
+                  >
+                    <div>
+                      {/* رأس بطاقة الفوج */}
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{medals[idx] || "⭐"}</span>
+                          <div>
+                            <h4 className="text-base font-black text-slate-900" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                              فوج {item.className}
+                            </h4>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                              isLeader ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-600"
+                            }`}>
+                              {rankLabels[idx] || `المرتبة ${idx + 1}`}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="text-xs font-bold text-slate-400 font-mono">
+                          {item.graded} تلميذ
+                        </span>
+                      </div>
+
+                      {/* مؤشرات الأداء الرئيسية */}
+                      <div className="grid grid-cols-2 gap-2 my-3 text-center">
+                        <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-100">
+                          <span className="text-[10px] text-emerald-800 font-bold block">معدل الفوج</span>
+                          <strong className="text-xl font-black font-mono text-emerald-950">
+                            {item.average}
+                          </strong>
+                          <span className="text-[9px] text-emerald-700 block font-bold">/ 20</span>
+                        </div>
+
+                        <div className="p-2.5 rounded-2xl bg-blue-50 border border-blue-100">
+                          <span className="text-[10px] text-blue-800 font-bold block">نسبة النجاح</span>
+                          <strong className="text-xl font-black font-mono text-blue-950">
+                            {item.passingRate}%
+                          </strong>
+                          <span className="text-[9px] text-blue-700 block font-bold">≥ 10 من 20</span>
+                        </div>
+                      </div>
+
+                      {/* شريط نسبة النجاح المرئي */}
+                      <div className="space-y-1 mb-3">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                          <span>نسبة التحصيل:</span>
+                          <span className="font-mono">{item.passingRate}%</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              item.passingRate >= 70
+                                ? "bg-emerald-600"
+                                : item.passingRate >= 50
+                                ? "bg-blue-600"
+                                : "bg-amber-500"
+                            }`}
+                            style={{ width: `${Math.min(100, item.passingRate)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* أرقام تفصيلية سريعة */}
+                      <div className="grid grid-cols-3 gap-1 p-2 rounded-xl bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-600 text-center">
+                        <div>
+                          <span className="block text-slate-400">الوسيط</span>
+                          <span className="font-mono font-black text-slate-800">{item.median}</span>
+                        </div>
+                        <div>
+                          <span className="block text-slate-400">أعلى علامة</span>
+                          <span className="font-mono font-black text-emerald-700">{item.highest}</span>
+                        </div>
+                        <div>
+                          <span className="block text-slate-400">أدنى علامة</span>
+                          <span className="font-mono font-black text-rose-700">{item.lowest}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* زر المعاينة التفصيلية */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedClass(item.className);
+                        setMode("single");
+                        onClassChange?.(item.className);
+                      }}
+                      className="mt-3.5 w-full py-2 rounded-xl text-xs font-black bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-800 transition cursor-pointer active:scale-95"
+                    >
+                      معاينة تفاصيل الفوج ←
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ─── رسم بياني شريطي مقارن لمعدلات الأفواج الـ 4 ─── */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-emerald-600" />
+                <h4 className="text-xs sm:text-sm font-black text-slate-900">
+                  مقارنة الأعمدة البيانية لمعدلات الأفواج ونسب النجاح
+                </h4>
+              </div>
+              <span className="text-[11px] font-bold text-slate-400">مقياس موحد / 20</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+              {allClassStatsList.map((item, idx) => {
+                const avgPct = Math.min(100, (item.average / 20) * 100);
+                return (
+                  <div key={item.className} className="space-y-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                    <div className="flex items-center justify-between text-xs font-black">
+                      <span className="text-slate-800">فوج {item.className}</span>
+                      <span className="font-mono text-emerald-700">{item.average} / 20</span>
+                    </div>
+
+                    <div className="h-28 flex items-end justify-center gap-3 bg-white p-2 rounded-xl border border-slate-200">
+                      {/* عمود المعدل */}
+                      <div className="w-8 flex flex-col items-center gap-1 h-full justify-end">
+                        <span className="text-[9px] font-mono font-bold text-emerald-900">{item.average}</span>
+                        <div
+                          className="w-full bg-emerald-600 rounded-t-lg transition-all duration-700 shadow-xs"
+                          style={{ height: `${avgPct}%` }}
+                          title={`معدل الفوج: ${item.average}`}
+                        />
+                        <span className="text-[9px] font-bold text-slate-400">معدل</span>
+                      </div>
+
+                      {/* عمود نسبة النجاح */}
+                      <div className="w-8 flex flex-col items-center gap-1 h-full justify-end">
+                        <span className="text-[9px] font-mono font-bold text-blue-900">{item.passingRate}%</span>
+                        <div
+                          className="w-full bg-blue-600 rounded-t-lg transition-all duration-700 shadow-xs"
+                          style={{ height: `${Math.min(100, item.passingRate)}%` }}
+                          title={`نسبة النجاح: ${item.passingRate}%`}
+                        />
+                        <span className="text-[9px] font-bold text-slate-400">نجاح</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ─── جدول الترتيب والمقارنة الشاملة لجميع الأفواج ─── */}
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
@@ -1686,7 +1863,7 @@ export default function GradesStatsDashboard({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {allClassStatsList.map((item, idx) => {
-                    const medals = ["🥇", "🥈", "🥉"];
+                    const medals = ["🥇", "🥈", "🥉", "🎖️"];
                     return (
                       <tr
                         key={item.className}
@@ -1748,7 +1925,7 @@ export default function GradesStatsDashboard({
       )}
 
       {/* ══════════════════════════════════════════════════════════ */}
-      {/* ─── نمط 4: خطة المعالجة البيداغوجية والدعم ─── */}
+      {/* ─── نمط 4: خطة المعالجة البيداغوجية والدعم المستهدف ─── */}
       {/* ══════════════════════════════════════════════════════════ */}
       {mode === "remediation" && (
         <div className="space-y-4">
@@ -1757,19 +1934,51 @@ export default function GradesStatsDashboard({
               <div>
                 <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-rose-600" />
-                  <span>سجل المعالجة البيداغوجية ومرافقة التلاميذ في فوج {selectedClass}</span>
+                  <span>مخطط المعالجة البيداغوجية الآلية ومرافقة التلاميذ المتعثرين</span>
                 </h3>
                 <p className="text-xs text-slate-500 font-bold mt-0.5">
-                  خطة عملية موجهة للتلاميذ المتعثرين في {currentEvalMeta.label} لحصص الاستدراك والمعالجة
+                  خطة علاجية مخصصة لتلاميذ فوج {selectedClass} بناءً على نقاط {currentEvalMeta.label} لحصص الاستدراك
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold px-3 py-1 rounded-xl bg-amber-50 text-amber-900 border border-amber-200">
-                  {singleStats.nearPassing.length} تلميذ فرصة إنقاذ
+                  {singleStats.nearPassing.length} تلميذ إنقاذ (8.00 - 9.99)
                 </span>
                 <span className="text-xs font-bold px-3 py-1 rounded-xl bg-rose-50 text-rose-900 border border-rose-200">
-                  {singleStats.criticalSupport.length} تلميذ دعم مكثف
+                  {singleStats.criticalSupport.length} تلميذ تدخل عاجل (&lt; 8)
                 </span>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>طباعة مخطط المعالجة 📄</span>
+                </button>
+              </div>
+            </div>
+
+            {/* بطاقات الإرشادات البيداغوجية */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-1">
+                <div className="flex items-center gap-2 text-amber-900 font-black text-xs">
+                  <Target className="w-4 h-4 text-amber-600" />
+                  <span>فئة الإنقاذ والمرافقة السريعة (8.00 إلى 9.99 ن)</span>
+                </div>
+                <p className="text-[11px] text-amber-900/80 leading-relaxed font-bold">
+                  ينقص هؤلاء التلاميذ القليل من التركيز وتصحيح الأخطاء الشائعة (الأخطاء الحسابية، عدم قراءة نص المسألة بعناية). التركيز معهم في أسبوع واحد يكفي لنقلهم إلى فئة الناجحين.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200 space-y-1">
+                <div className="flex items-center gap-2 text-rose-900 font-black text-xs">
+                  <ShieldAlert className="w-4 h-4 text-rose-600" />
+                  <span>فئة التدخل البيداغوجي العاجل (أقل من 8 نقاط)</span>
+                </div>
+                <p className="text-[11px] text-rose-900/80 leading-relaxed font-bold">
+                  صعوبات تراكمية أو غيابات متكررة. يتطلب إشراك ولي الأمر وتخصيص تمارين تأسيسية تبدأ من جدول الضرب والعمليات الأساسية وتوزيع بطاقات تمارين منزلية موجّهة.
+                </p>
               </div>
             </div>
 
@@ -1781,8 +1990,9 @@ export default function GradesStatsDashboard({
                     <th className="py-2.5 px-3">التلميذ</th>
                     <th className="py-2.5 px-3">العلامة الحالية</th>
                     <th className="py-2.5 px-3">المستوى والتشخيص</th>
+                    <th className="py-2.5 px-3">مجال المعالجة المحدد</th>
                     <th className="py-2.5 px-3">الإجراء البيداغوجي المقترح</th>
-                    <th className="py-2.5 px-3 text-center">الحالة</th>
+                    <th className="py-2.5 px-3 text-center">أولوية التدخل</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1795,6 +2005,9 @@ export default function GradesStatsDashboard({
                         <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
                           قريب من النجاح (ينقصه {Number((10 - st.score).toFixed(2))} ن)
                         </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-700 font-bold">
+                        العمليات على الأعداد الطبيعية والعشرية + حل المشكلات
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 font-bold">
                         تصحيح الأخطاء الشائعة + حل تمرين إضافي منزلي مع المراقبة
@@ -1814,15 +2027,18 @@ export default function GradesStatsDashboard({
                       <td className="py-2.5 px-3 font-mono font-black text-rose-700">{st.score} / 20</td>
                       <td className="py-2.5 px-3">
                         <span className="text-[11px] font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded-md">
-                          تعثر حاد (&lt; 5 نقاط)
+                          تعثر حاد (&lt; 8 نقاط)
                         </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-700 font-bold">
+                        المكتسبات القبلية + الحساب الذهني + الهندسة الأساسية
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 font-bold">
                         حصة استدراك فردية + مراجعة المكتسبات القبلية + استدعاء الولي
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         <span className="text-[10px] font-black bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">
-                          تدخل عاجل
+                          تدخل عاجل ⚠️
                         </span>
                       </td>
                     </tr>
@@ -1830,7 +2046,7 @@ export default function GradesStatsDashboard({
 
                   {singleStats.nearPassing.length === 0 && singleStats.criticalSupport.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">
+                      <td colSpan={6} className="py-8 text-center text-slate-400 font-bold">
                         لا يوجد أي تلاميذ بحاجة لمعالجة بيداغوجية مستعجلة في هذا الفوج، جميع النتائج مستقرة 👏
                       </td>
                     </tr>
