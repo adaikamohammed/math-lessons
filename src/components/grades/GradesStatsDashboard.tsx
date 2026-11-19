@@ -168,20 +168,32 @@ export default function GradesStatsDashboard({
   const computeDetailedStats = (studentsList: StudentStatsRow[], evalField: AssessmentType) => {
     const total = studentsList.length;
 
-    // استخراج العلامات الصالحة
+    // استخراج العلامات الصالحة واستبعاد الغائبين (غ) والخانات الفارغة تماماً حتى لا تؤثر على المتوسط
+    let absentCount = 0;
+    let emptyCount = 0;
     const validRecords: { name: string; score: number; gender: string; groupName: string }[] = [];
+
     studentsList.forEach((s) => {
       const raw = s[evalField];
-      if (raw !== undefined && raw !== null && raw !== "") {
-        const num = typeof raw === "number" ? raw : parseFloat(String(raw));
-        if (!isNaN(num) && num >= 0 && num <= 20) {
-          validRecords.push({
-            name: s.studentName,
-            score: num,
-            gender: (s.gender || "M").toUpperCase(),
-            groupName: s.groupName || "فوج 1",
-          });
-        }
+      if (raw === undefined || raw === null || raw === "" || raw === "-" || raw === "—" || raw === "ليس الآن") {
+        emptyCount++;
+        return;
+      }
+      const str = String(raw).trim();
+      if (str === "غ" || str === "غياب") {
+        absentCount++;
+        return;
+      }
+      const num = typeof raw === "number" ? raw : parseFloat(str.replace(/[,،]/g, "."));
+      if (!isNaN(num) && num >= 0 && num <= 20) {
+        validRecords.push({
+          name: s.studentName,
+          score: num,
+          gender: (s.gender || "M").toUpperCase(),
+          groupName: s.groupName || "فوج 1",
+        });
+      } else {
+        emptyCount++;
       }
     });
 
@@ -190,6 +202,8 @@ export default function GradesStatsDashboard({
       return {
         total,
         graded: 0,
+        absentCount,
+        emptyCount,
         average: 0,
         median: 0,
         passingCount: 0,
@@ -331,14 +345,17 @@ export default function GradesStatsDashboard({
       females: calcGender("F"),
     };
 
-    // 8. متوسطات معايير التقويم الفرعية
+    // 8. متوسطات معايير التقويم الفرعية (تستبعد الغائبين «غ» والخانات الفارغة)
     const calcFieldAvg = (field: keyof StudentStatsRow) => {
       const vals: number[] = [];
       studentsList.forEach((s) => {
         const v = s[field];
         if (v !== undefined && v !== null && v !== "") {
-          const n = Number(v);
-          if (!isNaN(n)) vals.push(n);
+          const str = String(v).trim();
+          if (str !== "غ" && str !== "غياب" && str !== "-" && str !== "—" && str !== "ليس الآن") {
+            const n = typeof v === "number" ? v : parseFloat(str.replace(/[,،]/g, "."));
+            if (!isNaN(n) && n >= 0) vals.push(n);
+          }
         }
       });
       return vals.length > 0 ? Number((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2)) : 0;
@@ -358,6 +375,8 @@ export default function GradesStatsDashboard({
     return {
       total,
       graded,
+      absentCount,
+      emptyCount,
       average,
       median,
       passingCount,
@@ -798,36 +817,54 @@ export default function GradesStatsDashboard({
       {mode !== "all" && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {/* KPI 1: إجمالي المرصودين */}
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
-              <span>المرصودون</span>
-              <Users className="w-3.5 h-3.5 text-blue-600" />
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+                <span>المرصودون الحاضرون</span>
+                <Users className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-black text-slate-900 font-mono">
+                  {singleStats.graded}
+                </span>
+                <span className="text-xs text-slate-400 font-mono font-bold">/ {singleStats.total}</span>
+              </div>
             </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl font-black text-slate-900 font-mono">
-                {singleStats.graded}
-              </span>
-              <span className="text-xs text-slate-400 font-mono font-bold">/ {singleStats.total}</span>
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              {singleStats.absentCount > 0 && (
+                <span className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.2 rounded font-black font-sans">
+                  {singleStats.absentCount} غائب (غ)
+                </span>
+              )}
+              {singleStats.emptyCount > 0 && (
+                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded font-bold">
+                  {singleStats.emptyCount} فارغ
+                </span>
+              )}
+              {singleStats.absentCount === 0 && singleStats.emptyCount === 0 && (
+                <span className="text-[10px] text-emerald-700 font-bold">رصد كامل 100%</span>
+              )}
             </div>
-            <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-              نسبة الرصد: {singleStats.total > 0 ? ((singleStats.graded / singleStats.total) * 100).toFixed(0) : 0}%
-            </p>
           </div>
 
           {/* KPI 2: المعدل الحسابي */}
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
-              <span>معدل الفوج</span>
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+                <span>معدل الفوج الحقيقي</span>
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-black text-emerald-700 font-mono">
+                  {singleStats.graded > 0 ? singleStats.average : "—"}
+                </span>
+                <span className="text-xs text-slate-400 font-mono font-bold">/ 20</span>
+              </div>
             </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl font-black text-emerald-700 font-mono">
-                {singleStats.graded > 0 ? singleStats.average : "—"}
-              </span>
-              <span className="text-xs text-slate-400 font-mono font-bold">/ 20</span>
-            </div>
-            <p className="text-[10px] text-emerald-700 font-bold mt-0.5">
-              {singleStats.average >= 14 ? "فوج متميز 🌟" : singleStats.average >= 10 ? "مستوى مقبول ✓" : "يحتاج مرافقة ⚠️"}
+            <p className="text-[10px] text-emerald-700 font-bold mt-1 truncate" title="يحسب فقط للعلامات المرصودة فعلياً دون احتساب الغائبين أو الخانات الفارغة">
+              {singleStats.graded > 0
+                ? `محسوب على ${singleStats.graded} حاضرين (مستبعد منه «غ» والفارغ)`
+                : "لا توجد علامات عددية"}
             </p>
           </div>
 

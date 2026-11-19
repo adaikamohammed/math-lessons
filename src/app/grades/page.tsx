@@ -25,6 +25,7 @@ import {
   HelpCircle,
   Info,
   X,
+  HeartHandshake,
 } from "lucide-react";
 
 const CLASSES = ["1م1", "1م2", "1م3", "2م3"];
@@ -265,7 +266,7 @@ export default function GradesLookupPage() {
 
     const parseNum = (v: any): number | null => {
       if (v === "" || v === undefined || v === null || v === "—" || v === "ليس الآن" || v === "-") return null;
-      if (v === "غ" || v === "غياب") return 0;
+      if (v === "غ" || v === "غياب") return null;
       const str = String(v).replace(/[,،]/g, ".").trim();
       if (str === "" || str === ".") return null;
       const n = parseFloat(str);
@@ -296,11 +297,16 @@ export default function GradesLookupPage() {
       continuousScore = Number(Math.min(20, Math.max(0, sum)).toFixed(2));
     }
 
+    const isTestAbsent = simScores.test1Score === "غ" || simScores.test1Score === "غياب";
+    const isExamAbsent = simScores.examScore === "غ" || simScores.examScore === "غياب";
+
     const test1 = clampVal(simScores.test1Score, 20);
     const exam = clampVal(simScores.examScore, 20);
 
     let continuousMonitoring: number | null = null;
-    if (continuousScore !== null && test1 !== null) {
+    if (isTestAbsent) {
+      continuousMonitoring = null;
+    } else if (continuousScore !== null && test1 !== null) {
       continuousMonitoring = Number(((continuousScore + test1) / 2).toFixed(2));
     } else if (continuousScore !== null) {
       continuousMonitoring = continuousScore;
@@ -310,13 +316,21 @@ export default function GradesLookupPage() {
 
     let termAverage: number | null = null;
     let isPendingExam = true;
-    if (continuousMonitoring !== null && exam !== null) {
+    if (isExamAbsent || isTestAbsent) {
+      termAverage = null;
+      isPendingExam = true;
+    } else if (continuousMonitoring !== null && exam !== null) {
       termAverage = Number(((continuousMonitoring + exam * 2) / 3).toFixed(2));
       isPendingExam = false;
     } else if (continuousMonitoring !== null) {
       termAverage = continuousMonitoring;
       isPendingExam = true;
     }
+
+    // التحقق هل يحتوي الكشف على أي غياب "غ" لتوجيه الولي برسالة الطمأنة
+    const hasAnyAbsent = Object.values(simScores).some(
+      (v) => v === "غ" || v === "غياب"
+    );
 
     // حساب العلامة المطلوبة في الاختبار لتحقيق هدف معدل معين
     // Avg = (Monitoring + Exam * 2) / 3  =>  Exam = (Avg * 3 - Monitoring) / 2
@@ -365,6 +379,7 @@ export default function GradesLookupPage() {
       isPendingExam,
       isModified,
       appreciation,
+      hasAnyAbsent,
       target10: calcRequiredExam(10),
       target12: calcRequiredExam(12),
       target14: calcRequiredExam(14),
@@ -611,6 +626,58 @@ export default function GradesLookupPage() {
         </form>
       </div>
 
+      {/* ─── رسالة توضيحية وطمأنة لأولياء الأمور الكرام ─── */}
+      <div className="bg-gradient-to-br from-emerald-50/90 via-teal-50/70 to-white rounded-3xl p-5 sm:p-6 border border-emerald-200/90 shadow-sm space-y-4 print:hidden">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-sm shadow-emerald-700/20">
+            <HeartHandshake className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm sm:text-base font-black text-emerald-950" style={{ fontFamily: "'Cairo', sans-serif" }}>
+              توضيح ورسالة طمأنة لأولياء الأمور الكرام 🌸
+            </h3>
+            <p className="text-xs text-emerald-800 font-bold">
+              حرصاً منا على الشفافية والراحة النفسية لأبنائنا التلاميذ وأوليائهم الأفاضل:
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          {/* بطاقة 1: معنى رمز غ */}
+          <div className="bg-white/95 rounded-2xl p-4 border border-emerald-100 shadow-2xs space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-xl bg-red-100 border border-red-200 text-red-700 font-black text-xs flex items-center justify-center font-sans">غ</span>
+              <h4 className="text-xs font-black text-slate-900">ماذا يعني رمز (غ)؟</h4>
+            </div>
+            <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
+              رمز <span className="text-red-700 font-black">(غ)</span> يعني أن التلميذ كان غائباً أثناء إجراء الاستجواب أو لم يتمكن من تسليم الوظيفة في موعدها.
+            </p>
+          </div>
+
+          {/* بطاقة 2: الطمأنة بالتعويض */}
+          <div className="bg-white/95 rounded-2xl p-4 border border-teal-100 shadow-2xs space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-xl bg-teal-100 border border-teal-200 text-teal-800 font-black text-xs flex items-center justify-center">🔄</span>
+              <h4 className="text-xs font-black text-slate-900">لا تقلقوا (التعويض مضمون)</h4>
+            </div>
+            <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
+              تطميناً للأولياء، سيتم تلقائياً وضع علامة <strong>استجواب 2</strong> نفسها كعلامة لـ <strong>استجواب 1</strong>، وكذلك علامة <strong>وظيفة 2</strong> نفسها لـ <strong>وظيفة 1</strong>.
+            </p>
+          </div>
+
+          {/* بطاقة 3: اكتمال التقويم */}
+          <div className="bg-white/95 rounded-2xl p-4 border border-emerald-100 shadow-2xs space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-xl bg-emerald-100 border border-emerald-200 text-emerald-800 font-black text-xs flex items-center justify-center">📅</span>
+              <h4 className="text-xs font-black text-slate-900">جاهزية التقويم قبل الاختبارات</h4>
+            </div>
+            <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
+              كامل نقاط التقويم المستمر ستكون جاهزة ومرصودة بنسبة 100% قبل انطلاق الاختبارات، بما في ذلك علامة الكراس والمشاركة والسلوك.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* ─── كشف النقاط الرسمي والمحاكي التفاعلي للتلميذ ─── */}
       {result && calculatedSim && (
         <div id="student-report-card" className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200 shadow-sm space-y-5 fade-up">
@@ -715,6 +782,21 @@ export default function GradesLookupPage() {
             )}
           </div>
 
+          {/* ─── تنبيه خاص للتلميذ والولي في حال وجود غياب (غ) ─── */}
+          {calculatedSim.hasAnyAbsent && (
+            <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-300 text-amber-950 text-xs font-bold flex items-start gap-3 animate-in fade-in">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-black text-amber-900 block text-xs sm:text-sm">
+                  ملاحظة طمأنة لولي أمر التلميذ(ة):
+                </span>
+                <p className="text-[11px] text-amber-900/90 leading-relaxed font-bold">
+                  يظهر رمز <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-black border border-red-200 font-sans">غ</span> في إحدى خانات التقييم أدناه؛ لا داعي للقلق إطلاقاً، حيث سيتم تلقائياً احتساب علامة الاستجواب الثاني كبديل ونفس علامة الاستجواب الأول، وكذلك الوظيفة الثانية كبديل للوظيفة الأولى لمن تغيب عنها، وستكون كامل نقاط التقويم المستمر مكتملة 100% بحول الله قبل أسبوع الاختبارات الرسمية.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ─── جدول أعمدة التقويم المستمر التفاعلي ─── */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -760,7 +842,11 @@ export default function GradesLookupPage() {
                           max={COLUMN_MAX_LIMITS.behaviorScore}
                           title="الحد الأقصى: 4 نقاط"
                           placeholder="قيد الرصد"
-                          className="w-14 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
+                          className={`w-14 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                            simScores.behaviorScore === "غ" || simScores.behaviorScore === "غياب"
+                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                          }`}
                         />
                         <span className="text-[10px] text-slate-400 font-mono">/ 4</span>
                       </div>
@@ -778,7 +864,11 @@ export default function GradesLookupPage() {
                           max={COLUMN_MAX_LIMITS.quiz1Score}
                           title="الحد الأقصى: 4 نقاط"
                           placeholder="قيد الرصد"
-                          className="w-14 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
+                          className={`w-14 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                            simScores.quiz1Score === "غ" || simScores.quiz1Score === "غياب"
+                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                          }`}
                         />
                         <span className="text-[10px] text-slate-400 font-mono">/ 4</span>
                       </div>
@@ -796,7 +886,11 @@ export default function GradesLookupPage() {
                           max={COLUMN_MAX_LIMITS.homework1Score}
                           title="الحد الأقصى: نقطتان"
                           placeholder="قيد الرصد"
-                          className="w-14 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
+                          className={`w-14 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                            simScores.homework1Score === "غ" || simScores.homework1Score === "غياب"
+                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                          }`}
                         />
                         <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
                       </div>
@@ -814,7 +908,11 @@ export default function GradesLookupPage() {
                           max={COLUMN_MAX_LIMITS.quiz2Score}
                           title="الحد الأقصى: 4 نقاط"
                           placeholder="لم يقوّم بعد"
-                          className="w-16 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
+                          className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                            simScores.quiz2Score === "غ" || simScores.quiz2Score === "غياب"
+                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                          }`}
                         />
                         <span className="text-[10px] text-slate-400 font-mono">/ 4</span>
                       </div>
@@ -832,7 +930,11 @@ export default function GradesLookupPage() {
                           max={COLUMN_MAX_LIMITS.homework2Score}
                           title="الحد الأقصى: نقطتان"
                           placeholder="لم يقوّم بعد"
-                          className="w-16 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
+                          className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                            simScores.homework2Score === "غ" || simScores.homework2Score === "غياب"
+                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                          }`}
                         />
                         <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
                       </div>
@@ -850,7 +952,11 @@ export default function GradesLookupPage() {
                           max={COLUMN_MAX_LIMITS.notebook1Score}
                           title="الحد الأقصى: نقطتان"
                           placeholder="لم يقوّم بعد"
-                          className="w-16 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
+                          className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                            simScores.notebook1Score === "غ" || simScores.notebook1Score === "غياب"
+                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                          }`}
                         />
                         <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
                       </div>
@@ -868,7 +974,11 @@ export default function GradesLookupPage() {
                           max={COLUMN_MAX_LIMITS.notebook2Score}
                           title="الحد الأقصى: نقطتان"
                           placeholder="لم يقوّم بعد"
-                          className="w-16 h-8 text-center text-xs font-mono font-black text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 outline-none transition"
+                          className={`w-16 h-8 text-center text-xs font-mono font-black rounded-lg outline-none transition ${
+                            simScores.notebook2Score === "غ" || simScores.notebook2Score === "غياب"
+                              ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                              : "text-slate-900 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/30"
+                          }`}
                         />
                         <span className="text-[10px] text-slate-400 font-mono">/ 2</span>
                       </div>
@@ -922,7 +1032,7 @@ export default function GradesLookupPage() {
             </div>
 
             {/* بطاقة الفرض المحروس */}
-            <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50 space-y-1.5">
+            <div className={`p-4 rounded-2xl border ${simScores.test1Score === "غ" || simScores.test1Score === "غياب" ? "border-red-200 bg-red-50/50" : "border-blue-200 bg-blue-50/50"} space-y-1.5`}>
               <span className="text-xs font-black text-blue-800 block">الفرض المحروس</span>
               <div className="flex items-center gap-1.5">
                 <input
@@ -934,30 +1044,36 @@ export default function GradesLookupPage() {
                   max={COLUMN_MAX_LIMITS.test1Score}
                   title="الحد الأقصى: 20 نقطة"
                   placeholder="20"
-                  className="w-16 h-8 text-center text-sm font-mono font-black text-blue-950 bg-white border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500/30 outline-none"
+                  className={`w-16 h-8 text-center text-sm font-mono rounded-lg outline-none transition ${
+                    simScores.test1Score === "غ" || simScores.test1Score === "غياب"
+                      ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                      : "text-blue-950 bg-white border border-blue-300 font-black focus:ring-2 focus:ring-blue-500/30"
+                  }`}
                 />
                 <span className="text-sm font-mono font-bold text-slate-500">/ 20</span>
               </div>
               <span className="text-[10px] text-blue-700 block font-bold">
-                علامة الفرض الكتابي المحروس
+                {simScores.test1Score === "غ" || simScores.test1Score === "غياب" ? "غائب عن الفرض الأول" : "علامة الفرض الكتابي المحروس"}
               </span>
             </div>
 
             {/* بطاقة المراقبة المستمرة */}
-            <div className="p-4 rounded-2xl border border-teal-200 bg-teal-50/80 space-y-1.5">
+            <div className={`p-4 rounded-2xl border ${simScores.test1Score === "غ" || simScores.test1Score === "غياب" ? "border-red-200 bg-red-50/50" : "border-teal-200 bg-teal-50/80"} space-y-1.5`}>
               <span className="text-xs font-black text-teal-800 block">المراقبة المستمرة</span>
-              <div className="text-2xl font-mono font-black text-teal-950">
-                {calculatedSim.continuousMonitoring !== null
+              <div className={`text-2xl font-mono font-black ${simScores.test1Score === "غ" || simScores.test1Score === "غياب" ? "text-red-700 font-sans text-xl" : "text-teal-950"}`}>
+                {simScores.test1Score === "غ" || simScores.test1Score === "غياب"
+                  ? "غ (معلق)"
+                  : calculatedSim.continuousMonitoring !== null
                   ? `${calculatedSim.continuousMonitoring} / 20`
                   : "قيد الحساب"}
               </div>
               <span className="text-[10px] text-teal-700 block font-bold font-mono">
-                (الفرض + التقويم) ÷ 2
+                {simScores.test1Score === "غ" || simScores.test1Score === "غياب" ? "يتطلب الفرض" : "(الفرض + التقويم) ÷ 2"}
               </span>
             </div>
 
             {/* بطاقة الاختبار الفصلي مع إدخال لتجربة المعدل */}
-            <div className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/60 space-y-1.5">
+            <div className={`p-4 rounded-2xl border ${simScores.examScore === "غ" || simScores.examScore === "غياب" ? "border-red-200 bg-red-50/50" : "border-indigo-200 bg-indigo-50/60"} space-y-1.5`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-indigo-900 block">الاختبار الفصلي</span>
                 <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded font-bold">معامل 2</span>
@@ -972,12 +1088,16 @@ export default function GradesLookupPage() {
                   max={COLUMN_MAX_LIMITS.examScore}
                   title="الحد الأقصى: 20 نقطة"
                   placeholder="توقع علامتك"
-                  className="w-full h-8 text-center text-sm font-mono font-black text-indigo-950 bg-white border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500/30 outline-none"
+                  className={`w-full h-8 text-center text-sm font-mono rounded-lg outline-none transition ${
+                    simScores.examScore === "غ" || simScores.examScore === "غياب"
+                      ? "bg-red-100 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                      : "text-indigo-950 bg-white border border-indigo-300 font-black focus:ring-2 focus:ring-indigo-500/30"
+                  }`}
                 />
                 <span className="text-sm font-mono font-bold text-slate-500">/ 20</span>
               </div>
               <span className="text-[10px] text-indigo-700 block font-bold">
-                اكتب علامة الاختبار لمعاينة المعدل
+                {simScores.examScore === "غ" || simScores.examScore === "غياب" ? "غائب عن الاختبار" : "اكتب علامة الاختبار لمعاينة المعدل"}
               </span>
             </div>
           </div>
@@ -999,12 +1119,16 @@ export default function GradesLookupPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                {calculatedSim.termAverage !== null && (
+                {calculatedSim.termAverage !== null ? (
                   <div className="text-3xl sm:text-4xl font-black text-emerald-800 font-mono">
                     {calculatedSim.termAverage}{" "}
                     <span className="text-xs sm:text-sm text-slate-400 font-normal">/ 20</span>
                   </div>
-                )}
+                ) : (simScores.examScore === "غ" || simScores.examScore === "غياب" || simScores.test1Score === "غ" || simScores.test1Score === "غياب") ? (
+                  <div className="px-3.5 py-1.5 rounded-2xl bg-red-100 border border-red-300 text-red-700 font-sans font-black text-base">
+                    غ (معلق للغياب)
+                  </div>
+                ) : null}
                 {result.grade?.rank && (
                   <div className="px-3.5 py-2 rounded-2xl bg-white border border-emerald-200 shadow-xs text-center font-bold">
                     <span className="text-[10px] text-slate-400 block">الترتيب بالفوج</span>

@@ -244,7 +244,7 @@ export function calculateRowScores(row: Partial<StudentGradeRow>): {
 } {
   const parseVal = (v: any): number | null => {
     if (v === "" || v === undefined || v === null || v === "—" || v === "ليس الآن" || v === "-") return null;
-    if (v === "غ" || v === "غياب") return 0;
+    if (v === "غ" || v === "غياب") return null;
     const str = String(v).replace(/[,،]/g, ".").trim();
     if (str === "" || str === ".") return null;
     const n = parseFloat(str);
@@ -287,11 +287,16 @@ export function calculateRowScores(row: Partial<StudentGradeRow>): {
   }
 
   // حساب المراقبة المستمرة = (الفرض + التقويم) / 2
+  const isTestAbsent = row.test1Score === "غ" || row.test1Score === "غياب";
+  const isExamAbsent = row.examScore === "غ" || row.examScore === "غياب";
+
   const numCont = parseVal(continuousScore);
   const numTest = parseVal(row.test1Score);
 
   let continuousMonitoring: string | number = "";
-  if (numCont !== null && numTest !== null) {
+  if (isTestAbsent) {
+    continuousMonitoring = "غ";
+  } else if (numCont !== null && numTest !== null) {
     continuousMonitoring = Number(((numCont + numTest) / 2).toFixed(2));
   } else if (numCont !== null) {
     continuousMonitoring = numCont;
@@ -304,7 +309,9 @@ export function calculateRowScores(row: Partial<StudentGradeRow>): {
   const numExam = parseVal(row.examScore);
 
   let termAverage: string | number = "";
-  if (numMon !== null && numExam !== null) {
+  if (isExamAbsent || isTestAbsent) {
+    termAverage = "غ";
+  } else if (numMon !== null && numExam !== null) {
     termAverage = Number(((numMon + numExam * 2) / 3).toFixed(2));
   } else if (numMon !== null) {
     termAverage = numMon;
@@ -1408,20 +1415,20 @@ export default function AdminGradesExcelPage() {
                           <span className="text-[9px] text-emerald-700 block font-bold">/ 20</span>
                         </div>
 
-                        <div className="bg-blue-100/60 p-2 rounded-xl border border-blue-200/80">
-                          <span className="text-[10px] font-bold text-blue-800 block">المراقبة المستمرة</span>
-                          <span className="text-sm sm:text-base font-black font-mono text-blue-950">
-                            {s.continuousMonitoring !== "" && s.continuousMonitoring !== undefined ? s.continuousMonitoring : "—"}
+                        <div className={`${s.continuousMonitoring === "غ" ? "bg-red-100/90 border-red-300 text-red-700" : "bg-blue-100/60 border-blue-200/80 text-blue-950"} p-2 rounded-xl border`}>
+                          <span className="text-[10px] font-bold block">المراقبة المستمرة</span>
+                          <span className="text-sm sm:text-base font-black font-mono">
+                            {s.continuousMonitoring === "غ" ? "غ (غائب)" : s.continuousMonitoring !== "" && s.continuousMonitoring !== undefined ? s.continuousMonitoring : "—"}
                           </span>
-                          <span className="text-[9px] text-blue-700 block font-bold">(ف+ت)/2</span>
+                          <span className="text-[9px] block font-bold">(ف+ت)/2</span>
                         </div>
 
-                        <div className="bg-amber-100/60 p-2 rounded-xl border border-amber-200/80">
-                          <span className="text-[10px] font-bold text-amber-900 block">المعدل الفصلي</span>
-                          <span className="text-sm sm:text-base font-black font-mono text-amber-950">
-                            {s.termAverage !== "" && s.termAverage !== undefined ? s.termAverage : "—"}
+                        <div className={`${s.termAverage === "غ" ? "bg-red-100/90 border-red-300 text-red-700" : "bg-amber-100/60 border-amber-200/80 text-amber-950"} p-2 rounded-xl border`}>
+                          <span className="text-[10px] font-bold block">المعدل الفصلي</span>
+                          <span className="text-sm sm:text-base font-black font-mono">
+                            {s.termAverage === "غ" ? "غ (غائب)" : s.termAverage !== "" && s.termAverage !== undefined ? s.termAverage : "—"}
                           </span>
-                          <span className="text-[9px] text-amber-800 block font-bold">معامل 3</span>
+                          <span className="text-[9px] block font-bold">معامل 3</span>
                         </div>
                       </div>
 
@@ -1674,20 +1681,28 @@ export default function AdminGradesExcelPage() {
 
                         // 2. علامة الفرض (20)
                         if (colKey === "test1Score") {
+                          const val = s.test1Score ?? "";
+                          const isAbsent = val === "غ" || val === "غياب";
                           return (
-                            <td key={colKey} className="p-0.5 bg-blue-50/20">
+                            <td key={colKey} className={`p-0.5 ${isAbsent ? "bg-red-50/80" : "bg-blue-50/20"}`}>
                               <input
                                 ref={(el) => {
                                   inputRefs.current[cellKey] = el;
                                 }}
                                 type="text"
                                 inputMode="decimal"
-                                value={s.test1Score ?? ""}
+                                value={val}
                                 onChange={(e) => handleCellChange(s.studentId, "test1Score", e.target.value)}
                                 onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
                                 onBlur={handleCellBlur}
                                 placeholder="الفرض"
-                                className="w-full h-8 text-center text-xs font-mono font-black text-blue-950 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500/30 outline-none"
+                                className={`w-full h-8 text-center text-xs font-mono rounded-lg outline-none transition ${
+                                  isAbsent
+                                    ? "bg-red-100/90 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                                    : val !== "" && val !== undefined
+                                    ? "text-blue-950 bg-white border border-blue-200 font-black focus:ring-2 focus:ring-blue-500/30"
+                                    : "text-blue-900/40 bg-white/70 border border-blue-100 hover:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-500/30 font-medium"
+                                }`}
                               />
                             </td>
                           );
@@ -1695,20 +1710,28 @@ export default function AdminGradesExcelPage() {
 
                         // 3. علامة الاختبار (20)
                         if (colKey === "examScore") {
+                          const val = s.examScore ?? "";
+                          const isAbsent = val === "غ" || val === "غياب";
                           return (
-                            <td key={colKey} className="p-0.5 bg-indigo-50/20">
+                            <td key={colKey} className={`p-0.5 ${isAbsent ? "bg-red-50/80" : "bg-indigo-50/20"}`}>
                               <input
                                 ref={(el) => {
                                   inputRefs.current[cellKey] = el;
                                 }}
                                 type="text"
                                 inputMode="decimal"
-                                value={s.examScore ?? ""}
+                                value={val}
                                 onChange={(e) => handleCellChange(s.studentId, "examScore", e.target.value)}
                                 onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
                                 onBlur={handleCellBlur}
                                 placeholder="اختبار"
-                                className="w-full h-8 text-center text-xs font-mono font-black text-indigo-950 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 outline-none"
+                                className={`w-full h-8 text-center text-xs font-mono rounded-lg outline-none transition ${
+                                  isAbsent
+                                    ? "bg-red-100/90 text-red-700 border-2 border-red-400 font-sans font-black shadow-xs ring-1 ring-red-400"
+                                    : val !== "" && val !== undefined
+                                    ? "text-indigo-950 bg-white border border-indigo-200 font-black focus:ring-2 focus:ring-indigo-500/30"
+                                    : "text-indigo-900/40 bg-white/70 border border-indigo-100 hover:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 font-medium"
+                                }`}
                               />
                             </td>
                           );
@@ -1725,9 +1748,12 @@ export default function AdminGradesExcelPage() {
 
                         // 5. المراقبة المستمرة = (الفرض + التقويم) / 2
                         if (colKey === "continuousMonitoring") {
+                          const isAbsent = s.continuousMonitoring === "غ" || s.continuousMonitoring === "غياب";
                           return (
-                            <td key={colKey} className="py-1.5 px-2 bg-blue-100/70 text-blue-950 font-black text-xs font-mono">
-                              {s.continuousMonitoring !== "" ? (
+                            <td key={colKey} className={`py-1.5 px-2 font-black text-xs font-mono ${isAbsent ? "bg-red-50 text-red-700" : "bg-blue-100/70 text-blue-950"}`}>
+                              {isAbsent ? (
+                                <span className="inline-block px-2 py-0.5 rounded-md bg-red-100 border border-red-300 text-red-700 font-sans font-black">غ</span>
+                              ) : s.continuousMonitoring !== "" ? (
                                 s.continuousMonitoring
                               ) : (
                                 <span className="text-slate-300">-</span>
@@ -1738,9 +1764,16 @@ export default function AdminGradesExcelPage() {
 
                         // 6. المعدل الفصلي المحسوب تلقائياً
                         if (colKey === "termAverage") {
+                          const isAbsent = s.termAverage === "غ" || s.termAverage === "غياب";
                           return (
-                            <td key={colKey} className="py-1.5 px-2 bg-gradient-to-b from-amber-50 to-amber-100 text-amber-950 font-black text-sm font-mono">
-                              {s.termAverage !== "" ? s.termAverage : <span className="text-slate-300 text-xs">-</span>}
+                            <td key={colKey} className={`py-1.5 px-2 font-black text-sm font-mono ${isAbsent ? "bg-red-50 text-red-700" : "bg-gradient-to-b from-amber-50 to-amber-100 text-amber-950"}`}>
+                              {isAbsent ? (
+                                <span className="inline-block px-2 py-0.5 rounded-md bg-red-100 border border-red-300 text-red-700 font-sans font-black text-xs">غ</span>
+                              ) : s.termAverage !== "" ? (
+                                s.termAverage
+                              ) : (
+                                <span className="text-slate-300 text-xs">-</span>
+                              )}
                             </td>
                           );
                         }

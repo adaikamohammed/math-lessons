@@ -121,8 +121,13 @@ export async function POST(req: NextRequest) {
     let classAvg: number | null = null;
 
     const validAverages = classGrades
-      .map((g) => g.termAverage)
-      .filter((avg): avg is number => typeof avg === "number" && !isNaN(avg));
+      .map((g) => {
+        const val = g.termAverage;
+        if (val === "" || val === undefined || val === null || val === "غ" || val === "غياب" || val === "-" || val === "—") return null;
+        const n = typeof val === "number" ? val : parseFloat(String(val).replace(/[,،]/g, "."));
+        return isNaN(n) ? null : n;
+      })
+      .filter((avg): avg is number => avg !== null);
 
     if (validAverages.length > 0) {
       highestAvg = Math.max(...validAverages);
