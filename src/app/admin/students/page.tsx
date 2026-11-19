@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -108,6 +109,10 @@ export function normalizeArabicForSort(text: string): string {
 }
 
 export default function AdminStudentsPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [roster, setRoster] = useState<StudentRosterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -972,7 +977,7 @@ export default function AdminStudentsPage() {
   };
 
   return (
-    <div className="pb-24 pt-3 fade-up space-y-4 max-w-6xl mx-auto px-2 sm:px-4" dir="rtl">
+    <div className="pb-24 pt-3 space-y-4 max-w-6xl mx-auto px-2 sm:px-4" dir="rtl">
       {/* مدخل رفع ملف الإكسل المخفي */}
       <input
         ref={fileInputRef}
@@ -1853,9 +1858,9 @@ export default function AdminStudentsPage() {
         )}
       </div>
 
-      {/* ─── شريط الحفظ العائم الثابت بأسفل الشاشة أثناء التعديل السريع ─── */}
-      {isBatchEditMode && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-2xl w-[94%] bg-slate-900/95 backdrop-blur-md text-white p-3 sm:p-4 rounded-3xl shadow-2xl border-2 border-emerald-500/70 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+      {/* ─── شريط الحفظ العائم الثابت بأسفل الشاشة أثناء التعديل السريع (Portaled) ─── */}
+      {mounted && isBatchEditMode && createPortal(
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9990] max-w-2xl w-[94%] bg-slate-900/95 backdrop-blur-md text-white p-3 sm:p-4 rounded-3xl shadow-2xl border-2 border-emerald-500/80 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150" dir="rtl">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black">
               <Zap className="w-5 h-5 fill-current" />
@@ -1898,80 +1903,80 @@ export default function AdminStudentsPage() {
               )}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* ─── شريط العمليات الجماعية العائم (Bulk Actions Floating Bar) ─── */}
-      {selectedIds.size > 0 && !isBatchEditMode && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-4xl w-[94%] bg-slate-900/95 backdrop-blur-md text-white p-3 sm:p-4 rounded-3xl shadow-2xl border border-slate-700 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+      {/* ─── شريط العمليات الجماعية العائم (Bulk Actions Floating Bar - Portaled) ─── */}
+      {mounted && selectedIds.size > 0 && !isBatchEditMode && createPortal(
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9990] max-w-4xl w-[94%] bg-slate-900/95 backdrop-blur-md text-white p-3 sm:p-4 rounded-3xl shadow-2xl border border-slate-700 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150" dir="rtl">
           <div className="flex items-center gap-2">
-            <span className="bg-emerald-500 text-slate-900 font-mono font-black text-xs px-2.5 py-1 rounded-xl">
-              {selectedIds.size} محدد
-            </span>
-            <span className="text-xs font-bold hidden sm:inline text-slate-300">
-              تم تحديد {selectedIds.size} من أصل {filteredRoster.length} تلميذاً
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-black">
+              تم تحديد <strong className="text-emerald-400 font-mono text-sm">{selectedIds.size}</strong> تلميذاً
             </span>
           </div>
 
-          {/* أزرار العمليات الجماعية */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* نقل إلى فوج آخر */}
             <button
               onClick={() => setShowMoveModal(true)}
               type="button"
               className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition flex items-center gap-1 cursor-pointer active:scale-95"
-              title="نقل التلاميذ المحددين إلى فوج آخر (1م1، 1م2، 1م3، 2م3)"
+              title="نقل التلاميذ المحددين إلى فوج آخر"
             >
               <ArrowRightLeft className="w-3.5 h-3.5" />
-              <span>نقل الفوج 🔄</span>
+              <span>نقل لفوج... 🔀</span>
             </button>
 
-            {/* تفويج فرعي: فوج 1 */}
+            {/* تعيين الفوج الفرعي 1 */}
             <button
               onClick={() => handleBulkSetSubgroup("فوج 1")}
               type="button"
-              className="px-2.5 py-1.5 rounded-xl bg-purple-900 hover:bg-purple-800 text-purple-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
+              className="px-2.5 py-1.5 rounded-xl bg-purple-900 hover:bg-purple-800 text-purple-200 text-xs font-bold transition cursor-pointer active:scale-95"
+              title="تعيين في فوج 1"
             >
-              <span>فوج 1</span>
+              فوج 1 👥
             </button>
 
-            {/* تفويج فرعي: فوج 2 */}
+            {/* تعيين الفوج الفرعي 2 */}
             <button
               onClick={() => handleBulkSetSubgroup("فوج 2")}
               type="button"
-              className="px-2.5 py-1.5 rounded-xl bg-amber-900 hover:bg-amber-800 text-amber-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
+              className="px-2.5 py-1.5 rounded-xl bg-amber-900 hover:bg-amber-800 text-amber-200 text-xs font-bold transition cursor-pointer active:scale-95"
+              title="تعيين في فوج 2"
             >
-              <span>فوج 2</span>
+              فوج 2 👥
             </button>
 
-            {/* تعيين كذكور */}
+            {/* تعيين الجنس: ذكور */}
             <button
               onClick={() => handleBulkSetGender("M")}
               type="button"
               className="px-2 py-1.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs font-bold transition cursor-pointer active:scale-95"
-              title="تعيين الجنس: ذكر"
+              title="تعيين الجنس: ذكور"
             >
-              👦 ذكور
+              ذكور 👦
             </button>
 
-            {/* تعيين كإناث */}
+            {/* تعيين الجنس: إناث */}
             <button
               onClick={() => handleBulkSetGender("F")}
               type="button"
               className="px-2 py-1.5 rounded-xl bg-pink-900 hover:bg-pink-800 text-pink-200 text-xs font-bold transition cursor-pointer active:scale-95"
-              title="تعيين الجنس: أنثى"
+              title="تعيين الجنس: إناث"
             >
-              👧 إناث
+              إناث 👧
             </button>
 
             {/* تعيين الحالة: جدد */}
             <button
               onClick={() => handleBulkSetRepeater(false)}
               type="button"
-              className="px-2 py-1.5 rounded-xl bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-xs font-bold transition cursor-pointer active:scale-95"
+              className="px-2 py-1.5 rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-200 text-xs font-bold transition cursor-pointer active:scale-95"
               title="تعيين الحالة: جديد"
             >
-              جدد
+              جدد ✅
             </button>
 
             {/* تعيين الحالة: معيدون */}
@@ -2005,13 +2010,22 @@ export default function AdminStudentsPage() {
               <X className="w-4 h-4" />
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* ─── نافذة النقل الجماعي للأفواج (Move Modal) ─── */}
-      {showMoveModal && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      {/* ─── نافذة النقل الجماعي للأفواج (Move Modal - Portaled to Document Body) ─── */}
+      {mounted && showMoveModal && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowMoveModal(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 my-auto max-h-[90vh] flex flex-col overflow-hidden text-right"
+            dir="rtl"
+          >
             {/* Header */}
             <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
               <div className="flex items-center gap-2">
@@ -2032,7 +2046,7 @@ export default function AdminStudentsPage() {
             </div>
 
             {/* Scrollable Body */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
               <p className="text-xs text-slate-600 font-bold">
                 سيتم نقل <strong className="text-emerald-700 font-mono font-black">{selectedIds.size} تلميذاً</strong> محدداً إلى الفوج المختار:
               </p>
@@ -2075,13 +2089,22 @@ export default function AdminStudentsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* ─── نافذة معاينة وتأكيد استيراد ملف Excel ─── */}
-      {showExcelModal && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      {/* ─── نافذة معاينة وتأكيد استيراد ملف Excel (Portaled to Document Body) ─── */}
+      {mounted && showExcelModal && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowExcelModal(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 my-auto max-h-[90vh] flex flex-col overflow-hidden text-right"
+            dir="rtl"
+          >
             {/* Header */}
             <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
               <div className="flex items-center gap-2">
@@ -2107,7 +2130,7 @@ export default function AdminStudentsPage() {
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
               {/* ملخص البيانات المقروءة */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
@@ -2225,13 +2248,23 @@ export default function AdminStudentsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* ─── نافذة إضافة / تعديل تلميذ فردي ─── */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      {/* ─── نافذة إضافة / تعديل تلميذ فردي (Portaled to Document Body) ─── */}
+      {mounted && showAddModal && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAddModal(false);
+          }}
+        >
+          <form
+            onSubmit={handleSaveStudent}
+            className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 my-auto max-h-[90vh] flex flex-col overflow-hidden text-right"
+            dir="rtl"
+          >
             {/* Header (ثابت بأعلى النافذة) */}
             <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
               <div className="flex items-center gap-2">
@@ -2253,7 +2286,7 @@ export default function AdminStudentsPage() {
             </div>
 
             {/* Scrollable Form Body */}
-            <form onSubmit={handleSaveStudent} id="studentModalForm" className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
               <div>
                 <label className="block font-black text-slate-700 mb-1">الاسم واللقب *</label>
                 <input
@@ -2346,7 +2379,7 @@ export default function AdminStudentsPage() {
                   className="w-full h-9 px-3 font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-mono"
                 />
               </div>
-            </form>
+            </div>
 
             {/* Fixed Footer (ثابت بأسفل النافذة ومباشرة أمام المستخدم) */}
             <div className="flex items-center justify-end gap-2 p-3 sm:px-5 sm:py-3.5 border-t border-slate-100 bg-slate-50 shrink-0">
@@ -2359,15 +2392,15 @@ export default function AdminStudentsPage() {
               </button>
               <button
                 type="submit"
-                form="studentModalForm"
                 className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black transition shadow-xs text-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <Check className="w-4 h-4" />
                 <span>{editingStudent ? "حفظ بيانات التلميذ" : "إضافة التلميذ"}</span>
               </button>
             </div>
-          </div>
-        </div>
+          </form>
+        </div>,
+        document.body
       )}
     </div>
   );
