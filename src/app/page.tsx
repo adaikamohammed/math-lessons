@@ -45,8 +45,12 @@ export default async function Home() {
     <div className="pt-5 pb-12 fade-up space-y-4">
       {/* رأس الصفحة */}
       <div className="text-center">
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center text-2xl font-extrabold shadow-md shadow-emerald-600/20">
-          ∑
+        <div className="relative inline-block mx-auto">
+          <img
+            src="/icons/icon-192.png"
+            alt="شعار مادة الرياضيات - الأستاذ محمد عدايكة"
+            className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl shadow-xl shadow-emerald-900/20 object-cover border-2 border-emerald-500/30 mx-auto transition-transform hover:scale-105"
+          />
         </div>
         <h1 className="mt-3 text-xl font-black text-slate-800 tracking-tight">
           دروس مادة الرياضيات

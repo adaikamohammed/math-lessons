@@ -94,9 +94,11 @@ export default function PWAInstallBanner() {
       <div className="bg-gradient-to-r from-emerald-850 via-teal-900 to-slate-900 text-white p-3.5 rounded-2xl shadow-xl border border-emerald-500/40 backdrop-blur-md space-y-2">
         <div className="flex items-start justify-between gap-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xl shrink-0 shadow-md shadow-emerald-950/40">
-              ∑
-            </div>
+            <img
+              src="/icons/icon-192.png"
+              alt="شعار تطبيق رياضيات عدايكة"
+              className="w-11 h-11 rounded-xl object-cover shrink-0 shadow-md shadow-emerald-950/40 border border-emerald-400/30"
+            />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="font-black text-xs text-white">تطبيق رياضيات عدايكة</span>

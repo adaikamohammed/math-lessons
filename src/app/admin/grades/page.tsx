@@ -970,6 +970,11 @@ export default function AdminGradesExcelPage() {
             >
               <ArrowRight className="w-5 h-5" />
             </Link>
+            <img
+              src="/icons/icon-192.png"
+              alt="شعار التطبيق"
+              className="w-10 h-10 rounded-xl object-cover shadow-xs border border-emerald-500/20 shrink-0"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-black text-slate-900">

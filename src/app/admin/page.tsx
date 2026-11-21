@@ -136,8 +136,12 @@ function Login({ onLogin }: { onLogin: () => void }) {
 
   return (
     <form onSubmit={submit} className="pt-16 max-w-sm mx-auto space-y-4 fade-up">
-      <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2">
-        <Lock className="w-6 h-6" />
+      <div className="text-center mb-2">
+        <img
+          src="/icons/icon-192.png"
+          alt="شعار التطبيق"
+          className="w-18 h-18 rounded-2xl mx-auto shadow-lg shadow-emerald-950/20 border-2 border-emerald-500/30 object-cover"
+        />
       </div>
       <h1 className="text-xl font-black text-center text-slate-800">لوحة تحكم الأستاذ</h1>
       <p className="text-xs text-center text-slate-500">أدخل كلمة المرور لإدارة الدروس ورفع الصور</p>
@@ -1237,9 +1241,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       {/* الشريط العلوي */}
       <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-base font-extrabold text-slate-800">لوحة تحكم الأستاذ محمد عدايكة</h1>
-            <p className="text-[11px] text-emerald-700 font-bold">متوسطة المجاهد باهي علي — مادة الرياضيات</p>
+          <div className="flex items-center gap-3">
+            <img
+              src="/icons/icon-192.png"
+              alt="شعار التطبيق"
+              className="w-11 h-11 rounded-xl object-cover shadow-sm border border-emerald-500/20 shrink-0"
+            />
+            <div>
+              <h1 className="text-base font-extrabold text-slate-800">لوحة تحكم الأستاذ محمد عدايكة</h1>
+              <p className="text-[11px] text-emerald-700 font-bold">متوسطة المجاهد باهي علي — مادة الرياضيات</p>
+            </div>
           </div>
           <button
             onClick={handleLogout}

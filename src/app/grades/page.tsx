@@ -493,17 +493,24 @@ export default function GradesLookupPage() {
         <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>فضاء أولياء وتلاميذ الرياضيات • كشف نقاط تفاعلي وحساب فوري للمعدل</span>
+          <div className="flex items-center gap-3.5">
+            <img
+              src="/icons/icon-192.png"
+              alt="شعار مادة الرياضيات"
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-md shadow-emerald-900/15 object-cover border border-emerald-500/20 shrink-0"
+            />
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>فضاء أولياء وتلاميذ الرياضيات • كشف نقاط تفاعلي وحساب فوري للمعدل</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                كشف النقاط وبطاقة التقويم المستمر والمعدل
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 font-bold">
+                متوسطة المجاهد باهي علي — الأستاذ محمد عدايكة — الوادي
+              </p>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900" style={{ fontFamily: "'Cairo', sans-serif" }}>
-              كشف النقاط وبطاقة التقويم المستمر والمعدل
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-bold">
-              متوسطة المجاهد باهي علي — الأستاذ محمد عدايكة — الوادي
-            </p>
           </div>
 
           <Link
