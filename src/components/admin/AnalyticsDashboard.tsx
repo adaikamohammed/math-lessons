@@ -37,6 +37,40 @@ export interface AnalyticsApiResponse {
     lastVisit: string;
     uniqueDevicesCount: number;
   };
+  periodSummaries?: {
+    today: {
+      visits: number;
+      views: number;
+      uniqueDevices: number;
+      returningDevices: number;
+      repeatRate: number;
+      peak: string;
+    };
+    week: {
+      visits: number;
+      views: number;
+      uniqueDevices: number;
+      returningDevices: number;
+      repeatRate: number;
+      peak: string;
+    };
+    month: {
+      visits: number;
+      views: number;
+      uniqueDevices: number;
+      returningDevices: number;
+      repeatRate: number;
+      peak: string;
+    };
+    all: {
+      visits: number;
+      views: number;
+      uniqueDevices: number;
+      returningDevices: number;
+      repeatRate: number;
+      peak: string;
+    };
+  };
   charts: {
     todayHourly: {
       hour: number;
@@ -104,7 +138,7 @@ interface AnalyticsDashboardProps {
   onRefresh: () => void;
 }
 
-type TimeFilter = "today_hours" | "last_7_days" | "last_30_days" | "platforms";
+type TimeFilter = "today_hours" | "last_7_days" | "last_30_days" | "all_time" | "platforms";
 type MetricFilter = "both" | "visits" | "views" | "devices";
 
 export default function AnalyticsDashboard({
@@ -118,6 +152,128 @@ export default function AnalyticsDashboard({
   const [logSearch, setLogSearch] = useState("");
   const [logFilter, setLogFilter] = useState<"all" | "lessons" | "returning" | "new">("all");
   const [showAllLogs, setShowAllLogs] = useState(false);
+
+  // إحصائيات المؤشرات الرقمية متجاوبة ديناميكياً مع الفلتر الزمني المختار (اليوم / الأسبوع / الشهر / الكل)
+  const activePeriodStats = useMemo(() => {
+    if (!data) {
+      return {
+        label: "الكل",
+        suffix: "التراكمي",
+        visits: 0,
+        views: 0,
+        uniqueDevices: 0,
+        returningDevices: 0,
+        repeatRate: 0,
+        peak: "-",
+        visitsSub: "المجموع التراكمي",
+        viewsSub: "كل الدروس",
+        devicesSub: "أجهزة فريدة",
+        returningSub: "زيارات مكررة",
+        peakLabel: "ساعة الذروة",
+      };
+    }
+
+    const summaries = data.periodSummaries;
+
+    if (timeFilter === "today_hours") {
+      const today = summaries?.today;
+      const v = today?.visits ?? data.siteAnalytics?.todayVisits ?? 0;
+      const w = today?.views ?? data.siteAnalytics?.todayViews ?? 0;
+      const u = today?.uniqueDevices ?? Math.min(v || 1, data.retention?.totalUniqueDevices || 1);
+      const r = today?.returningDevices ?? 0;
+      const rep = today?.repeatRate ?? 0;
+      const pk = today?.peak ?? (data.charts?.peakHour?.label || "-");
+      return {
+        label: "اليوم بالساعات (24h)",
+        suffix: "اليوم",
+        visits: v,
+        views: w,
+        uniqueDevices: u,
+        returningDevices: r,
+        repeatRate: rep,
+        peak: pk,
+        visitsSub: "منذ منتصف الليل (24h)",
+        viewsSub: "مشاهدات دروس اليوم",
+        devicesSub: "أجهزة تصفحت اليوم",
+        returningSub: "عادوا للمراجعة اليوم",
+        peakLabel: "ساعة ذروة اليوم",
+      };
+    }
+
+    if (timeFilter === "last_7_days") {
+      const week = summaries?.week;
+      const v = week?.visits ?? 0;
+      const w = week?.views ?? 0;
+      const u = week?.uniqueDevices ?? 0;
+      const r = week?.returningDevices ?? 0;
+      const rep = week?.repeatRate ?? data.retention?.repeatRate ?? 0;
+      const pk = week?.peak ?? "-";
+      return {
+        label: "آخر 7 أيام (أسبوعياً)",
+        suffix: "الأسبوع",
+        visits: v,
+        views: w,
+        uniqueDevices: u,
+        returningDevices: r,
+        repeatRate: rep,
+        peak: pk,
+        visitsSub: "خلال آخر 7 أيام",
+        viewsSub: "مشاهدات الأسبوع الحالي",
+        devicesSub: "أجهزة الأسبوع",
+        returningSub: "تلاميذ مكررون",
+        peakLabel: "أنشط يوم أسبوعياً",
+      };
+    }
+
+    if (timeFilter === "last_30_days") {
+      const month = summaries?.month;
+      const v = month?.visits ?? 0;
+      const w = month?.views ?? 0;
+      const u = month?.uniqueDevices ?? 0;
+      const r = month?.returningDevices ?? 0;
+      const rep = month?.repeatRate ?? data.retention?.repeatRate ?? 0;
+      const pk = month?.peak ?? "-";
+      return {
+        label: "آخر 30 يوماً (شهرياً)",
+        suffix: "الشهر",
+        visits: v,
+        views: w,
+        uniqueDevices: u,
+        returningDevices: r,
+        repeatRate: rep,
+        peak: pk,
+        visitsSub: "خلال آخر 30 يوماً",
+        viewsSub: "مشاهدات الشهر الحالي",
+        devicesSub: "أجهزة الشهر",
+        returningSub: "تلاميذ أوفياء",
+        peakLabel: "أنشط يوم شهرياً",
+      };
+    }
+
+    // "all_time" or "platforms"
+    const all = summaries?.all;
+    const v = all?.visits ?? data.siteAnalytics?.totalVisits ?? 0;
+    const w = all?.views ?? data.totalLessonViews ?? 0;
+    const u = all?.uniqueDevices ?? data.retention?.totalUniqueDevices ?? 0;
+    const r = all?.returningDevices ?? data.retention?.returningDevicesCount ?? 0;
+    const rep = all?.repeatRate ?? data.retention?.repeatRate ?? 0;
+    const pk = all?.peak ?? (data.charts?.peakHour?.label || "-");
+    return {
+      label: timeFilter === "platforms" ? "الأجهزة والأنظمة" : "المجموع التراكمي (الكل)",
+      suffix: "التراكمي",
+      visits: v,
+      views: w,
+      uniqueDevices: u,
+      returningDevices: r,
+      repeatRate: rep,
+      peak: pk,
+      visitsSub: "المجموع الكلي التراكمي",
+      viewsSub: `${data.totalLessonsCount ?? 0} درس منشور`,
+      devicesSub: "إجمالي الأجهزة المسجلة",
+      returningSub: "يعودون للمراجعة دائماً",
+      peakLabel: "ساعة الذروة الكبرى",
+    };
+  }, [data, timeFilter]);
 
   // حساب أقصى قيمة للأعمدة لضبط مقياس الارتفاع
   const currentChartData = useMemo(() => {
@@ -148,7 +304,7 @@ export default function AnalyticsDashboard({
         raw: d,
       }));
     }
-    if (timeFilter === "last_30_days") {
+    if (timeFilter === "last_30_days" || timeFilter === "all_time") {
       return data.charts.last30Days.map((d) => ({
         key: d.date,
         label: d.displayDate,
@@ -263,114 +419,25 @@ export default function AnalyticsDashboard({
         </button>
       </div>
 
-      {/* ================= 2. بطاقات المؤشرات الأساسية (KPIs) ================= */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-        {/* إجمالي زيارات الموقع */}
-        <div className="bg-gradient-to-br from-emerald-50/50 to-teal-50/30 p-3 rounded-xl border border-emerald-100/90 relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
-            <span className="font-bold text-slate-600">زيارات الموقع</span>
-            <Globe className="w-3.5 h-3.5 text-emerald-600" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-emerald-950">
-            {data?.siteAnalytics?.totalVisits ?? 0}
-            <span className="text-[10px] font-normal text-slate-500 mr-1">زيارة</span>
-          </div>
-          <div className="text-[10px] text-emerald-700/80 font-medium mt-0.5 truncate">
-            المجموع التراكمي
-          </div>
-        </div>
+      {/* ================= 2. شريط فلترة المؤشرات بالأزمنة (اليوم / الأسبوع / الشهر / الكل) ================= */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 bg-slate-50 border border-slate-200/90 rounded-2xl">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <span className="text-xs font-black text-slate-700 flex items-center gap-1.5 ml-1">
+            <Filter className="w-4 h-4 text-emerald-600" />
+            <span>تصفية الإحصائيات:</span>
+          </span>
 
-        {/* زيارات اليوم */}
-        <div className="bg-gradient-to-br from-blue-50/50 to-sky-50/30 p-3 rounded-xl border border-blue-100/90">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
-            <span className="font-bold text-slate-600">زيارات اليوم 📅</span>
-            <Clock className="w-3.5 h-3.5 text-blue-600" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-blue-950">
-            {data?.siteAnalytics?.todayVisits ?? 0}
-            <span className="text-[10px] font-normal text-slate-500 mr-1">زيارة</span>
-          </div>
-          <div className="text-[10px] text-blue-700/80 font-medium mt-0.5 truncate">
-            منذ منتصف الليل
-          </div>
-        </div>
-
-        {/* إجمالي مشاهدات الدروس */}
-        <div className="bg-gradient-to-br from-purple-50/50 to-fuchsia-50/30 p-3 rounded-xl border border-purple-100/90">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
-            <span className="font-bold text-slate-600">مشاهدات الدروس</span>
-            <Eye className="w-3.5 h-3.5 text-purple-600" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-purple-950">
-            {data?.totalLessonViews ?? 0}
-            <span className="text-[10px] font-normal text-slate-500 mr-1">مشاهدة</span>
-          </div>
-          <div className="text-[10px] text-purple-700/80 font-medium mt-0.5 truncate">
-            {data?.totalLessonsCount ?? 0} درس منشور
-          </div>
-        </div>
-
-        {/* الأجهزة الفريدة (أجهزة مختلفة) */}
-        <div className="bg-gradient-to-br from-cyan-50/50 to-teal-50/30 p-3 rounded-xl border border-cyan-100/90">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
-            <span className="font-bold text-slate-600">أجهزة مختلفة 📱</span>
-            <Users className="w-3.5 h-3.5 text-cyan-600" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-cyan-950">
-            {data?.retention?.totalUniqueDevices ?? 0}
-            <span className="text-[10px] font-normal text-slate-500 mr-1">جهاز</span>
-          </div>
-          <div className="text-[10px] text-cyan-700/80 font-medium mt-0.5 truncate">
-            زوار وتلاميذ فريدين
-          </div>
-        </div>
-
-        {/* نفس الجهاز (زيارات متكررة) */}
-        <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 p-3 rounded-xl border border-amber-100/90">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
-            <span className="font-bold text-slate-600">نفس الجهاز 🔁</span>
-            <UserCheck className="w-3.5 h-3.5 text-amber-600" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-amber-950">
-            {data?.retention?.returningDevicesCount ?? 0}
-            <span className="text-[10px] font-normal text-slate-500 mr-1">مكرر</span>
-          </div>
-          <div className="text-[10px] text-amber-700/80 font-medium mt-0.5 truncate">
-            يعودون للمراجعة
-          </div>
-        </div>
-
-        {/* نسبة الولاء والتكرار */}
-        <div className="bg-gradient-to-br from-rose-50/50 to-pink-50/30 p-3 rounded-xl border border-rose-100/90">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
-            <span className="font-bold text-slate-600">معدل التكرار 📈</span>
-            <TrendingUp className="w-3.5 h-3.5 text-rose-600" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-rose-950">
-            {data?.retention?.repeatRate ?? 0}%
-          </div>
-          <div className="text-[10px] text-rose-700/80 font-medium mt-0.5 truncate">
-            نسبة نفس التلاميذ
-          </div>
-        </div>
-      </div>
-
-      {/* ================= 3. قسم الأعمدة البيانية التفاعلية ================= */}
-      <div className="border border-slate-200/90 rounded-2xl p-4 bg-gradient-to-b from-slate-50/50 to-white space-y-4">
-        {/* أزرار الفلترة بالساعات / بالأيام / بالأشهر */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
-          {/* فلتر الفترات الزمنية */}
-          <div className="flex items-center bg-slate-100/90 p-1 rounded-xl gap-1">
+          <div className="flex flex-wrap items-center bg-white p-1 rounded-xl gap-1 border border-slate-200/80 shadow-2xs">
             <button
               type="button"
               onClick={() => setTimeFilter("today_hours")}
               className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 ${
                 timeFilter === "today_hours"
-                  ? "bg-white text-emerald-800 shadow-xs border border-slate-200/60"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
               }`}
             >
-              <Clock className="w-3.5 h-3.5 text-emerald-600" />
+              <Clock className="w-3.5 h-3.5" />
               <span>اليوم بالساعات (24h)</span>
             </button>
 
@@ -379,11 +446,11 @@ export default function AnalyticsDashboard({
               onClick={() => setTimeFilter("last_7_days")}
               className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 ${
                 timeFilter === "last_7_days"
-                  ? "bg-white text-emerald-800 shadow-xs border border-slate-200/60"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
               }`}
             >
-              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              <Calendar className="w-3.5 h-3.5" />
               <span>آخر 7 أيام (أسبوعياً)</span>
             </button>
 
@@ -392,12 +459,25 @@ export default function AnalyticsDashboard({
               onClick={() => setTimeFilter("last_30_days")}
               className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 ${
                 timeFilter === "last_30_days"
-                  ? "bg-white text-emerald-800 shadow-xs border border-slate-200/60"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
               }`}
             >
-              <Layers className="w-3.5 h-3.5 text-purple-600" />
-              <span>آخر 30 يوماً</span>
+              <Layers className="w-3.5 h-3.5" />
+              <span>آخر 30 يوماً (شهرياً)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTimeFilter("all_time")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 ${
+                timeFilter === "all_time"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>المجموع التراكمي (الكل)</span>
             </button>
 
             <button
@@ -405,13 +485,131 @@ export default function AnalyticsDashboard({
               onClick={() => setTimeFilter("platforms")}
               className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 ${
                 timeFilter === "platforms"
-                  ? "bg-white text-emerald-800 shadow-xs border border-slate-200/60"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
               }`}
             >
-              <Smartphone className="w-3.5 h-3.5 text-amber-600" />
+              <Smartphone className="w-3.5 h-3.5" />
               <span>الأجهزة والأنظمة</span>
             </button>
+          </div>
+        </div>
+
+        <div className="text-[11px] font-bold text-slate-500 bg-white px-2.5 py-1 rounded-lg border border-slate-200/80">
+          عرض أرقام: <span className="text-emerald-800 font-black">{activePeriodStats.label}</span>
+        </div>
+      </div>
+
+      {/* ================= 3. بطاقات المؤشرات الأساسية (KPIs) متجاوبة مع الفلتر ================= */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+        {/* إجمالي زيارات الموقع */}
+        <div className="bg-gradient-to-br from-emerald-50/50 to-teal-50/30 p-3 rounded-xl border border-emerald-100/90 relative overflow-hidden transition-all duration-300">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
+            <span className="font-bold text-slate-600">زيارات {activePeriodStats.suffix}</span>
+            <Globe className="w-3.5 h-3.5 text-emerald-600" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-emerald-950">
+            {activePeriodStats.visits}
+            <span className="text-[10px] font-normal text-slate-500 mr-1">زيارة</span>
+          </div>
+          <div className="text-[10px] text-emerald-700/80 font-medium mt-0.5 truncate">
+            {activePeriodStats.visitsSub}
+          </div>
+        </div>
+
+        {/* مشاهدات الدروس */}
+        <div className="bg-gradient-to-br from-purple-50/50 to-fuchsia-50/30 p-3 rounded-xl border border-purple-100/90 transition-all duration-300">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
+            <span className="font-bold text-slate-600">مشاهدات {activePeriodStats.suffix}</span>
+            <Eye className="w-3.5 h-3.5 text-purple-600" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-purple-950">
+            {activePeriodStats.views}
+            <span className="text-[10px] font-normal text-slate-500 mr-1">مشاهدة</span>
+          </div>
+          <div className="text-[10px] text-purple-700/80 font-medium mt-0.5 truncate">
+            {activePeriodStats.viewsSub}
+          </div>
+        </div>
+
+        {/* الأجهزة الفريدة (أجهزة مختلفة) */}
+        <div className="bg-gradient-to-br from-cyan-50/50 to-teal-50/30 p-3 rounded-xl border border-cyan-100/90 transition-all duration-300">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
+            <span className="font-bold text-slate-600">أجهزة مختلفة 📱</span>
+            <Users className="w-3.5 h-3.5 text-cyan-600" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-cyan-950">
+            {activePeriodStats.uniqueDevices}
+            <span className="text-[10px] font-normal text-slate-500 mr-1">جهاز</span>
+          </div>
+          <div className="text-[10px] text-cyan-700/80 font-medium mt-0.5 truncate">
+            {activePeriodStats.devicesSub}
+          </div>
+        </div>
+
+        {/* نفس الجهاز (زيارات متكررة) */}
+        <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 p-3 rounded-xl border border-amber-100/90 transition-all duration-300">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
+            <span className="font-bold text-slate-600">نفس الجهاز 🔁</span>
+            <UserCheck className="w-3.5 h-3.5 text-amber-600" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-amber-950">
+            {activePeriodStats.returningDevices}
+            <span className="text-[10px] font-normal text-slate-500 mr-1">مكرر</span>
+          </div>
+          <div className="text-[10px] text-amber-700/80 font-medium mt-0.5 truncate">
+            {activePeriodStats.returningSub}
+          </div>
+        </div>
+
+        {/* نسبة الولاء والتكرار */}
+        <div className="bg-gradient-to-br from-rose-50/50 to-pink-50/30 p-3 rounded-xl border border-rose-100/90 transition-all duration-300">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
+            <span className="font-bold text-slate-600">معدل التكرار 📈</span>
+            <TrendingUp className="w-3.5 h-3.5 text-rose-600" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-rose-950">
+            {activePeriodStats.repeatRate}%
+          </div>
+          <div className="text-[10px] text-rose-700/80 font-medium mt-0.5 truncate">
+            نسبة عودة نفس التلاميذ
+          </div>
+        </div>
+
+        {/* ذروة التفاعل / أنشط نقطة */}
+        <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/30 p-3 rounded-xl border border-indigo-100/90 transition-all duration-300">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] mb-1">
+            <span className="font-bold text-slate-600 truncate">{activePeriodStats.peakLabel}</span>
+            <Flame className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-indigo-950 truncate">
+            {activePeriodStats.peak}
+          </div>
+          <div className="text-[10px] text-indigo-700/80 font-medium mt-0.5 truncate">
+            أعلى نقطة تفاعل
+          </div>
+        </div>
+      </div>
+
+      {/* ================= 4. قسم الأعمدة البيانية التفاعلية ================= */}
+      <div className="border border-slate-200/90 rounded-2xl p-4 bg-gradient-to-b from-slate-50/50 to-white space-y-4">
+        {/* شريط معلومات الرسم والمؤشرات */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+              <BarChart3 className="w-4 h-4 text-emerald-600" />
+              <span>
+                {timeFilter === "today_hours"
+                  ? "الرسم البياني لتفاعل اليوم بالساعات (24 ساعة)"
+                  : timeFilter === "last_7_days"
+                  ? "الرسم البياني للتفاعل خلال آخر 7 أيام"
+                  : timeFilter === "last_30_days"
+                  ? "الرسم البياني للتفاعل خلال آخر 30 يوماً"
+                  : timeFilter === "all_time"
+                  ? "نظرة بيانية على نشاط الموقع (آخر 30 يوماً مع إجمالي تراكمي)"
+                  : "توزيع أنواع الأجهزة وأنظمة التشغيل والمتصفحات"}
+              </span>
+            </span>
           </div>
 
           {/* فلتر المؤشر المعروض (الزيارات vs المشاهدات vs الأجهزة) */}

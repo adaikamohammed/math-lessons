@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Lock,
   Calculator,
+  Eye,
 } from "lucide-react";
 import { getLessonsData } from "@/lib/storage";
 import HomeAnnouncements from "@/components/HomeAnnouncements";
@@ -40,6 +41,10 @@ const years = [
 export default async function Home() {
   const data = await getLessonsData();
   const announcements = data.announcements || [];
+  const level1Lessons = (data.lessons || []).filter((l) => l.level === 1);
+  const level2Lessons = (data.lessons || []).filter((l) => l.level === 2);
+  const level1Views = level1Lessons.reduce((sum, l) => sum + (l.views || 0), 0);
+  const level2Views = level2Lessons.reduce((sum, l) => sum + (l.views || 0), 0);
 
   return (
     <div className="pt-5 pb-12 fade-up space-y-4">
@@ -110,6 +115,15 @@ export default async function Home() {
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-black text-slate-900">{y.title}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5 font-medium">{y.subtitle}</div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-bold">
+                    {y.level === 1 ? level1Lessons.length : level2Lessons.length} مورد
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-black border border-purple-200/60 shadow-2xs">
+                    <Eye className="w-3 h-3 text-purple-600" />
+                    <span>{y.level === 1 ? level1Views : level2Views} مشاهدة</span>
+                  </span>
+                </div>
               </div>
               <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-emerald-700 group-hover:bg-emerald-50 transition shrink-0">
                 <ChevronLeft className="w-4 h-4" />

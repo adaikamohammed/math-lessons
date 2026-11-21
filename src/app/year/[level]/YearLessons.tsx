@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { ChevronLeft, Image as ImageIcon, BookOpen, Layers, StickyNote, Sparkles, FileText } from "lucide-react";
+import { ChevronLeft, Image as ImageIcon, BookOpen, Layers, StickyNote, Sparkles, FileText, Eye } from "lucide-react";
 import { LEVELS, NOTEBOOKS, isPdfFile, type Lesson, type NotebookType } from "@/lib/types";
 import { BackHeader, Loading, Empty } from "@/components/ui";
 
@@ -87,9 +87,37 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
     return groups;
   }, [lessonsItems]);
 
+  // إجمالي مشاهدات جميع دروس هذا المستوى
+  const totalYearViews = useMemo(() => {
+    if (!allLessons) return 0;
+    return allLessons.reduce((acc, l) => acc + (l.views || 0), 0);
+  }, [allLessons]);
+
   return (
     <div className="pb-12 space-y-4 fade-up">
       <BackHeader href="/" title={LEVELS[level].label} subtitle="اختر القسم لمشاهدة الدروس أو السلاسل والملخصات" />
+
+      {/* شريط تشجيعي يعرض إجمالي مشاهدات تلاميذ هذا المستوى */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-purple-50/80 via-white to-emerald-50/80 p-3 rounded-2xl border border-purple-100 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-black text-sm">
+            👁️
+          </span>
+          <div>
+            <div className="text-xs font-black text-slate-800">
+              إقبال وتفاعل تلاميذ {LEVELS[level].short}
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium">
+              شاهد التلاميذ دروس هذا المستوى حتى الآن
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs font-black text-purple-900 bg-white border border-purple-200 px-3 py-1.5 rounded-xl shadow-2xs">
+          <Eye className="w-4 h-4 text-purple-600" />
+          <span className="text-sm font-black text-purple-700">{totalYearViews}</span>
+          <span>مشاهدة</span>
+        </div>
+      </div>
 
       {/* أزرار اختيار الأقسام الـ 4 (الدروس، الأعمال الموجهة، سلاسل التمارين، الملخصات) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-100 shadow-2xs">
@@ -263,6 +291,11 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
 
                               {/* الملاحظات وعدد الصور وحالة الواجب */}
                               <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                <span className="flex items-center gap-1 text-[10px] text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد المشاهدات">
+                                  <Eye className="w-3 h-3 text-purple-600" />
+                                  <span>{l.views || 0} مشاهدة</span>
+                                </span>
+
                                 {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
                                   <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
                                     <FileText className="w-3 h-3 text-red-500" />
@@ -347,6 +380,11 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
 
                       {/* الملاحظات وعدد الصور */}
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="flex items-center gap-1 text-[10px] text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد المشاهدات">
+                          <Eye className="w-3 h-3 text-purple-600" />
+                          <span>{l.views || 0} مشاهدة</span>
+                        </span>
+
                         {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
                           <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
                             <FileText className="w-3 h-3 text-red-500" />
@@ -413,6 +451,11 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                       </h3>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="flex items-center gap-1 text-[10px] text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد المشاهدات">
+                          <Eye className="w-3 h-3 text-purple-600" />
+                          <span>{l.views || 0} مشاهدة</span>
+                        </span>
+
                         {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
                           <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
                             <FileText className="w-3 h-3 text-red-500" />
@@ -485,6 +528,11 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                       </h3>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="flex items-center gap-1 text-[10px] text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد المشاهدات">
+                          <Eye className="w-3 h-3 text-purple-600" />
+                          <span>{l.views || 0} مشاهدة</span>
+                        </span>
+
                         {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
                           <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
                             <FileText className="w-3 h-3 text-red-500" />

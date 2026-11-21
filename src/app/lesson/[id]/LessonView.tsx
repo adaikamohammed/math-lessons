@@ -15,6 +15,7 @@ import {
   ExternalLink,
   CheckCircle2,
   Clock,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
 import { LEVELS, NOTEBOOKS, isPdfFile, type Lesson, type LessonImage } from "@/lib/types";
@@ -45,6 +46,7 @@ export function LessonView({ id }: { id: string }) {
                 level: data.lesson.level,
                 path: typeof window !== "undefined" ? window.location.pathname : `/lesson/${id}`,
               });
+              setLesson((prev) => (prev ? { ...prev, views: (prev.views || 0) + 1 } : prev));
             }
           } catch {
             // ignore
@@ -129,6 +131,14 @@ export function LessonView({ id }: { id: string }) {
                     : isSummary
                     ? "📌 ملخص ومطوية"
                     : "📘 كراس الدروس"}
+                </span>
+
+                <span
+                  className="bg-purple-50 text-purple-900 border border-purple-200/90 px-2 py-0.5 rounded-md inline-flex items-center gap-1 font-black shadow-2xs"
+                  title="عدد المشاهدات المسجلة لهذا الدرس"
+                >
+                  <Eye className="w-3.5 h-3.5 text-purple-600" />
+                  <span>{lesson.views || 0} مشاهدة</span>
                 </span>
               </div>
 
