@@ -109,7 +109,7 @@ export default async function Home() {
             </span>
           </div>
           <p className="text-xs text-slate-600 mt-1 line-clamp-1 font-semibold">
-            جوائز تحفيزية قيّمة لجميع التلاميذ • شروط استحقاق الهدية وقوائم الأقسام وتأكيد كشف النقاط
+            جوائز تحفيزية قيّمة لجميع التلاميذ • شروط استحقاق الهدية وقوائم التحدي للأقسام الأربعة
           </p>
         </div>
         <ChevronLeft className="w-5 h-5 text-amber-600 group-hover:text-amber-800 transition shrink-0" />
