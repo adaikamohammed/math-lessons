@@ -149,6 +149,7 @@ export async function getLessonsData(): Promise<LessonsData> {
           announcements: Array.isArray(json.announcements) ? json.announcements : [],
           anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
           siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
+          rewardSubmissions: Array.isArray(json.rewardSubmissions) ? json.rewardSubmissions : [],
         };
         const result = synchronizeStudents(rawResult);
         memoryCache = { data: JSON.parse(JSON.stringify(result)), timestamp: Date.now() };
@@ -181,6 +182,7 @@ export async function getLessonsData(): Promise<LessonsData> {
       announcements: Array.isArray(json.announcements) ? json.announcements : [],
       anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
       siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
+      rewardSubmissions: Array.isArray(json.rewardSubmissions) ? json.rewardSubmissions : [],
     };
   } catch {
     return {
@@ -196,6 +198,7 @@ export async function getLessonsData(): Promise<LessonsData> {
       announcements: [],
       anonymousMessages: [],
       siteAnalytics: { totalVisits: 0 },
+      rewardSubmissions: [],
     };
   }
 }
@@ -233,6 +236,9 @@ async function executeSave(data: LessonsData): Promise<void> {
     }
     if (data.siteAnalytics === undefined && existing.siteAnalytics) {
       data.siteAnalytics = existing.siteAnalytics;
+    }
+    if (data.rewardSubmissions === undefined && existing.rewardSubmissions) {
+      data.rewardSubmissions = existing.rewardSubmissions;
     }
   } catch (mergeErr) {
     console.warn("Could not merge existing data before save:", mergeErr);
@@ -314,6 +320,34 @@ export async function uploadImageFile(
     url: localUrl,
     downloadUrl: localUrl,
   };
+}
+
+// ----------------- رفع صورة إثبات كشف النقاط لتحدي الهدايا -----------------
+export async function uploadRewardProofFile(
+  file: File | Blob,
+  fileName: string
+): Promise<{ url: string }> {
+  const safeName = (fileName || "proof.jpg").replace(/[^a-zA-Z0-9.-]/g, "_");
+  const uniqueName = `proof-${Date.now()}-${safeName}`;
+  const token = getBlobToken();
+
+  if (token) {
+    const blobPath = `rewards/proofs/${uniqueName}`;
+    const blob = await put(blobPath, file, {
+      access: "public",
+      token,
+    });
+    return { url: blob.url };
+  }
+
+  // Local fallback
+  await ensureLocalDirs();
+  const proofsDir = path.join(LOCAL_UPLOADS_DIR, "rewards");
+  await fs.mkdir(proofsDir, { recursive: true });
+  const filePath = path.join(proofsDir, uniqueName);
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(filePath, buffer);
+  return { url: `/uploads/rewards/${uniqueName}` };
 }
 
 // ----------------- حذف صورة -----------------

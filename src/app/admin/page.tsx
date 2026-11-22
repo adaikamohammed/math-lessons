@@ -53,6 +53,7 @@ import {
   Mail,
   Phone,
   Send,
+  Gift,
 } from "lucide-react";
 import {
   LEVELS,
@@ -1310,6 +1311,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <Megaphone className="w-3.5 h-3.5 text-emerald-600" />
             <span>الإعلان والتوجيهات</span>
           </Link>
+          <Link
+            href="/rewards"
+            target="_blank"
+            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition text-[11px]"
+          >
+            <Gift className="w-3.5 h-3.5 text-amber-600" />
+            <span>صفحة الجوائز 🎁</span>
+          </Link>
         </div>
 
         {/* بطاقة التقييم الميداني السريع المستقل (مخصصة للهاتف أثناء الحصة) */}
@@ -1343,7 +1352,30 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         {/* شريط الإدارة المتطورة: إدارة الأفواج ورصد النقاط كإكسل وفضاء استعلام الأولياء */}
-        <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          <Link
+            href="/admin/rewards"
+            className="p-3 rounded-2xl bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 border-2 border-amber-300 hover:border-amber-400 text-amber-950 flex items-center justify-between gap-2 transition group shadow-2xs active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-xs">
+                🎁
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs font-black text-slate-900 group-hover:text-amber-800 transition truncate flex items-center gap-1.5">
+                  <span>كشوف وتأكيدات الهدايا</span>
+                  <span className="text-[9px] bg-amber-600 text-white font-black px-1.5 py-0.2 rounded-full">
+                    تحدي 4 فئات
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-500 font-medium truncate">
+                  معاينة كشوف النقاط المرفوعة من الأولياء واعتماد الفائزين
+                </div>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-amber-600 shrink-0" />
+          </Link>
+
           <Link
             href="/admin/students"
             className="p-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 hover:border-emerald-300 text-emerald-950 flex items-center justify-between gap-2 transition group shadow-2xs active:scale-[0.99]"

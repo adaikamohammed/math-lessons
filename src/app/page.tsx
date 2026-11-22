@@ -12,6 +12,8 @@ import {
   Lock,
   Calculator,
   Eye,
+  Gift,
+  Sparkles,
 } from "lucide-react";
 import { getLessonsData } from "@/lib/storage";
 import HomeAnnouncements from "@/components/HomeAnnouncements";
@@ -88,6 +90,29 @@ export default async function Home() {
           </p>
         </div>
         <ChevronLeft className="w-5 h-5 text-emerald-600 group-hover:text-emerald-800 transition shrink-0" />
+      </Link>
+
+      {/* فضاء تحدي الهدايا وجوائز التفوق الرياضي للأولياء والتلاميذ */}
+      <Link
+        href="/rewards"
+        className="flex items-center gap-3.5 bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-emerald-500/10 rounded-2xl p-4 border-2 border-amber-400/90 shadow-xs hover:border-amber-500 hover:shadow-md active:scale-[0.98] transition group relative overflow-hidden"
+      >
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-amber-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/30 group-hover:scale-105 transition-transform">
+          <Gift className="w-6 h-6 text-amber-100" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-black text-sm text-slate-900">هدايا وجوائز الرياضيات 🎁</span>
+            <span className="text-[10px] bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded-md border border-amber-300 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-amber-600" />
+              <span>تحدي الاختبار 4 فئات 🏆</span>
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 mt-1 line-clamp-1 font-semibold">
+            جوائز تحفيزية قيّمة لجميع التلاميذ • شروط استحقاق الهدية وقوائم الأقسام وتأكيد كشف النقاط
+          </p>
+        </div>
+        <ChevronLeft className="w-5 h-5 text-amber-600 group-hover:text-amber-800 transition shrink-0" />
       </Link>
 
       {/* 1. الأساس: الدروس المصورة للسبورة (أول ما يراه التلميذ) */}

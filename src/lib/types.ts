@@ -295,7 +295,90 @@ export type LessonsData = {
   announcements?: Announcement[];
   anonymousMessages?: AnonymousMessage[];
   siteAnalytics?: SiteAnalyticsData;
+  rewardSubmissions?: RewardProofSubmission[];
 };
+
+export type RewardChallengeTierId =
+  | "tier1_remontada"
+  | "tier2_full_mark"
+  | "tier3_excellence"
+  | "tier4_elite";
+
+export type RewardChallengeTier = {
+  id: RewardChallengeTierId;
+  name: string;
+  shortName: string;
+  badge: string;
+  conditionText: string;
+  detailedCondition: string;
+  targetAudience: string;
+  minScoreText: string;
+  colorName: "amber" | "slate" | "yellow" | "purple";
+};
+
+export type RewardProofSubmission = {
+  id: string;
+  studentName: string;
+  className: string;
+  tierId: RewardChallengeTierId;
+  parentPhone?: string;
+  proofImageUrl: string;
+  notes?: string;
+  status: "pending" | "approved" | "rejected";
+  teacherFeedback?: string;
+  submittedAt: string;
+  reviewedAt?: string;
+};
+
+export const REWARD_TIERS: RewardChallengeTier[] = [
+  {
+    id: "tier1_remontada",
+    name: "تحدي الريمونتادا والقفزة الكبرى",
+    shortName: "الريمونتادا",
+    badge: "⚡ الريمونتادا",
+    conditionText: "علامة الاختبار فوق 17",
+    detailedCondition: "الحصول في اختبار مادة الرياضيات على علامة فوق 17 من 20",
+    targetAudience: "تلاميذ الفرض الأول (أقل من 5 نقاط)",
+    minScoreText: "فرض أقل من 5",
+    colorName: "amber",
+  },
+  {
+    id: "tier2_full_mark",
+    name: "تحدي العلامة الكاملة",
+    shortName: "العلامة الكاملة",
+    badge: "🥈 التحدي الفضي",
+    conditionText: "علامة الاختبار 20 / 20",
+    detailedCondition: "الحصول في اختبار مادة الرياضيات على العلامة الكاملة 20 من 20",
+    targetAudience: "تلاميذ الفرض الأول (من 5 إلى أقل من 10)",
+    minScoreText: "فرض من 5 إلى أقل من 10",
+    colorName: "slate",
+  },
+  {
+    id: "tier3_excellence",
+    name: "تحدي الامتياز الفصلي",
+    shortName: "الامتياز الفصلي",
+    badge: "🥇 التحدي الذهبي",
+    conditionText: "اختبار 20 + معدل الفصل فوق 15",
+    detailedCondition: "الحصول في اختبار الرياضيات على 20 / 20 + معدل الفصل الأول العام فوق 15 من 20",
+    targetAudience: "تلاميذ الفرض الأول (من 10 إلى أقل من 15)",
+    minScoreText: "فرض من 10 إلى أقل من 15",
+    colorName: "yellow",
+  },
+  {
+    id: "tier4_elite",
+    name: "تحدي النخبة والعباقرة",
+    shortName: "النخبة والعباقرة",
+    badge: "💎 التحدي الماسي",
+    conditionText: "اختبار 20 + معدل الفصل فوق 18",
+    detailedCondition: "الحصول في اختبار الرياضيات على 20 / 20 + معدل الفصل الأول العام فوق 18 من 20",
+    targetAudience: "تلاميذ الفرض الأول (من 15 إلى 20)",
+    minScoreText: "فرض من 15 إلى 20",
+    colorName: "purple",
+  },
+];
+
+export const REWARD_REGULATION_NOTICE =
+  "توزع الهدايا والجوائز بحسب عدد الفائزين المتأهلين، وفي حال كان عدد الفائزين أكثر من المتوقع، يحق للأستاذ تشديد معايير وشروط المفاضلة لضمان تكريم التلاميذ الأكثر اجتهاداً واستحقاقاً.";
 
 export const LEVELS = {
   1: { label: "السنة الأولى متوسط", short: "1 متوسط" },
