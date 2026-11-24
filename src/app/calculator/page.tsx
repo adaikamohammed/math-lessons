@@ -5,11 +5,7 @@ import Link from "next/link";
 import {
   Calculator,
   ArrowRight,
-  Sparkles,
-  BookOpen,
   RotateCcw,
-  CheckCircle2,
-  Trophy,
 } from "lucide-react";
 
 export default function SimpleMathCalculatorPage() {
@@ -46,16 +42,6 @@ export default function SimpleMathCalculatorPage() {
     if (average >= 10) return { text: "مقبول 📈", color: "bg-amber-600 text-white" };
     return { text: "دون المتوسط ⚠️", color: "bg-rose-600 text-white" };
   }, [average]);
-
-  // كم يحتاج في الاختبار ليصل لمعدل معين؟
-  const getNeededFor = (target: number) => {
-    const ev = Math.min(20, Math.max(0, evalScore || 0));
-    const qz = Math.min(20, Math.max(0, quizScore || 0));
-    const needed = (target * 4 - ev - qz) / 2;
-    if (needed <= 0) return "مضمون ✓";
-    if (needed > 20) return "صعب قليلاً";
-    return `${needed.toFixed(1)} / 20`;
-  };
 
   return (
     <div className="pb-16 pt-3 max-w-2xl mx-auto space-y-4 fade-up px-3" dir="rtl">
@@ -237,31 +223,6 @@ export default function SimpleMathCalculatorPage() {
             <span>10</span>
             <span>15</span>
             <span className="text-purple-700 font-black">20</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. ماذا تحتاج في الاختبار لتصل لأهدافك؟ (مبسطة جداً) */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
-        <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-          <Sparkles className="w-4 h-4 text-amber-500" />
-          <span>كم تحتاج في الاختبار لتحصل على هذه المعدلات؟</span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-            <div className="text-[10px] text-slate-500 font-bold">معدل 10</div>
-            <div className="font-black text-slate-900 text-sm mt-0.5">{getNeededFor(10)}</div>
-          </div>
-
-          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-            <div className="text-[10px] text-slate-500 font-bold">معدل 14</div>
-            <div className="font-black text-slate-900 text-sm mt-0.5">{getNeededFor(14)}</div>
-          </div>
-
-          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-            <div className="text-[10px] text-slate-500 font-bold">معدل 16</div>
-            <div className="font-black text-slate-900 text-sm mt-0.5">{getNeededFor(16)}</div>
           </div>
         </div>
       </div>
