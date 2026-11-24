@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   HelpCircle,
   BarChart3,
+  LineChart,
+  AreaChart,
   Layers,
   Flame,
   ChevronRight,
@@ -140,6 +142,58 @@ interface AnalyticsDashboardProps {
 
 type TimeFilter = "today_hours" | "last_7_days" | "last_30_days" | "all_time" | "platforms";
 type MetricFilter = "both" | "visits" | "views" | "devices";
+
+// خوارزمية رسم المنحنيات البيانية الانسيابية (Clamped Catmull-Rom Cubic Spline)
+function buildSmoothSpline(
+  points: { x: number; y: number }[],
+  baseY: number,
+  topY: number
+): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  if (points.length === 2) {
+    return `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)} L ${points[1].x.toFixed(1)} ${points[1].y.toFixed(1)}`;
+  }
+
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = i > 0 ? points[i - 1] : points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = i < points.length - 2 ? points[i + 2] : p2;
+
+    let cp1x = p1.x + (p2.x - p0.x) / 6;
+    let cp1y = p1.y + (p2.y - p0.y) / 6;
+    let cp2x = p2.x - (p3.x - p1.x) / 6;
+    let cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    // تثبيت القاعدة لمنع الانحناء تحت خط الصفر في المناطق الصامتة
+    if (Math.abs(p1.y - baseY) < 0.8 && Math.abs(p2.y - baseY) < 0.8) {
+      cp1y = baseY;
+      cp2y = baseY;
+    } else {
+      cp1y = Math.min(baseY, Math.max(topY, cp1y));
+      cp2y = Math.min(baseY, Math.max(topY, cp2y));
+    }
+
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+
+  return d;
+}
+
+function buildAreaSpline(
+  points: { x: number; y: number }[],
+  baseY: number,
+  topY: number
+): string {
+  if (points.length === 0) return "";
+  const linePath = buildSmoothSpline(points, baseY, topY);
+  const first = points[0];
+  const last = points[points.length - 1];
+  return `${linePath} L ${last.x.toFixed(1)} ${baseY.toFixed(1)} L ${first.x.toFixed(1)} ${baseY.toFixed(1)} Z`;
+}
 
 export default function AnalyticsDashboard({
   data,
@@ -327,10 +381,92 @@ export default function AnalyticsDashboard({
       if (metricFilter === "visits") highest = Math.max(highest, item.visits);
       else if (metricFilter === "views") highest = Math.max(highest, item.views);
       else if (metricFilter === "devices") highest = Math.max(highest, item.devices);
-      else highest = Math.max(highest, item.visits, item.views, item.total);
+      else highest = Math.max(highest, item.visits, item.views, item.devices);
     }
-    return Math.max(highest, 5); // حد أدنى 5 لتناسق الرسم
+    const base = Math.max(highest, 4);
+    if (base <= 5) return 5;
+    if (base <= 10) return 10;
+    if (base <= 20) return 20;
+    if (base <= 50) return Math.ceil(base / 5) * 5;
+    return Math.ceil(base / 10) * 10;
   }, [currentChartData, metricFilter]);
+
+  // حساب إحداثيات النقاط للرسم البياني المنحني (SVG Spline Coordinates)
+  const chartPoints = useMemo(() => {
+    const N = currentChartData.length;
+    if (N === 0) {
+      return {
+        visitsPoints: [],
+        viewsPoints: [],
+        devicesPoints: [],
+        allCoords: [],
+        baseY: 270,
+        topY: 30,
+        paddingLeft: 55,
+        paddingRight: 40,
+        innerWidth: 905,
+        innerHeight: 240,
+      };
+    }
+
+    const paddingLeft = 55;
+    const paddingRight = 40;
+    const paddingTop = 30;
+    const innerWidth = 1000 - paddingLeft - paddingRight; // 905
+    const innerHeight = 240;
+    const baseY = paddingTop + innerHeight; // 270
+    const topY = paddingTop; // 30
+
+    const visitsPoints: { x: number; y: number }[] = [];
+    const viewsPoints: { x: number; y: number }[] = [];
+    const devicesPoints: { x: number; y: number }[] = [];
+    const allCoords: {
+      x: number;
+      yVisits: number;
+      yViews: number;
+      yDevices: number;
+      item: (typeof currentChartData)[0];
+      index: number;
+    }[] = [];
+
+    for (let i = 0; i < N; i++) {
+      const item = currentChartData[i];
+      const x = paddingLeft + (N > 1 ? (i / (N - 1)) * innerWidth : innerWidth / 2);
+      const vRatio = Math.min(1, Math.max(0, item.visits / maxVal));
+      const wRatio = Math.min(1, Math.max(0, item.views / maxVal));
+      const dRatio = Math.min(1, Math.max(0, item.devices / maxVal));
+
+      const yVisits = baseY - vRatio * innerHeight;
+      const yViews = baseY - wRatio * innerHeight;
+      const yDevices = baseY - dRatio * innerHeight;
+
+      visitsPoints.push({ x, y: yVisits });
+      viewsPoints.push({ x, y: yViews });
+      devicesPoints.push({ x, y: yDevices });
+
+      allCoords.push({
+        x,
+        yVisits,
+        yViews,
+        yDevices,
+        item,
+        index: i,
+      });
+    }
+
+    return {
+      visitsPoints,
+      viewsPoints,
+      devicesPoints,
+      allCoords,
+      baseY,
+      topY,
+      paddingLeft,
+      paddingRight,
+      innerWidth,
+      innerHeight,
+    };
+  }, [currentChartData, maxVal]);
 
   // تصفية سجل الأحداث المباشر
   const filteredEvents = useMemo(() => {
@@ -591,104 +727,160 @@ export default function AnalyticsDashboard({
         </div>
       </div>
 
-      {/* ================= 4. قسم الأعمدة البيانية التفاعلية ================= */}
-      <div className="border border-slate-200/90 rounded-2xl p-4 bg-gradient-to-b from-slate-50/50 to-white space-y-4">
-        {/* شريط معلومات الرسم والمؤشرات */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-              <BarChart3 className="w-4 h-4 text-emerald-600" />
-              <span>
-                {timeFilter === "today_hours"
-                  ? "الرسم البياني لتفاعل اليوم بالساعات (24 ساعة)"
-                  : timeFilter === "last_7_days"
-                  ? "الرسم البياني للتفاعل خلال آخر 7 أيام"
-                  : timeFilter === "last_30_days"
-                  ? "الرسم البياني للتفاعل خلال آخر 30 يوماً"
-                  : timeFilter === "all_time"
-                  ? "نظرة بيانية على نشاط الموقع (آخر 30 يوماً مع إجمالي تراكمي)"
-                  : "توزيع أنواع الأجهزة وأنظمة التشغيل والمتصفحات"}
-              </span>
-            </span>
+      {/* ================= 4. قسم المنحنى البياني التفاعلي (SVG Spline Area Chart) ================= */}
+      <div className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 bg-gradient-to-b from-slate-50/50 to-white space-y-4 shadow-xs">
+        {/* شريط التحكم والتنقل المباشر: أزرار الفترات الزمنية + أزرار اختيار المنحنيات */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+          {/* عنوان المنحنى البياني مع مؤشر الأيقونة */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-4 h-4 text-emerald-700" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
+                <span>
+                  {timeFilter === "today_hours"
+                    ? "المنحنى البياني لتفاعل اليوم بالساعات (24 ساعة)"
+                    : timeFilter === "last_7_days"
+                    ? "المنحنى البياني للتفاعل خلال آخر 7 أيام (أسبوعياً)"
+                    : timeFilter === "last_30_days"
+                    ? "المنحنى البياني للتفاعل خلال آخر 30 يوماً (شهرياً)"
+                    : timeFilter === "all_time"
+                    ? "نظرة منحنى النشاط التراكمي الشامل"
+                    : "توزيع أنواع الأجهزة والأنظمة المتصلة"}
+                </span>
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium">
+                انسيابية بيانية دقيقة لحركة الزوار، مشاهدات الدروس والأجهزة الفريدة
+              </p>
+            </div>
           </div>
 
-          {/* فلتر المؤشر المعروض (الزيارات vs المشاهدات vs الأجهزة) */}
-          {timeFilter !== "platforms" && (
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-              <span className="text-[11px] text-slate-400 font-semibold ml-1">عرض:</span>
-              <button
-                type="button"
-                onClick={() => setMetricFilter("both")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition ${
-                  metricFilter === "both"
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                الكل (مقارنة)
-              </button>
-              <button
-                type="button"
-                onClick={() => setMetricFilter("visits")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition flex items-center gap-1 ${
-                  metricFilter === "visits"
-                    ? "bg-emerald-600 text-white"
-                    : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                الزيارات
-              </button>
-              <button
-                type="button"
-                onClick={() => setMetricFilter("views")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition flex items-center gap-1 ${
-                  metricFilter === "views"
-                    ? "bg-purple-600 text-white"
-                    : "bg-purple-50 text-purple-800 hover:bg-purple-100"
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-                مشاهدات الدروس
-              </button>
-              <button
-                type="button"
-                onClick={() => setMetricFilter("devices")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition flex items-center gap-1 ${
-                  metricFilter === "devices"
-                    ? "bg-cyan-600 text-white"
-                    : "bg-cyan-50 text-cyan-800 hover:bg-cyan-100"
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                الأجهزة
-              </button>
-            </div>
-          )}
+          {/* أزرار التنقل السريع بين الفترات (اليوم / الأسبوع / الشهر / الأجهزة) */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <button
+              type="button"
+              onClick={() => {
+                setTimeFilter("today_hours");
+                setHoveredIndex(null);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                timeFilter === "today_hours"
+                  ? "bg-white text-emerald-800 shadow-xs border border-slate-200"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5 text-emerald-600" />
+              <span>اليوم (24h)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTimeFilter("last_7_days");
+                setHoveredIndex(null);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                timeFilter === "last_7_days"
+                  ? "bg-white text-emerald-800 shadow-xs border border-slate-200"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+              <span>آخر 7 أيام</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTimeFilter("last_30_days");
+                setHoveredIndex(null);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                timeFilter === "last_30_days"
+                  ? "bg-white text-emerald-800 shadow-xs border border-slate-200"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-emerald-600" />
+              <span>آخر 30 يوماً</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTimeFilter("platforms");
+                setHoveredIndex(null);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                timeFilter === "platforms"
+                  ? "bg-white text-emerald-800 shadow-xs border border-slate-200"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+              <span>الأجهزة</span>
+            </button>
+          </div>
         </div>
 
-        {/* عرض الأعمدة البيانية (Column Chart) */}
+        {/* عرض المنحنى البياني التفاعلي (Spline Line Chart) */}
         {timeFilter !== "platforms" ? (
           <div className="space-y-3">
-            {/* دليل الألوان ومعلومات الذروة */}
-            <div className="flex flex-wrap items-center justify-between text-xs gap-2">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-bold">
-                  <span className="w-3 h-3 rounded-md bg-emerald-500"></span>
-                  <span>زيارات الموقع</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-bold">
-                  <span className="w-3 h-3 rounded-md bg-purple-500"></span>
+            {/* أزرار تحديد المنحنيات ومؤشر الذروة ودليل الألوان */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+              {/* اختيار المنحنى المعروض */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-slate-700">
+                <span className="text-[11px] text-slate-400 font-semibold ml-1">المنحنيات:</span>
+                <button
+                  type="button"
+                  onClick={() => setMetricFilter("both")}
+                  className={`px-3 py-1 rounded-lg text-xs font-black transition cursor-pointer ${
+                    metricFilter === "both"
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  الكل (مقارنة 3 خطوط)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMetricFilter("visits")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                    metricFilter === "visits"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white"></span>
+                  <span>الزيارات</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMetricFilter("views")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                    metricFilter === "views"
+                      ? "bg-purple-600 text-white shadow-xs"
+                      : "bg-purple-50 text-purple-800 hover:bg-purple-100"
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500 border border-white"></span>
                   <span>مشاهدات الدروس</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-bold">
-                  <span className="w-3 h-3 rounded-md bg-cyan-500"></span>
-                  <span>أجهزة فريدة</span>
-                </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMetricFilter("devices")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                    metricFilter === "devices"
+                      ? "bg-cyan-600 text-white shadow-xs"
+                      : "bg-cyan-50 text-cyan-800 hover:bg-cyan-100"
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 border border-white"></span>
+                  <span>الأجهزة الفريدة</span>
+                </button>
               </div>
 
+              {/* شارة ساعة أو يوم الذروة */}
               {peakHourInfo && (
-                <div className="flex items-center gap-1.5 text-[11px] font-black text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                <div className="flex items-center gap-1.5 text-xs font-black text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 shrink-0">
                   <Flame className="w-3.5 h-3.5 text-amber-500" />
                   <span>
                     ساعة الذروة المسجلة: {peakHourInfo.label} ({peakHourInfo.visitsAndViews} حركة)
@@ -697,125 +889,331 @@ export default function AnalyticsDashboard({
               )}
             </div>
 
-            {/* الحاوية الرسومية للأعمدة */}
-            <div className="relative pt-6 pb-2 px-1 bg-white border border-slate-100 rounded-xl overflow-x-auto">
-              <div
-                className="flex items-end gap-1.5 sm:gap-2 h-44 sm:h-52 min-w-[580px] pb-6 px-2 relative"
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                {/* خطوط الشبكة المساعدة (Grid Lines) */}
-                <div className="absolute inset-x-0 top-0 border-b border-dashed border-slate-200/60 pointer-events-none flex justify-between text-[9px] text-slate-400 px-2">
-                  <span>{maxVal}</span>
-                </div>
-                <div className="absolute inset-x-0 top-1/2 border-b border-dashed border-slate-200/60 pointer-events-none flex justify-between text-[9px] text-slate-400 px-2">
-                  <span>{Math.round(maxVal / 2)}</span>
-                </div>
+            {/* شريط الفحص المباشر للنقطة النشطة (Active Point Live Inspector) */}
+            {(() => {
+              const activeIdx = hoveredIndex !== null ? hoveredIndex : chartPoints.allCoords.length > 0 ? (timeFilter === "today_hours" ? new Date().getHours() : chartPoints.allCoords.length - 1) : null;
+              const activeCoord = activeIdx !== null ? chartPoints.allCoords[activeIdx] : null;
+              if (!activeCoord) return null;
+              const item = activeCoord.item;
 
-                {/* رسم الأعمدة */}
-                {currentChartData.map((item, idx) => {
-                  const visitHeightPct = Math.min(100, Math.max(0, (item.visits / maxVal) * 100));
-                  const viewHeightPct = Math.min(100, Math.max(0, (item.views / maxVal) * 100));
-                  const devHeightPct = Math.min(100, Math.max(0, (item.devices / maxVal) * 100));
-                  const isHovered = hoveredIndex === idx;
+              return (
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 sm:px-4 bg-slate-900 text-white rounded-xl border border-slate-800 shadow-md">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="text-xs sm:text-sm font-black text-amber-300">
+                      {item.label}
+                    </span>
+                    {item.subLabel && (
+                      <span className="text-[11px] text-slate-400 font-normal">
+                        ({item.subLabel})
+                      </span>
+                    )}
+                    {item.isHighlight && (
+                      <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        {timeFilter === "today_hours" ? "الساعة الحالية 🔴" : "اليوم 🔴"}
+                      </span>
+                    )}
+                  </div>
 
-                  return (
-                    <div
-                      key={item.key}
-                      onMouseEnter={() => setHoveredIndex(idx)}
-                      onClick={() => setHoveredIndex(idx)}
-                      className={`flex-1 flex flex-col items-center justify-end h-full relative cursor-pointer group transition-all duration-200 ${
-                        item.isHighlight ? "bg-emerald-50/40 rounded-t-lg" : ""
-                      }`}
-                    >
-                      {/* Tooltip تفصيلي عند التحويم فوق العمود */}
-                      {isHovered && (
-                        <div className="absolute -top-24 z-30 bg-slate-900 text-white rounded-xl p-2.5 shadow-xl text-[11px] whitespace-nowrap min-w-[140px] pointer-events-none border border-slate-700 animate-in fade-in zoom-in-95">
-                          <div className="font-black text-amber-400 border-b border-slate-800 pb-1 mb-1.5 flex items-center justify-between">
-                            <span>{item.label}</span>
-                            {item.subLabel && (
-                              <span className="text-[10px] text-slate-400 font-normal">
-                                {item.subLabel}
-                              </span>
-                            )}
-                          </div>
-                          <div className="space-y-0.5">
-                            <div className="flex items-center justify-between gap-3 text-emerald-400">
-                              <span>زيارات الموقع:</span>
-                              <span className="font-black">{item.visits}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-3 text-purple-400">
-                              <span>مشاهدات الدروس:</span>
-                              <span className="font-black">{item.views}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-3 text-cyan-400">
-                              <span>أجهزة فريدة:</span>
-                              <span className="font-black">{item.devices}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* قيمة العمود في الأعلى إذا كانت نشطة */}
-                      {(item.visits > 0 || item.views > 0) && (
-                        <span className="text-[9px] font-black text-slate-700 mb-1 group-hover:scale-110 transition">
-                          {metricFilter === "visits"
-                            ? item.visits
-                            : metricFilter === "views"
-                            ? item.views
-                            : metricFilter === "devices"
-                            ? item.devices
-                            : item.visits + item.views}
-                        </span>
-                      )}
-
-                      {/* قضبان الأعمدة (Bars) */}
-                      <div className="w-full flex items-end justify-center gap-0.5 sm:gap-1 max-w-[28px] h-full">
-                        {/* عمود الزيارات */}
-                        {(metricFilter === "both" || metricFilter === "visits") && (
-                          <div
-                            style={{ height: `${Math.max(visitHeightPct, item.visits > 0 ? 6 : 2)}%` }}
-                            className={`w-full rounded-t-md transition-all duration-300 ${
-                              item.visits > 0
-                                ? "bg-gradient-to-t from-emerald-600 to-emerald-400 group-hover:from-emerald-700 group-hover:to-emerald-300 shadow-xs"
-                                : "bg-slate-100"
-                            }`}
-                          />
-                        )}
-
-                        {/* عمود مشاهدات الدروس */}
-                        {(metricFilter === "both" || metricFilter === "views") && (
-                          <div
-                            style={{ height: `${Math.max(viewHeightPct, item.views > 0 ? 6 : 2)}%` }}
-                            className={`w-full rounded-t-md transition-all duration-300 ${
-                              item.views > 0
-                                ? "bg-gradient-to-t from-purple-600 to-purple-400 group-hover:from-purple-700 group-hover:to-purple-300 shadow-xs"
-                                : "bg-slate-100"
-                            }`}
-                          />
-                        )}
-
-                        {/* عمود الأجهزة إذا كان منفرداً */}
-                        {metricFilter === "devices" && (
-                          <div
-                            style={{ height: `${Math.max(devHeightPct, item.devices > 0 ? 6 : 2)}%` }}
-                            className={`w-full rounded-t-md transition-all duration-300 ${
-                              item.devices > 0
-                                ? "bg-gradient-to-t from-cyan-600 to-cyan-400 group-hover:from-cyan-700 group-hover:to-cyan-300 shadow-xs"
-                                : "bg-slate-100"
-                            }`}
-                          />
-                        )}
-                      </div>
-
-                      {/* عنوان أسفل العمود (الوقت / اليوم) */}
-                      <div className="absolute bottom-0 text-[10px] font-bold text-slate-500 truncate max-w-[36px] text-center">
-                        <span className={item.isHighlight ? "text-emerald-700 font-black" : ""}>
-                          {item.label}
-                        </span>
-                      </div>
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-xs">
+                    <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      <span>زيارات الموقع:</span>
+                      <span className="font-black text-white text-sm">{item.visits}</span>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-1.5 text-purple-400 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                      <span>مشاهدات الدروس:</span>
+                      <span className="font-black text-white text-sm">{item.views}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-cyan-400 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                      <span>الأجهزة الفريدة:</span>
+                      <span className="font-black text-white text-sm">{item.devices}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* الحاوية الرسومية للمنحنى البياني (SVG Spline Area & Line) */}
+            <div className="relative pt-2 pb-2 px-1 bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-2xs">
+              <div className="w-full overflow-x-auto">
+                <div className="min-w-[620px] sm:min-w-full">
+                  <svg
+                    viewBox="0 0 1000 320"
+                    className="w-full h-56 sm:h-64 select-none"
+                    onMouseLeave={() => setHoveredIndex(null)}
+                  >
+                    <defs>
+                      {/* تدرج مساحة الزيارات */}
+                      <linearGradient id="curve-grad-visits" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
+                        <stop offset="60%" stopColor="#10b981" stopOpacity="0.08" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
+                      </linearGradient>
+
+                      {/* تدرج مساحة المشاهدات */}
+                      <linearGradient id="curve-grad-views" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#a855f7" stopOpacity="0.35" />
+                        <stop offset="60%" stopColor="#a855f7" stopOpacity="0.08" />
+                        <stop offset="100%" stopColor="#a855f7" stopOpacity="0.00" />
+                      </linearGradient>
+
+                      {/* تدرج مساحة الأجهزة */}
+                      <linearGradient id="curve-grad-devices" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.30" />
+                        <stop offset="60%" stopColor="#06b6d4" stopOpacity="0.06" />
+                        <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.00" />
+                      </linearGradient>
+
+                      {/* تأثير الظل للنقاط النشطة */}
+                      <filter id="glow-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                        <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.25" />
+                      </filter>
+                    </defs>
+
+                    {/* خطوط الشبكة الأفقية والمقاييس الرقمية (Y-Axis Grid Lines) */}
+                    {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
+                      const y = chartPoints.baseY - ratio * chartPoints.innerHeight;
+                      const val = Math.round(maxVal * ratio);
+                      return (
+                        <g key={`grid_${ratio}`}>
+                          <line
+                            x1={chartPoints.paddingLeft}
+                            y1={y}
+                            x2={1000 - chartPoints.paddingRight}
+                            y2={y}
+                            stroke={ratio === 0 ? "#cbd5e1" : "#f1f5f9"}
+                            strokeWidth={ratio === 0 ? "1.5" : "1"}
+                            strokeDasharray={ratio === 0 ? undefined : "4 4"}
+                          />
+                          <text
+                            x={chartPoints.paddingLeft - 8}
+                            y={y + 3.5}
+                            textAnchor="end"
+                            fontSize="10"
+                            fontWeight="bold"
+                            fill="#94a3b8"
+                          >
+                            {val}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* تظليل المساحات تحت المنحنيات (Area Gradients) */}
+                    {(metricFilter === "both" || metricFilter === "visits") && (
+                      <path
+                        d={buildAreaSpline(chartPoints.visitsPoints, chartPoints.baseY, chartPoints.topY)}
+                        fill="url(#curve-grad-visits)"
+                      />
+                    )}
+
+                    {(metricFilter === "both" || metricFilter === "views") && (
+                      <path
+                        d={buildAreaSpline(chartPoints.viewsPoints, chartPoints.baseY, chartPoints.topY)}
+                        fill="url(#curve-grad-views)"
+                      />
+                    )}
+
+                    {metricFilter === "devices" && (
+                      <path
+                        d={buildAreaSpline(chartPoints.devicesPoints, chartPoints.baseY, chartPoints.topY)}
+                        fill="url(#curve-grad-devices)"
+                      />
+                    )}
+
+                    {/* خطوط المنحنيات الانسيابية (Spline Stroke Lines) */}
+                    {(metricFilter === "both" || metricFilter === "visits") && (
+                      <path
+                        d={buildSmoothSpline(chartPoints.visitsPoints, chartPoints.baseY, chartPoints.topY)}
+                        fill="none"
+                        stroke="#10b981"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    )}
+
+                    {(metricFilter === "both" || metricFilter === "views") && (
+                      <path
+                        d={buildSmoothSpline(chartPoints.viewsPoints, chartPoints.baseY, chartPoints.topY)}
+                        fill="none"
+                        stroke="#a855f7"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    )}
+
+                    {(metricFilter === "both" || metricFilter === "devices") && (
+                      <path
+                        d={buildSmoothSpline(chartPoints.devicesPoints, chartPoints.baseY, chartPoints.topY)}
+                        fill="none"
+                        stroke="#06b6d4"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeDasharray={metricFilter === "both" ? "4 3" : undefined}
+                      />
+                    )}
+
+                    {/* نقاط البيانات على طول الخط إذا كانت القيم منفرجة ومحددة */}
+                    {chartPoints.allCoords.map((pt) => {
+                      const isHovered = hoveredIndex === pt.index;
+                      return (
+                        <g key={`dots_${pt.index}`}>
+                          {(metricFilter === "both" || metricFilter === "visits") && (pt.item.visits > 0 || isHovered) && (
+                            <circle
+                              cx={pt.x}
+                              cy={pt.yVisits}
+                              r={isHovered ? 5.5 : 3.5}
+                              fill="#10b981"
+                              stroke="#ffffff"
+                              strokeWidth={isHovered ? 2.5 : 1.5}
+                            />
+                          )}
+                          {(metricFilter === "both" || metricFilter === "views") && (pt.item.views > 0 || isHovered) && (
+                            <circle
+                              cx={pt.x}
+                              cy={pt.yViews}
+                              r={isHovered ? 5.5 : 3.5}
+                              fill="#a855f7"
+                              stroke="#ffffff"
+                              strokeWidth={isHovered ? 2.5 : 1.5}
+                            />
+                          )}
+                          {metricFilter === "devices" && (pt.item.devices > 0 || isHovered) && (
+                            <circle
+                              cx={pt.x}
+                              cy={pt.yDevices}
+                              r={isHovered ? 5 : 3}
+                              fill="#06b6d4"
+                              stroke="#ffffff"
+                              strokeWidth={isHovered ? 2 : 1.5}
+                            />
+                          )}
+                        </g>
+                      );
+                    })}
+
+                    {/* خط المؤشر الرأسي التفاعلي عند التحويم (Interactive Crosshair Guide) */}
+                    {hoveredIndex !== null && chartPoints.allCoords[hoveredIndex] && (
+                      <g>
+                        <line
+                          x1={chartPoints.allCoords[hoveredIndex].x}
+                          y1={chartPoints.topY}
+                          x2={chartPoints.allCoords[hoveredIndex].x}
+                          y2={chartPoints.baseY}
+                          stroke="#059669"
+                          strokeWidth="1.5"
+                          strokeDasharray="3 3"
+                        />
+                        {/* هالة النقطة النشطة */}
+                        {(metricFilter === "both" || metricFilter === "visits") && (
+                          <circle
+                            cx={chartPoints.allCoords[hoveredIndex].x}
+                            cy={chartPoints.allCoords[hoveredIndex].yVisits}
+                            r="11"
+                            fill="#10b981"
+                            opacity="0.25"
+                          />
+                        )}
+                        {(metricFilter === "both" || metricFilter === "views") && (
+                          <circle
+                            cx={chartPoints.allCoords[hoveredIndex].x}
+                            cy={chartPoints.allCoords[hoveredIndex].yViews}
+                            r="11"
+                            fill="#a855f7"
+                            opacity="0.25"
+                          />
+                        )}
+                        {(metricFilter === "both" || metricFilter === "devices") && (
+                          <circle
+                            cx={chartPoints.allCoords[hoveredIndex].x}
+                            cy={chartPoints.allCoords[hoveredIndex].yDevices}
+                            r="10"
+                            fill="#06b6d4"
+                            opacity="0.25"
+                          />
+                        )}
+                      </g>
+                    )}
+
+                    {/* تسميات وتدريجات المحور الأفقي (X-Axis Ticks & Labels) */}
+                    {chartPoints.allCoords.map((pt) => {
+                      const N = chartPoints.allCoords.length;
+                      let showLabel = false;
+                      if (timeFilter === "today_hours") {
+                        showLabel = pt.index % 3 === 0 || pt.item.isHighlight;
+                      } else if (timeFilter === "last_7_days") {
+                        showLabel = true;
+                      } else {
+                        showLabel = pt.index % 5 === 0 || pt.index === N - 1;
+                      }
+
+                      return (
+                        <g key={`label_${pt.index}`}>
+                          <line
+                            x1={pt.x}
+                            y1={chartPoints.baseY}
+                            x2={pt.x}
+                            y2={chartPoints.baseY + 4}
+                            stroke="#cbd5e1"
+                            strokeWidth="1.5"
+                          />
+                          {showLabel && (
+                            <text
+                              x={pt.x}
+                              y={chartPoints.baseY + (timeFilter === "last_7_days" ? 17 : 20)}
+                              textAnchor="middle"
+                              fontSize={timeFilter === "last_7_days" ? "11" : "10"}
+                              fontWeight={pt.item.isHighlight ? "900" : "600"}
+                              fill={pt.item.isHighlight ? "#047857" : "#64748b"}
+                            >
+                              {pt.item.label}
+                            </text>
+                          )}
+                          {timeFilter === "last_7_days" && pt.item.subLabel && (
+                            <text
+                              x={pt.x}
+                              y={chartPoints.baseY + 30}
+                              textAnchor="middle"
+                              fontSize="9"
+                              fontWeight="bold"
+                              fill="#94a3b8"
+                            >
+                              {pt.item.subLabel}
+                            </text>
+                          )}
+                        </g>
+                      );
+                    })}
+
+                    {/* شرائح استشعار التحويم التفاعلية (Transparent Touch & Hover Slices) */}
+                    {chartPoints.allCoords.map((pt, idx) => {
+                      const N = chartPoints.allCoords.length;
+                      const sliceWidth = chartPoints.innerWidth / Math.max(1, N);
+                      const sliceX = pt.x - sliceWidth / 2;
+
+                      return (
+                        <rect
+                          key={`slice_${idx}`}
+                          x={sliceX}
+                          y={chartPoints.topY}
+                          width={sliceWidth}
+                          height={chartPoints.innerHeight + 25}
+                          fill="transparent"
+                          className="cursor-pointer"
+                          onMouseEnter={() => setHoveredIndex(idx)}
+                          onTouchStart={() => setHoveredIndex(idx)}
+                          onClick={() => setHoveredIndex(idx)}
+                        />
+                      );
+                    })}
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
