@@ -523,6 +523,33 @@ export default function GradesLookupPage() {
         </div>
       </div>
 
+      {/* رابط سريع لمحاكي معدل الرياضيات الرسمي بالمعامل */}
+      <Link
+        href="/calculator"
+        className="flex items-center justify-between p-3.5 bg-gradient-to-r from-teal-50 via-emerald-50 to-cyan-50 rounded-2xl border border-teal-200 shadow-2xs hover:border-teal-400 transition group print:hidden"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center font-black shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+            <Calculator className="w-5 h-5 text-teal-100" />
+          </div>
+          <div>
+            <div className="text-xs font-black text-teal-950 flex items-center gap-1.5">
+              <span>محاكي معدل الفصل الأول لمادة الرياضيات 🧮</span>
+              <span className="text-[10px] bg-teal-200/80 text-teal-900 px-1.5 py-0.2 rounded font-bold">
+                حساب بالمعامل (1م: 2 | 2م: 3)
+              </span>
+            </div>
+            <div className="text-[11px] text-teal-700/80 font-medium">
+              جرّب علامة الاختبار المتوقعة واحسب معدل مادتك وحاسبة الهدف العكسي
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-xs font-black text-teal-800 shrink-0">
+          <span>فتح المحاكي</span>
+          <ArrowRight className="w-4 h-4 text-teal-600 group-hover:-translate-x-1 transition-transform" />
+        </div>
+      </Link>
+
       {/* نموذج البحث وتاريخ الميلاد */}
       <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200 shadow-sm space-y-5 print:hidden">
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">

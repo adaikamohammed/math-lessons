@@ -134,6 +134,28 @@ export default async function Home() {
         <ChevronLeft className="w-5 h-5 text-amber-600 group-hover:text-amber-800 transition shrink-0" />
       </Link>
 
+      {/* فضاء محاكي معدل الفصل الأول لمادة الرياضيات */}
+      <Link
+        href="/calculator"
+        className="flex items-center gap-3.5 bg-gradient-to-r from-teal-500/15 via-emerald-500/10 to-cyan-500/10 rounded-2xl p-4 border-2 border-teal-400/80 shadow-xs hover:border-teal-500 hover:shadow-sm active:scale-[0.98] transition group relative overflow-hidden"
+      >
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-600 via-emerald-600 to-cyan-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-teal-600/25 group-hover:scale-105 transition-transform">
+          <Calculator className="w-6 h-6 text-teal-100" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-black text-sm text-slate-900">محاكي معدل مادة الرياضيات 🧮</span>
+            <span className="text-[10px] bg-teal-100 text-teal-800 font-black px-2 py-0.5 rounded-md border border-teal-200">
+              معامل 2 و 3 ⚖️
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 mt-1 line-clamp-1 font-semibold">
+            جرّب علامة الاختبار المتوقعة واحسب معدل المادة الفصلي ومجموع النقاط بالمعامل الوزاري
+          </p>
+        </div>
+        <ChevronLeft className="w-5 h-5 text-teal-600 group-hover:text-teal-800 transition shrink-0" />
+      </Link>
+
       {/* 1. الأساس: الدروس المصورة للسبورة (أول ما يراه التلميذ) */}
       <div className="space-y-2.5 pt-1">
         <div className="flex items-center justify-between px-1">
