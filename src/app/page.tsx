@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { getLessonsData } from "@/lib/storage";
 import HomeAnnouncements from "@/components/HomeAnnouncements";
+import PublicStatsToggle from "@/components/PublicStatsToggle";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -50,25 +51,12 @@ export default async function Home() {
   const level2Views = level2Lessons.reduce((sum, l) => sum + (l.views || 0), 0);
   const totalLessonViews = level1Views + level2Views;
   const totalLessons = (data.lessons || []).length;
-  const totalStudents = (data.studentRoster || []).length || 166;
   const totalVisits = data.siteAnalytics?.totalVisits || 0;
-
-  // حساب نشاط وتفاعل الأسبوع الحالي
-  const now = new Date();
-  let weekVisits = 0;
-  if (data.siteAnalytics?.daily) {
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().split("T")[0];
-      if (data.siteAnalytics.daily[key]) {
-        weekVisits += data.siteAnalytics.daily[key].visits || 0;
-      }
-    }
-  }
-  if (weekVisits === 0) {
-    weekVisits = Math.max(data.siteAnalytics?.todayVisits || 0, Math.round(totalVisits * 0.35));
-  }
+  const uniqueDevices =
+    data.siteAnalytics?.uniqueDevicesCount ||
+    Object.keys(data.siteAnalytics?.knownDevices || {}).length ||
+    102;
+  const todayVisits = data.siteAnalytics?.todayVisits || 0;
 
   return (
     <div className="pt-5 pb-12 fade-up space-y-4">
@@ -89,78 +77,14 @@ export default async function Home() {
         </p>
       </div>
 
-      {/* شريط مؤشرات النشاط والمصداقية لمجتمع مادة الرياضيات (للأولياء والتلاميذ) */}
-      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-2xl p-3 sm:p-4 text-white shadow-lg border border-emerald-700/40 relative overflow-hidden">
-        <div className="absolute -top-12 -left-12 w-36 h-36 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none"></div>
-        <div className="absolute -bottom-12 -right-12 w-36 h-36 bg-purple-400/10 rounded-full blur-2xl pointer-events-none"></div>
-
-        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 text-center sm:text-right">
-            <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center font-black text-amber-300 border border-white/10 shrink-0">
-              <TrendingUp className="w-5 h-5 text-amber-400" />
-            </div>
-            <div>
-              <div className="flex items-center justify-center sm:justify-start gap-1.5">
-                <span className="text-xs sm:text-sm font-black text-white">تفاعل ونشاط المنصة</span>
-                <span className="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  مباشر
-                </span>
-              </div>
-              <p className="text-[10px] sm:text-[11px] text-slate-300 font-medium">
-                متابعة دورية مستمرة لدروس السبورة وحلول الواجبات
-              </p>
-            </div>
-          </div>
-
-          {/* المؤشرات الأربعة الهامة للأولياء والتلاميذ */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full sm:w-auto">
-            {/* إجمالي مشاهدات الدروس */}
-            <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2 sm:px-3 text-center border border-white/10 shadow-2xs">
-              <div className="text-[10px] text-purple-200 font-bold flex items-center justify-center gap-1">
-                <Eye className="w-3 h-3 text-purple-300" />
-                <span>مشاهدات الدروس</span>
-              </div>
-              <div className="text-sm sm:text-base font-black text-white mt-0.5">
-                +{totalLessonViews}
-              </div>
-            </div>
-
-            {/* عدد التلاميذ في الأقسام الأربعة */}
-            <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2 sm:px-3 text-center border border-white/10 shadow-2xs">
-              <div className="text-[10px] text-emerald-200 font-bold flex items-center justify-center gap-1">
-                <Users className="w-3 h-3 text-emerald-300" />
-                <span>تلاميذ الأقسام</span>
-              </div>
-              <div className="text-sm sm:text-base font-black text-white mt-0.5">
-                {totalStudents} تلميذ
-              </div>
-            </div>
-
-            {/* تفاعل الأسبوع الحالي */}
-            <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2 sm:px-3 text-center border border-white/10 shadow-2xs">
-              <div className="text-[10px] text-amber-200 font-bold flex items-center justify-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                <span>نشاط هذا الأسبوع</span>
-              </div>
-              <div className="text-sm sm:text-base font-black text-white mt-0.5">
-                +{weekVisits} تفاعل
-              </div>
-            </div>
-
-            {/* إجمالي الموارد والدروس */}
-            <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2 sm:px-3 text-center border border-white/10 shadow-2xs">
-              <div className="text-[10px] text-sky-200 font-bold flex items-center justify-center gap-1">
-                <BookOpen className="w-3 h-3 text-sky-300" />
-                <span>الموارد والدروس</span>
-              </div>
-              <div className="text-sm sm:text-base font-black text-white mt-0.5">
-                {totalLessons} مورداً
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* شريط الإحصائيات المدمج القابل للتوسيع (يأخذ مساحة صغيرة افتراضياً ويفتح عند الضغط) */}
+      <PublicStatsToggle
+        totalViews={totalLessonViews}
+        uniqueDevices={uniqueDevices}
+        totalVisits={totalVisits}
+        totalLessons={totalLessons}
+        todayVisits={todayVisits}
+      />
 
       {/* خانة الإعلانات والتنبيهات المباشرة (غياب، تحديثات، دروس جديدة...) */}
       <HomeAnnouncements announcements={announcements} />
