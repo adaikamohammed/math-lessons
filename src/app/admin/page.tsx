@@ -74,6 +74,7 @@ import {
   type MessageCategory,
 } from "@/lib/types";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
+import FormattedAnnouncementContent from "@/components/FormattedAnnouncementContent";
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -3896,19 +3897,86 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 />
               </div>
 
-              {/* 4. تفاصيل ونَص الإعلان */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  نص الإعلان والتفاصيل: <span className="text-red-500">*</span>
-                </label>
+              {/* 4. تفاصيل ونَص الإعلان مع أدوات التنسيق الاحترافية */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-1 flex-wrap">
+                  <label className="text-xs font-bold text-slate-700 block">
+                    نص الإعلان والتفاصيل: <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    (يدعم الخط العريض، التلوين بالأحمر، والمطات)
+                  </span>
+                </div>
+
+                {/* شريط أدوات التنسيق السريع بنقرة واحدة */}
+                <div className="flex items-center gap-1.5 flex-wrap p-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setAnnContent((prev) => prev ? `${prev}\n- ` : "- ")}
+                    className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 text-slate-700 font-bold transition flex items-center gap-1 cursor-pointer"
+                    title="إضافة عنصر قائمة أو مطة"
+                  >
+                    <span>• قائمة ومطة (-)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAnnContent((prev) => `${prev} **نص عريض** `)}
+                    className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-slate-900 font-black transition flex items-center gap-1 cursor-pointer"
+                    title="جعل النص بخط عريض بولد"
+                  >
+                    <span>B خط عريض</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAnnContent((prev) => `${prev} [red: نص عريض باللون الأحمر] `)}
+                    className="px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 hover:border-rose-400 text-red-600 font-black transition flex items-center gap-1 cursor-pointer"
+                    title="كتابة نص بلون أحمر بارز للتنبيهات والمواعيد الهامة"
+                  >
+                    <span>🔴 عريض أحمر</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAnnContent((prev) => `${prev} [hl: نص مميز بخلفية] `)}
+                    className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 hover:border-amber-400 text-amber-800 font-bold transition flex items-center gap-1 cursor-pointer"
+                    title="تظليل النص بخلفية صفراء خفيفة"
+                  >
+                    <span>🟡 تظليل أصفر</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAnnContent((prev) => `${prev} ⚠️ `)}
+                    className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition cursor-pointer"
+                    title="إدراج أيقونة تنبيه"
+                  >
+                    <span>⚠️ تنبيه</span>
+                  </button>
+                </div>
+
                 <textarea
                   rows={4}
-                  placeholder="اكتب هنا التفاصيل الكاملة للإعلان أو الملاحظة أو التوجيهات التي تود توجيهها للتلاميذ وأوليائهم..."
+                  placeholder="اكتب هنا التفاصيل الكاملة... يمكنك استخدام [red: نص أحمر] و **نص عريض** ومطات القائمة (- أو •)"
                   value={annContent}
                   onChange={(e) => setAnnContent(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition leading-relaxed"
                   required
                 />
+
+                {/* صندوق المعاينة الحية الفورية */}
+                {annContent.trim().length > 0 && (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1.5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between text-[10px] font-black text-slate-500">
+                      <span>👁️ معاينة شكل الإعلان الفعلي للتلاميذ والأولياء:</span>
+                      <span className="text-emerald-700 font-bold">مباشر</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-2xs">
+                      <FormattedAnnouncementContent content={annContent} />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 5. خيار التثبيت في الأعلى */}
@@ -4051,9 +4119,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     <h4 className="text-xs font-black text-slate-900 mt-2">
                       {ann.title}
                     </h4>
-                    <p className="text-[11px] text-slate-700 mt-1 leading-relaxed whitespace-pre-line">
-                      {ann.content}
-                    </p>
+                    <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 mt-1">
+                      <FormattedAnnouncementContent content={ann.content} />
+                    </div>
 
                     {/* إحصائيات تفاعل الإعلان (مشاهدات + أجهزة فريدة) للأستاذ */}
                     <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100 text-[10px] sm:text-[11px] font-black">

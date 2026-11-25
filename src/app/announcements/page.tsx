@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Announcement, AnnouncementCategory } from "@/lib/types";
 import { getOrCreateClientIdentity } from "@/lib/analyticsClient";
+import FormattedAnnouncementContent from "@/components/FormattedAnnouncementContent";
 
 const CATEGORY_MAP: Record<
   string,
@@ -284,8 +285,8 @@ export default function AnnouncementsPage() {
                 {/* المحتوى الكامل عند التوسيع */}
                 {isExpanded && (
                   <div className="p-4 pt-1 border-t border-slate-200/70 bg-white/90 animate-in fade-in duration-200">
-                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/60 text-xs sm:text-sm text-slate-800 font-medium leading-relaxed whitespace-pre-line select-text">
-                      {item.content}
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/60">
+                      <FormattedAnnouncementContent content={item.content} />
                     </div>
                   </div>
                 )}

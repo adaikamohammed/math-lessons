@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   Megaphone,
@@ -14,11 +15,11 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Sparkles,
   ExternalLink,
 } from "lucide-react";
 import { Announcement, AnnouncementCategory } from "@/lib/types";
 import { getOrCreateClientIdentity } from "@/lib/analyticsClient";
+import FormattedAnnouncementContent from "@/components/FormattedAnnouncementContent";
 
 const CATEGORY_STYLES: Record<
   AnnouncementCategory,
@@ -98,6 +99,9 @@ export default function HomeAnnouncements({
   // حالة فتح نافذة القراءة السريعة (Modal)
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
+  // تأكيد تثبيت المكون في المتصفح لتمكين React Portal على document.body
+  const [mounted, setMounted] = useState(false);
+
   // إحصائيات محلية محدثة لحظياً عند القراءة
   const [statsMap, setStatsMap] = useState<
     Record<string, { views: number; uniqueDevicesCount: number }>
@@ -107,7 +111,22 @@ export default function HomeAnnouncements({
   const [trackedInSession, setTrackedInSession] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // ملء الإحصائيات الأولية
+    setMounted(true);
+  }, []);
+
+  // قفل تمرير الصفحة الخلفية عند فتح النافذة لتكون في منتصف شاشة الهاتف تماماً
+  useEffect(() => {
+    if (selectedAnnouncement) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [selectedAnnouncement]);
+
+  useEffect(() => {
     const initial: Record<string, { views: number; uniqueDevicesCount: number }> = {};
     activeItems.forEach((a) => {
       initial[a.id] = {
@@ -137,7 +156,6 @@ export default function HomeAnnouncements({
     if (!trackedInSession[ann.id]) {
       setTrackedInSession((prev) => ({ ...prev, [ann.id]: true }));
 
-      // استدعاء بصمة الجهاز
       let visitorId = "";
       try {
         const identity = getOrCreateClientIdentity();
@@ -146,7 +164,6 @@ export default function HomeAnnouncements({
         // ignore
       }
 
-      // تحديث واجهة المستخدم بشكل متفائل (Optimistic Update)
       setStatsMap((prev) => {
         const prevStats = prev[ann.id] || { views: ann.views || 0, uniqueDevicesCount: ann.uniqueDevicesCount || 0 };
         return {
@@ -158,7 +175,6 @@ export default function HomeAnnouncements({
         };
       });
 
-      // إرسال التتبع للخادم
       fetch("/api/announcements/track", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -176,9 +192,7 @@ export default function HomeAnnouncements({
             }));
           }
         })
-        .catch(() => {
-          // ignore error
-        });
+        .catch(() => {});
     }
   };
 
@@ -286,153 +300,155 @@ export default function HomeAnnouncements({
         )}
       </div>
 
-      {/* 2. نافذة القراءة والتصفح السريعة المنبثقة (Announcement Reader Modal) */}
-      {selectedAnnouncement && (() => {
-        const modalStyle = CATEGORY_STYLES[selectedAnnouncement.category] || CATEGORY_STYLES.general;
-        const ModalIcon = modalStyle.icon;
-        const modalStats = statsMap[selectedAnnouncement.id] || {
-          views: selectedAnnouncement.views || 1,
-          uniqueDevicesCount: selectedAnnouncement.uniqueDevicesCount || 1,
-        };
+      {/* 2. نافذة القراءة والتصفح المنبثقة مباشرة على document.body (مضمونة التمركز في منتصف شاشة الهاتف) */}
+      {mounted && selectedAnnouncement && createPortal(
+        (() => {
+          const modalStyle = CATEGORY_STYLES[selectedAnnouncement.category] || CATEGORY_STYLES.general;
+          const modalStats = statsMap[selectedAnnouncement.id] || {
+            views: selectedAnnouncement.views || 1,
+            uniqueDevicesCount: selectedAnnouncement.uniqueDevicesCount || 1,
+          };
 
-        const otherAnnouncements = activeItems.filter((a) => a.id !== selectedAnnouncement.id);
+          const otherAnnouncements = activeItems.filter((a) => a.id !== selectedAnnouncement.id);
 
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
-            onClick={() => setSelectedAnnouncement(null)}
-            dir="rtl"
-          >
+          return (
             <div
-              className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/65 backdrop-blur-xs animate-in fade-in duration-200"
+              onClick={() => setSelectedAnnouncement(null)}
+              dir="rtl"
             >
-              {/* رأس النافذة */}
-              <div className={`p-4 sm:p-5 border-b border-slate-100 ${modalStyle.bg} relative`}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span
-                      className={`text-xs font-black px-2.5 py-0.5 rounded-full border shadow-2xs ${modalStyle.badgeBg}`}
+              <div
+                className="bg-white rounded-3xl max-w-lg w-full max-h-[88vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* رأس النافذة */}
+                <div className={`p-4 sm:p-5 border-b border-slate-100 ${modalStyle.bg} shrink-0`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`text-xs font-black px-2.5 py-0.5 rounded-full border shadow-2xs ${modalStyle.badgeBg}`}
+                      >
+                        {modalStyle.badge}
+                      </span>
+
+                      {selectedAnnouncement.pinned && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md">
+                          <Pin className="w-3 h-3 fill-amber-700 text-amber-700" /> مثبت
+                        </span>
+                      )}
+
+                      {selectedAnnouncement.date && (
+                        <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 mr-1">
+                          <Calendar className="w-3 h-3 text-slate-400" />
+                          {selectedAnnouncement.date}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* زر الإغلاق المباشر */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAnnouncement(null)}
+                      className="w-8 h-8 rounded-full bg-white/95 hover:bg-white text-slate-500 hover:text-slate-900 border border-slate-200 flex items-center justify-center transition cursor-pointer shadow-xs shrink-0"
+                      title="إغلاق النافذة"
                     >
-                      {modalStyle.badge}
-                    </span>
-
-                    {selectedAnnouncement.pinned && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md">
-                        <Pin className="w-3 h-3 fill-amber-700 text-amber-700" /> مثبت في الصدارة
-                      </span>
-                    )}
-
-                    {selectedAnnouncement.date && (
-                      <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 mr-1">
-                        <Calendar className="w-3 h-3 text-slate-400" />
-                        {selectedAnnouncement.date}
-                      </span>
-                    )}
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  {/* زر الإغلاق */}
+                  {/* عنوان الإعلان */}
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 mt-2.5 leading-snug">
+                    {selectedAnnouncement.title}
+                  </h2>
+
+                  {/* شريط الإحصائيات بالعين والأجهزة */}
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200/50 text-[11px] font-bold">
+                    <span className="inline-flex items-center gap-1 text-purple-700 bg-white/90 px-2 py-0.5 rounded-md border border-purple-200 shadow-2xs font-black">
+                      <Eye className="w-3.5 h-3.5 text-purple-600" />
+                      <span>+{modalStats.views} مشاهدة</span>
+                    </span>
+
+                    <span className="inline-flex items-center gap-1 text-cyan-800 bg-white/90 px-2 py-0.5 rounded-md border border-cyan-200 shadow-2xs font-black">
+                      <Smartphone className="w-3.5 h-3.5 text-cyan-600" />
+                      <span>{modalStats.uniqueDevicesCount} جهاز فريد</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* نص ومحتوى الإعلان مع التنسيق المتقدم (مطات، خط عريض، خط أحمر) */}
+                <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-right flex-1">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <FormattedAnnouncementContent content={selectedAnnouncement.content} />
+                  </div>
+
+                  {/* تصفح بقية الإعلانات الأخرى المنشورة مباشرة */}
+                  {otherAnnouncements.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      <div className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                        <Megaphone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>إعلانات أخرى مهمة ({otherAnnouncements.length}):</span>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {otherAnnouncements.map((other) => {
+                          const otherStyle = CATEGORY_STYLES[other.category] || CATEGORY_STYLES.general;
+                          const otherStats = statsMap[other.id] || { views: other.views || 0, uniqueDevicesCount: 0 };
+
+                          return (
+                            <div
+                              key={other.id}
+                              onClick={() => handleOpenAnnouncement(other)}
+                              className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-300 transition cursor-pointer group"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`text-[10px] font-black px-1.5 py-0.2 rounded border ${otherStyle.badgeBg} shrink-0`}>
+                                  {otherStyle.badge}
+                                </span>
+                                <span className="text-xs font-bold text-slate-800 truncate group-hover:text-emerald-700">
+                                  {other.title}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 shrink-0">
+                                <span className="flex items-center gap-0.5 text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded font-black">
+                                  <Eye className="w-2.5 h-2.5" />
+                                  <span>{otherStats.views}</span>
+                                </span>
+                                <ChevronLeft className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* أسفل النافذة */}
+                <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
+                  <Link
+                    href="/announcements"
+                    onClick={() => setSelectedAnnouncement(null)}
+                    className="text-xs font-black text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>أرشيف جميع الإعلانات</span>
+                  </Link>
+
                   <button
                     type="button"
                     onClick={() => setSelectedAnnouncement(null)}
-                    className="w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-400 hover:text-slate-800 border border-slate-200 flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
-                    title="إغلاق النافذة"
+                    className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black transition cursor-pointer"
                   >
-                    <X className="w-4 h-4" />
+                    إغلاق
                   </button>
                 </div>
-
-                {/* عنوان الإعلان في النافذة */}
-                <h2 className="text-base sm:text-lg font-black text-slate-900 mt-2.5 leading-snug">
-                  {selectedAnnouncement.title}
-                </h2>
-
-                {/* شريط الإحصائيات بالعين والأجهزة */}
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200/50 text-[11px] font-bold">
-                  <span className="inline-flex items-center gap-1 text-purple-700 bg-white/80 px-2 py-0.5 rounded-md border border-purple-200 shadow-2xs font-black">
-                    <Eye className="w-3.5 h-3.5 text-purple-600" />
-                    <span>+{modalStats.views} مشاهدة</span>
-                  </span>
-
-                  <span className="inline-flex items-center gap-1 text-cyan-800 bg-white/80 px-2 py-0.5 rounded-md border border-cyan-200 shadow-2xs font-black">
-                    <Smartphone className="w-3.5 h-3.5 text-cyan-600" />
-                    <span>{modalStats.uniqueDevicesCount} جهاز فريد</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* نص ومحتوى الإعلان كاملاً مع إمكانية التمرير المريح */}
-              <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-right flex-1">
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-slate-800 text-xs sm:text-sm font-medium leading-relaxed whitespace-pre-line select-text">
-                  {selectedAnnouncement.content}
-                </div>
-
-                {/* تصفح بقية الإعلانات الأخرى مباشرة دون إغلاق النافذة */}
-                {otherAnnouncements.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
-                    <div className="text-xs font-black text-slate-700 flex items-center gap-1.5">
-                      <Megaphone className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>إعلانات أخرى مهمة ({otherAnnouncements.length}):</span>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      {otherAnnouncements.map((other) => {
-                        const otherStyle = CATEGORY_STYLES[other.category] || CATEGORY_STYLES.general;
-                        const otherStats = statsMap[other.id] || { views: other.views || 0, uniqueDevicesCount: 0 };
-
-                        return (
-                          <div
-                            key={other.id}
-                            onClick={() => handleOpenAnnouncement(other)}
-                            className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-300 transition cursor-pointer group"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className={`text-[10px] font-black px-1.5 py-0.2 rounded border ${otherStyle.badgeBg} shrink-0`}>
-                                {otherStyle.badge}
-                              </span>
-                              <span className="text-xs font-bold text-slate-800 truncate group-hover:text-emerald-700">
-                                {other.title}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 shrink-0">
-                              <span className="flex items-center gap-0.5 text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded font-black">
-                                <Eye className="w-2.5 h-2.5" />
-                                <span>{otherStats.views}</span>
-                              </span>
-                              <ChevronLeft className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600" />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* أسفل النافذة */}
-              <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
-                <Link
-                  href="/announcements"
-                  onClick={() => setSelectedAnnouncement(null)}
-                  className="text-xs font-black text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>أرشيف جميع الإعلانات</span>
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedAnnouncement(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black transition cursor-pointer"
-                >
-                  إغلاق
-                </button>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })(),
+        document.body
+      )}
     </div>
   );
 }
