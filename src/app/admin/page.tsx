@@ -54,6 +54,7 @@ import {
   Phone,
   Send,
   Gift,
+  Smartphone,
 } from "lucide-react";
 import {
   LEVELS,
@@ -4053,6 +4054,23 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     <p className="text-[11px] text-slate-700 mt-1 leading-relaxed whitespace-pre-line">
                       {ann.content}
                     </p>
+
+                    {/* إحصائيات تفاعل الإعلان (مشاهدات + أجهزة فريدة) للأستاذ */}
+                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100 text-[10px] sm:text-[11px] font-black">
+                      <span className="inline-flex items-center gap-1 text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                        <Eye className="w-3 h-3 text-purple-600" />
+                        <span>{ann.views || 0} مشاهدة</span>
+                      </span>
+
+                      <span className="inline-flex items-center gap-1 text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-200">
+                        <Smartphone className="w-3 h-3 text-cyan-600" />
+                        <span>{ann.uniqueDevicesCount || (ann.views ? 1 : 0)} جهاز فريد</span>
+                      </span>
+
+                      <span className="text-[10px] text-slate-400 font-bold mr-auto">
+                        {ann.uniqueDevicesCount && ann.views ? `${(ann.views / ann.uniqueDevicesCount).toFixed(1)}x مراجعة` : "تفاعل جديد"}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>

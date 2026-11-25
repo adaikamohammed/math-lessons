@@ -332,7 +332,7 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* 7. [التوجيهات التربوية والدليل المدرسي]: ميثاق التقويم + دليل تنظيم الكراريس */}
+      {/* 7. [التوجيهات التربوية والدليل المدرسي]: ميثاق التقويم + دليل تنظيم الكراريس + سجل الإعلانات */}
       <div className="space-y-2 pt-2">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
@@ -341,7 +341,7 @@ export default async function Home() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* ميثاق ومعايير التقويم المستمر (20/20) */}
           <Link
             href="/assessment"
@@ -352,7 +352,7 @@ export default async function Home() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-xs text-slate-900">ميثاق التقويم المستمر (20/20)</span>
+                <span className="font-black text-xs text-slate-900">ميثاق التقويم (20/20)</span>
                 <span className="text-[9px] bg-teal-50 text-teal-800 font-bold px-1.5 py-0.2 rounded">شفافية ⚖️</span>
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
@@ -368,15 +368,35 @@ export default async function Home() {
             className="flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs hover:border-slate-300 active:scale-[0.98] transition group"
           >
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-              <Megaphone className="w-5 h-5" />
+              <BookOpen className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-xs text-slate-900">دليل تنظيم الكراريس والتوجيهات</span>
+                <span className="font-black text-xs text-slate-900">دليل تنظيم الكراريس</span>
                 <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.2 rounded">دليل 📚</span>
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
                 تنظيم كراس الدروس والأعمال الموجهة • الأدوات المدرسية • ساعة الاستقبال
+              </p>
+            </div>
+            <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />
+          </Link>
+
+          {/* سجل وأرشيف الإعلانات المدرسية */}
+          <Link
+            href="/announcements"
+            className="flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs hover:border-amber-300 active:scale-[0.98] transition group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+              <Megaphone className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-xs text-slate-900">سجل الإعلانات المدرسية</span>
+                <span className="text-[9px] bg-amber-50 text-amber-800 font-bold px-1.5 py-0.2 rounded">أرشيف 📢</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                مواعيد الفروض، تصحيح الكراريس وتنبيهات الغياب والمستجدات
               </p>
             </div>
             <ChevronLeft className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition shrink-0" />

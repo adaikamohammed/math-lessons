@@ -181,6 +181,9 @@ export type Announcement = {
   pinned?: boolean; // هل الإعلان مثبت في الأعلى
   active?: boolean; // هل الإعلان ظاهر للزوار
   createdAt: string;
+  views?: number; // إجمالي المشاهدات
+  uniqueDevicesCount?: number; // عدد الأجهزة والتلاميذ الفريدين
+  viewedDevices?: string[]; // مصفوفة معرفات الأجهزة لمنع تكرار الحساب لنفس الجهاز
 };
 
 export type MessageCategory = "question" | "suggestion" | "criticism" | "other";

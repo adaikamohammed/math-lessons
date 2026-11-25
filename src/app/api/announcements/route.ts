@@ -66,6 +66,9 @@ export async function POST(req: NextRequest) {
       pinned: Boolean(pinned),
       active: true,
       createdAt: now.toISOString(),
+      views: 0,
+      uniqueDevicesCount: 0,
+      viewedDevices: [],
     };
 
     data.announcements.unshift(newAnnouncement);
