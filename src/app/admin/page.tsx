@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import imageCompression from "browser-image-compression";
 import Link from "next/link";
 import {
@@ -280,6 +281,21 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [replyContent, setReplyContent] = useState<string>("");
   const [replyIsPublic, setReplyIsPublic] = useState<boolean>(false);
   const [savingReply, setSavingReply] = useState<boolean>(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isBatchEvalModalOpen || deletingAnnouncement || deletingMessage || replyingMessage) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [isBatchEvalModalOpen, deletingAnnouncement, deletingMessage, replyingMessage]);
 
   // حالات الإحصائيات ومعرفة مشاهدات الدروس والزوار
   const [analyticsData, setAnalyticsData] = useState<any | null>(null);
@@ -3690,92 +3706,108 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       )}
 
       {/* نافذة استيراد قائمة تلاميذ الفوج دفعة واحدة */}
-      {isBatchEvalModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl p-5 max-w-md w-full space-y-4 shadow-xl border border-slate-100 fade-up my-auto max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+      {mounted && isBatchEvalModalOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsBatchEvalModalOpen(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 flex flex-col max-h-[88vh] sm:max-h-[85vh] overflow-hidden text-right"
+            dir="rtl"
+          >
+            {/* Fixed Header */}
+            <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
                   <Users className="w-4 h-4" />
                 </div>
-                <h3 className="font-extrabold text-sm text-slate-800">
-                  استيراد قائمة تلاميذ الفوج دفعة واحدة
-                </h3>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-800">
+                    استيراد قائمة تلاميذ الفوج دفعة واحدة
+                  </h3>
+                  <p className="text-[10px] text-slate-400">إضافة أو تحديث قائمة القسم بسرعة</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsBatchEvalModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
-                <select
-                  className="input text-xs font-bold"
-                  value={batchEvalClass}
-                  onChange={(e) => setBatchEvalClass(e.target.value)}
-                >
-                  {HONOR_CLASSES.map((cls) => (
-                    <option key={cls} value={cls}>
-                      {cls}
-                    </option>
-                  ))}
-                </select>
+            {/* Scrollable Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-3.5">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
+                  <select
+                    className="input text-xs font-bold"
+                    value={batchEvalClass}
+                    onChange={(e) => setBatchEvalClass(e.target.value)}
+                  >
+                    {HONOR_CLASSES.map((cls) => (
+                      <option key={cls} value={cls}>
+                        {cls}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">الفوج:</label>
+                  <select
+                    className="input text-xs font-bold"
+                    value={batchEvalGroup}
+                    onChange={(e) =>
+                      setBatchEvalGroup(e.target.value as "فوج 1" | "فوج 2" | "القسم كامل")
+                    }
+                  >
+                    <option value="فوج 1">فوج 1 (نصف القسم)</option>
+                    <option value="فوج 2">فوج 2 (نصف القسم)</option>
+                    <option value="القسم كامل">القسم كامل</option>
+                  </select>
+                </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">الفوج:</label>
-                <select
-                  className="input text-xs font-bold"
-                  value={batchEvalGroup}
-                  onChange={(e) =>
-                    setBatchEvalGroup(e.target.value as "فوج 1" | "فوج 2" | "القسم كامل")
-                  }
-                >
-                  <option value="فوج 1">فوج 1 (نصف القسم)</option>
-                  <option value="فوج 2">فوج 2 (نصف القسم)</option>
-                  <option value="القسم كامل">القسم كامل</option>
-                </select>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  الصق أسماء التلاميذ هنا (كل اسم في سطر، أو مفصولة بفواصل):
+                </label>
+                <textarea
+                  className="input text-xs min-h-[140px] font-mono leading-relaxed"
+                  placeholder={"أحمد بوخالفة\nسارة لعريبي\nيونس بلحاج\nمحمد زياني..."}
+                  value={batchEvalNames}
+                  onChange={(e) => setBatchEvalNames(e.target.value)}
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  يمكنك نسخ القائمة مباشرة من ملف إكسل أو وورد ولصقها هنا.
+                </p>
               </div>
-            </div>
 
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                الصق أسماء التلاميذ هنا (كل اسم في سطر، أو مفصولة بفواصل):
+              {/* خيار النقطة الابتدائية */}
+              <label className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-emerald-600 rounded border-slate-300"
+                  checked={batchDefaultFullScore}
+                  onChange={(e) => setBatchDefaultFullScore(e.target.checked)}
+                />
+                <span className="text-xs font-bold text-emerald-950">
+                  تعيين النقطة الابتدائية 20/20 للجميع (لأقوم بالخصم فقط أثناء المرور)
+                </span>
               </label>
-              <textarea
-                className="input text-xs min-h-[140px] font-mono leading-relaxed"
-                placeholder={"أحمد بوخالفة\nسارة لعريبي\nيونس بلحاج\nمحمد زياني..."}
-                value={batchEvalNames}
-                onChange={(e) => setBatchEvalNames(e.target.value)}
-              />
-              <p className="text-[10px] text-slate-400 mt-1">
-                يمكنك نسخ القائمة مباشرة من ملف إكسل أو وورد ولصقها هنا.
-              </p>
             </div>
 
-            {/* خيار النقطة الابتدائية */}
-            <label className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 cursor-pointer">
-              <input
-                type="checkbox"
-                className="w-4 h-4 text-emerald-600 rounded border-slate-300"
-                checked={batchDefaultFullScore}
-                onChange={(e) => setBatchDefaultFullScore(e.target.checked)}
-              />
-              <span className="text-xs font-bold text-emerald-950">
-                تعيين النقطة الابتدائية 20/20 للجميع (لأقوم بالخصم فقط أثناء المرور)
-              </span>
-            </label>
-
-            <div className="flex gap-2 pt-2">
+            {/* Fixed Footer */}
+            <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 shrink-0 flex gap-2">
               <button
                 type="button"
                 onClick={handleBatchImport}
-                className="btn-primary flex-1 py-2.5 text-xs bg-emerald-600 hover:bg-emerald-700"
+                className="btn-primary flex-1 py-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-1.5"
               >
                 حفظ واستيراد القائمة مباشرة
               </button>
@@ -3788,7 +3820,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ==================== 6. تبويب لوحة الإعلانات والتنبيهات المباشرة ==================== */}
@@ -4630,10 +4663,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       )}
 
       {/* نافذة تأكيد حذف إعلان */}
-      {deletingAnnouncement && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-slate-100 fade-up">
-            <div className="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center mx-auto text-xl">
+      {mounted && deletingAnnouncement && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDeletingAnnouncement(null);
+          }}
+        >
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-100 fade-up text-center" dir="rtl">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto text-xl">
               <Trash2 className="w-6 h-6" />
             </div>
             <div className="text-center space-y-1">
@@ -4657,14 +4695,20 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* نافذة تأكيد حذف رسالة */}
-      {deletingMessage && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-slate-100 fade-up">
-            <div className="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center mx-auto text-xl">
+      {mounted && deletingMessage && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDeletingMessage(null);
+          }}
+        >
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-100 fade-up text-center" dir="rtl">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto text-xl">
               <Trash2 className="w-6 h-6" />
             </div>
             <div className="text-center space-y-1">
@@ -4688,26 +4732,34 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* نافذة كتابة أو تعديل رد الأستاذ على رسالة */}
-      {replyingMessage && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div
-            className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-xl border border-slate-100 fade-up"
+      {mounted && replyingMessage && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !savingReply) setReplyingMessage(null);
+          }}
+        >
+          <form
+            onSubmit={handleSaveReply}
+            className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 flex flex-col max-h-[88vh] sm:max-h-[85vh] overflow-hidden text-right"
             dir="rtl"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            {/* Fixed Header */}
+            <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
-                  <MessageSquare className="w-5 h-5" />
+                  <MessageSquare className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-900">
                     {replyingMessage.reply?.content ? "تعديل رد الأستاذ" : "كتابة رد للأولياء / التلميذ"}
                   </h3>
-                  <span className="text-[11px] text-slate-500 font-medium">
+                  <span className="text-[10px] text-slate-400 font-medium">
                     {replyingMessage.trackingCode ? `رمز المتابعة: ${replyingMessage.trackingCode}` : "سيصل الرد مباشرة للمرسل"}
                   </span>
                 </div>
@@ -4715,38 +4767,39 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               <button
                 type="button"
                 onClick={() => setReplyingMessage(null)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                disabled={savingReply}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* ملخص الرسالة الأصلية */}
-            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-1.5 text-xs">
-              <div className="flex items-center gap-2 flex-wrap">
-                {replyingMessage.studentName && (
-                  <span className="text-[10px] font-black bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
-                    👤 التلميذ: {replyingMessage.studentName}
-                  </span>
-                )}
-                {replyingMessage.className && (
-                  <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md">
-                    {replyingMessage.className}
-                  </span>
-                )}
-                {replyingMessage.senderName && (
-                  <span className="text-[10px] text-slate-500 font-medium">
-                    المرسل: {replyingMessage.senderName}
-                  </span>
-                )}
+            {/* Scrollable Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-3.5">
+              {/* ملخص الرسالة الأصلية */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-1.5 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {replyingMessage.studentName && (
+                    <span className="text-[10px] font-black bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
+                      👤 التلميذ: {replyingMessage.studentName}
+                    </span>
+                  )}
+                  {replyingMessage.className && (
+                    <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md">
+                      {replyingMessage.className}
+                    </span>
+                  )}
+                  {replyingMessage.senderName && (
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      المرسل: {replyingMessage.senderName}
+                    </span>
+                  )}
+                </div>
+                <p className="text-slate-800 line-clamp-3 leading-relaxed whitespace-pre-line font-medium text-[11px]">
+                  "{replyingMessage.content}"
+                </p>
               </div>
-              <p className="text-slate-800 line-clamp-3 leading-relaxed whitespace-pre-line font-medium text-[11px]">
-                "{replyingMessage.content}"
-              </p>
-            </div>
 
-            {/* نموذج كتابة الرد */}
-            <form onSubmit={handleSaveReply} className="space-y-3.5">
               <div>
                 <label className="text-xs font-black text-slate-800 block mb-1.5">
                   نص رد وتوجيه الأستاذ: <span className="text-red-500">*</span>
@@ -4778,44 +4831,46 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </span>
                 </div>
               </label>
+            </div>
 
-              {/* أزرار الإجراء */}
-              <div className="flex items-center gap-2 pt-2">
+            {/* Fixed Footer */}
+            <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 shrink-0 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setReplyingMessage(null)}
+                disabled={savingReply}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 text-slate-700 text-xs font-black hover:bg-slate-200 transition"
+              >
+                إلغاء
+              </button>
+              {replyingMessage.reply?.content && (
                 <button
                   type="button"
-                  onClick={() => setReplyingMessage(null)}
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 text-slate-700 text-xs font-black hover:bg-slate-200 transition cursor-pointer"
+                  onClick={() => {
+                    setReplyContent("");
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold hover:bg-red-100 transition"
+                  title="حذف الرد الحالي"
                 >
-                  إلغاء
+                  مسح الرد
                 </button>
-                {replyingMessage.reply?.content && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReplyContent("");
-                    }}
-                    className="py-2.5 px-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold hover:bg-red-100 transition cursor-pointer"
-                    title="حذف الرد الحالي"
-                  >
-                    مسح الرد
-                  </button>
+              )}
+              <button
+                type="submit"
+                disabled={savingReply}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-purple-700 text-white text-xs font-black hover:bg-purple-800 transition flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
+              >
+                {savingReply ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
                 )}
-                <button
-                  type="submit"
-                  disabled={savingReply}
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-purple-700 text-white text-xs font-black hover:bg-purple-800 transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                >
-                  {savingReply ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-3.5 h-3.5" />
-                  )}
-                  <span>حفظ وإرسال الرد ✓</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <span>حفظ وإرسال الرد ✓</span>
+              </button>
+            </div>
+          </form>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -4856,6 +4911,21 @@ function LessonCard({
   const [deletingHwImageId, setDeletingHwImageId] = useState<string | null>(null);
   const [isDeletingHwImg, setIsDeletingHwImg] = useState(false);
   const [cardTab, setCardTab] = useState<"homework" | "board">("homework");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (deletingImageId || deletingHwImageId || previewImg) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [deletingImageId, deletingHwImageId, previewImg]);
 
   const isDirectedWork = lesson.type === "directed_work";
   const isWorksheet = lesson.type === "worksheets";
@@ -5806,9 +5876,14 @@ function LessonCard({
         </div>
       )}
 
-      {deletingImageId && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
+      {mounted && deletingImageId && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingImg) setDeletingImageId(null);
+          }}
+        >
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full space-y-4 shadow-2xl border border-slate-100 text-center fade-up" dir="rtl">
             <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -5822,7 +5897,7 @@ function LessonCard({
               <button
                 disabled={isDeletingImg}
                 onClick={confirmDeleteImage}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center justify-center gap-1"
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
               >
                 {isDeletingImg ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الصورة"}
               </button>
@@ -5835,12 +5910,18 @@ function LessonCard({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {deletingHwImageId && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
+      {mounted && deletingHwImageId && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingHwImg) setDeletingHwImageId(null);
+          }}
+        >
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full space-y-4 shadow-2xl border border-slate-100 text-center fade-up" dir="rtl">
             <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -5854,7 +5935,7 @@ function LessonCard({
               <button
                 disabled={isDeletingHwImg}
                 onClick={confirmDeleteHwImage}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center justify-center gap-1"
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
               >
                 {isDeletingHwImg ? <Loader2 className="w-4 h-4 animate-spin" /> : "نعم، حذف الصورة"}
               </button>
@@ -5867,12 +5948,13 @@ function LessonCard({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {previewImg && (
+      {mounted && previewImg && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-3"
+          className="fixed inset-0 z-[9999] bg-black/95 flex flex-col items-center justify-center p-3 animate-in fade-in duration-150"
           onClick={() => setPreviewImg(null)}
         >
           <div className="absolute top-4 left-4 flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
@@ -5882,7 +5964,7 @@ function LessonCard({
               rel="noopener noreferrer"
               className="px-3 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold flex items-center gap-1.5 transition backdrop-blur-xs"
             >
-              <ExternalLink className="w-4 h-4" />
+              <ExternalLink className="w-3.5 h-3.5" />
               <span>فتح في نافذة كاملة</span>
             </a>
             <button
@@ -5908,7 +5990,8 @@ function LessonCard({
               className="max-w-full max-h-[90vh] object-contain rounded-lg"
             />
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -5935,6 +6018,16 @@ function EditLessonModal({
   const [type, setType] = useState<NotebookType>(lesson.type || "lessons");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -5973,157 +6066,178 @@ function EditLessonModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
       <form
         onSubmit={submit}
-        className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-3.5 shadow-xl border border-slate-100 fade-up my-auto max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 flex flex-col max-h-[88vh] sm:max-h-[85vh] overflow-hidden text-right"
+        dir="rtl"
       >
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
               <Pencil className="w-4 h-4" />
             </div>
-            <h3 className="font-extrabold text-sm text-slate-800">تعديل بيانات العنصر</h3>
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-800">تعديل بيانات العنصر</h3>
+              <p className="text-[10px] text-slate-400">تحديث تفاصيل الدرس أو المورد</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+            disabled={busy}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {err && (
-          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{err}</span>
-          </div>
-        )}
+        {/* Scrollable Form Body */}
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-3.5">
+          {err && (
+            <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{err}</span>
+            </div>
+          )}
 
-        <div>
-          <label className="text-xs font-bold text-slate-600 block mb-1">القسم التابع له:</label>
-          <div className="grid grid-cols-2 gap-1.5">
-            <button
-              type="button"
-              onClick={() => setType("lessons")}
-              className={`py-2 text-[11px] font-bold rounded-xl border transition ${
-                type === "lessons"
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-400 ring-1 ring-emerald-400"
-                  : "bg-slate-50 text-slate-600 border-slate-200"
-              }`}
-            >
-              📘 كراس الدروس
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("directed_work")}
-              className={`py-2 text-[11px] font-bold rounded-xl border transition ${
-                type === "directed_work"
-                  ? "bg-sky-50 text-sky-800 border-sky-400 ring-1 ring-sky-400"
-                  : "bg-slate-50 text-slate-600 border-slate-200"
-              }`}
-            >
-              📗 الأعمال الموجهة
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("worksheets")}
-              className={`py-2 text-[11px] font-bold rounded-xl border transition ${
-                type === "worksheets"
-                  ? "bg-indigo-50 text-indigo-800 border-indigo-400 ring-1 ring-indigo-400"
-                  : "bg-slate-50 text-slate-600 border-slate-200"
-              }`}
-            >
-              📑 سلاسل التمارين
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("summaries")}
-              className={`py-2 text-[11px] font-bold rounded-xl border transition ${
-                type === "summaries"
-                  ? "bg-amber-50 text-amber-800 border-amber-400 ring-1 ring-amber-400"
-                  : "bg-slate-50 text-slate-600 border-slate-200"
-              }`}
-            >
-              📌 الملخصات
-            </button>
-          </div>
-        </div>
-
-        {type === "lessons" && (
           <div>
-            <label className="text-xs font-bold text-slate-600 block mb-1">الميدان:</label>
-            <input
-              className="input text-xs font-semibold"
-              value={field}
-              onChange={(e) => setField(e.target.value)}
-              required
-            />
+            <label className="text-xs font-bold text-slate-600 block mb-1">القسم التابع له:</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setType("lessons")}
+                className={`py-2 text-[11px] font-bold rounded-xl border transition ${
+                  type === "lessons"
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-400 ring-1 ring-emerald-400"
+                    : "bg-slate-50 text-slate-600 border-slate-200"
+                }`}
+              >
+                📘 كراس الدروس
+              </button>
+              <button
+                type="button"
+                onClick={() => setType("directed_work")}
+                className={`py-2 text-[11px] font-bold rounded-xl border transition ${
+                  type === "directed_work"
+                    ? "bg-sky-50 text-sky-800 border-sky-400 ring-1 ring-sky-400"
+                    : "bg-slate-50 text-slate-600 border-slate-200"
+                }`}
+              >
+                📗 الأعمال الموجهة
+              </button>
+              <button
+                type="button"
+                onClick={() => setType("worksheets")}
+                className={`py-2 text-[11px] font-bold rounded-xl border transition ${
+                  type === "worksheets"
+                    ? "bg-indigo-50 text-indigo-800 border-indigo-400 ring-1 ring-indigo-400"
+                    : "bg-slate-50 text-slate-600 border-slate-200"
+                }`}
+              >
+                📑 سلاسل التمارين
+              </button>
+              <button
+                type="button"
+                onClick={() => setType("summaries")}
+                className={`py-2 text-[11px] font-bold rounded-xl border transition ${
+                  type === "summaries"
+                    ? "bg-amber-50 text-amber-800 border-amber-400 ring-1 ring-amber-400"
+                    : "bg-slate-50 text-slate-600 border-slate-200"
+                }`}
+              >
+                📌 الملخصات
+              </button>
+            </div>
           </div>
-        )}
 
-        {(type === "lessons" || type === "worksheets" || type === "summaries") && (
+          {type === "lessons" && (
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">الميدان:</label>
+              <input
+                className="input text-xs font-semibold"
+                value={field}
+                onChange={(e) => setField(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
+          {(type === "lessons" || type === "worksheets" || type === "summaries") && (
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">المقطع المعرفي:</label>
+              <input
+                className="input text-xs font-semibold"
+                value={section}
+                onChange={(e) => setSection(e.target.value)}
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-4 gap-2">
+            <div className="col-span-1">
+              <label className="text-xs font-bold text-slate-600 block mb-1">الرقم:</label>
+              <input
+                className="input text-center text-sm font-extrabold text-emerald-700 bg-emerald-50/40"
+                inputMode="numeric"
+                value={num}
+                onChange={(e) => setNum(e.target.value)}
+                required
+              />
+            </div>
+            <div className="col-span-3">
+              <label className="text-xs font-bold text-slate-600 block mb-1">العنوان:</label>
+              <input
+                className="input text-xs font-semibold"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="text-xs font-bold text-slate-600 block mb-1">المقطع المعرفي:</label>
-            <input
-              className="input text-xs font-semibold"
-              value={section}
-              onChange={(e) => setSection(e.target.value)}
+            <label className="text-xs font-bold text-slate-600 block mb-1">
+              ملاحظات وتوجيهات الأستاذ للدرس:
+            </label>
+            <textarea
+              className="input text-xs min-h-[50px]"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="اكتب ملاحظة للدرس إن أردت..."
             />
           </div>
-        )}
 
-        <div className="grid grid-cols-4 gap-2">
-          <div className="col-span-1">
-            <label className="text-xs font-bold text-slate-600 block mb-1">الرقم:</label>
-            <input
-              className="input text-center text-sm font-extrabold text-emerald-700 bg-emerald-50/40"
-              inputMode="numeric"
-              value={num}
-              onChange={(e) => setNum(e.target.value)}
-              required
-            />
-          </div>
-          <div className="col-span-3">
-            <label className="text-xs font-bold text-slate-600 block mb-1">العنوان:</label>
-            <input
-              className="input text-xs font-semibold"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
+          <div>
+            <label className="text-xs font-bold text-blue-800 block mb-1 flex items-center gap-1">
+              <FileText className="w-3.5 h-3.5 text-blue-600" />
+              <span>تفاصيل وتمارين الواجب المنزلي (اختياري):</span>
+            </label>
+            <textarea
+              className="input text-xs min-h-[50px] border-blue-200 bg-blue-50/20"
+              value={homeworkNotes}
+              onChange={(e) => setHomeworkNotes(e.target.value)}
+              placeholder="مثال: حل التمارين 14 و 15 ص 30 في كراس المحاولات 96ص..."
             />
           </div>
         </div>
 
-        <div>
-          <label className="text-xs font-bold text-slate-600 block mb-1">
-            ملاحظات وتوجيهات الأستاذ للدرس:
-          </label>
-          <textarea
-            className="input text-xs min-h-[50px]"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="اكتب ملاحظة للدرس إن أردت..."
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-bold text-blue-800 block mb-1 flex items-center gap-1">
-            <FileText className="w-3.5 h-3.5 text-blue-600" />
-            <span>تفاصيل وتمارين الواجب المنزلي (اختياري):</span>
-          </label>
-          <textarea
-            className="input text-xs min-h-[50px] border-blue-200 bg-blue-50/20"
-            value={homeworkNotes}
-            onChange={(e) => setHomeworkNotes(e.target.value)}
-            placeholder="مثال: حل التمارين 14 و 15 ص 30 في كراس المحاولات 96ص..."
-          />
-        </div>
-
-        <div className="flex gap-2 pt-1">
-          <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs">
+        {/* Fixed Footer */}
+        <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 shrink-0 flex gap-2">
+          <button
+            type="submit"
+            disabled={busy}
+            className="btn-primary flex-1 py-2.5 text-xs flex items-center justify-center gap-1.5"
+          >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التعديل"}
           </button>
           <button
@@ -6136,7 +6250,8 @@ function EditLessonModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -6152,6 +6267,16 @@ function DeleteLessonModal({
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const submitDelete = async () => {
     setBusy(true);
@@ -6170,9 +6295,16 @@ function DeleteLessonModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full space-y-4 shadow-2xl border border-slate-100 text-center fade-up" dir="rtl">
         <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
           <Trash2 className="w-6 h-6" />
         </div>
@@ -6210,7 +6342,8 @@ function DeleteLessonModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -6230,6 +6363,16 @@ function EditSummonsModal({
   const [isExtraSunday, setIsExtraSunday] = useState(Boolean(summons.isUrgent));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -6265,82 +6408,103 @@ function EditSummonsModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
       <form
         onSubmit={submit}
-        className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-3.5 shadow-xl border border-slate-100 fade-up"
+        className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-100 flex flex-col max-h-[88vh] sm:max-h-[85vh] overflow-hidden text-right"
+        dir="rtl"
       >
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center">
               <Pencil className="w-4 h-4" />
             </div>
-            <h3 className="font-extrabold text-sm text-slate-800">تعديل موعد استقبال ولي التلميذ 🤝</h3>
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-800">تعديل موعد استقبال ولي التلميذ 🤝</h3>
+              <p className="text-[10px] text-slate-400">تحديث بيانات الاستدعاء والملاحظات</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+            disabled={busy}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {err && (
-          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{err}</span>
-          </div>
-        )}
+        {/* Scrollable Body */}
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-3.5">
+          {err && (
+            <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{err}</span>
+            </div>
+          )}
 
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
-              <input
-                className="input text-xs font-bold"
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
-                required
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+                <input
+                  className="input text-xs font-bold"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="text-xs font-bold text-slate-700 block mb-1">الفوج:</label>
+                <input
+                  className="input text-xs text-center font-black text-sky-700 bg-sky-50/50 border-sky-200"
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">ملاحظة الأستاذ لولي الأمر:</label>
+              <textarea
+                className="input text-xs min-h-[60px]"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="اكتب ملاحظة ودية لولي الأمر أو سبب اللقاء..."
               />
             </div>
-            <div className="col-span-1">
-              <label className="text-xs font-bold text-slate-700 block mb-1">الفوج:</label>
+
+            <label className="flex items-center gap-2 p-2 rounded-xl bg-sky-50/70 border border-sky-200 cursor-pointer">
               <input
-                className="input text-xs text-center font-black text-sky-700 bg-sky-50/50 border-sky-200"
-                value={className}
-                onChange={(e) => setClassName(e.target.value)}
-                required
+                type="checkbox"
+                className="w-4 h-4 text-sky-600 rounded border-slate-300"
+                checked={isExtraSunday}
+                onChange={(e) => setIsExtraSunday(e.target.checked)}
               />
-            </div>
+              <span className="text-xs font-bold text-sky-950">
+                توقيت إضافي: الأحد صباحاً (08:00 إلى 09:00)
+              </span>
+            </label>
           </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">ملاحظة الأستاذ لولي الأمر:</label>
-            <textarea
-              className="input text-xs min-h-[60px]"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="اكتب ملاحظة ودية لولي الأمر أو سبب اللقاء..."
-            />
-          </div>
-
-          <label className="flex items-center gap-2 p-2 rounded-xl bg-sky-50/70 border border-sky-200 cursor-pointer">
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-sky-600 rounded border-slate-300"
-              checked={isExtraSunday}
-              onChange={(e) => setIsExtraSunday(e.target.checked)}
-            />
-            <span className="text-xs font-bold text-sky-950">
-              توقيت إضافي: الأحد صباحاً (08:00 إلى 09:00)
-            </span>
-          </label>
         </div>
 
-        <div className="flex gap-2 pt-1">
-          <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs bg-sky-600 hover:bg-sky-700">
+        {/* Fixed Footer */}
+        <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 shrink-0 flex gap-2">
+          <button
+            type="submit"
+            disabled={busy}
+            className="btn-primary flex-1 py-2.5 text-xs bg-sky-600 hover:bg-sky-700 flex items-center justify-center gap-1.5"
+          >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التعديل"}
           </button>
           <button
@@ -6353,7 +6517,8 @@ function EditSummonsModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -6369,6 +6534,16 @@ function DeleteSummonsModal({
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const submitDelete = async () => {
     setBusy(true);
@@ -6387,9 +6562,16 @@ function DeleteSummonsModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full space-y-4 shadow-2xl border border-slate-100 text-center fade-up" dir="rtl">
         <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mx-auto">
           <Users className="w-6 h-6" />
         </div>
@@ -6427,7 +6609,8 @@ function DeleteSummonsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -6447,6 +6630,16 @@ function EditHonorModal({
   const [badge, setBadge] = useState(honor.badge || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -6482,86 +6675,107 @@ function EditHonorModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
       <form
         onSubmit={submit}
-        className="bg-white rounded-3xl p-5 max-w-md w-full space-y-4 shadow-xl border border-slate-100 text-right fade-up"
+        className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 flex flex-col max-h-[88vh] sm:max-h-[85vh] overflow-hidden text-right"
+        dir="rtl"
       >
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
               🏆
             </div>
-            <h3 className="font-extrabold text-sm text-slate-800">تعديل بيانات التلميذ في لوحة الشرف</h3>
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-800">تعديل بيانات التلميذ في لوحة الشرف</h3>
+              <p className="text-[10px] text-slate-400">تحديث اللقب والوسام التشجيعي</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200"
+            disabled={busy}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {err && (
-          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold">{err}</div>
-        )}
+        {/* Scrollable Body */}
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-3.5">
+          {err && (
+            <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold">{err}</div>
+          )}
 
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+                <input
+                  className="input text-xs"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="col-span-1">
+                <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
+                <select
+                  className="input text-xs font-black text-amber-900 bg-amber-50/40 border-amber-200"
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value)}
+                  required
+                >
+                  {HONOR_CLASSES.map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">وسام / لقب تشجيعي:</label>
               <input
                 className="input text-xs"
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
-                required
+                value={badge}
+                onChange={(e) => setBadge(e.target.value)}
+                placeholder="مثال: ⭐ نجم الرياضيات"
               />
             </div>
 
-            <div className="col-span-1">
-              <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
-              <select
-                className="input text-xs font-black text-amber-900 bg-amber-50/40 border-amber-200"
-                value={className}
-                onChange={(e) => setClassName(e.target.value)}
-                required
-              >
-                {HONOR_CLASSES.map((cls) => (
-                  <option key={cls} value={cls}>
-                    {cls}
-                  </option>
-                ))}
-              </select>
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                ملاحظة تشجيعية (اختيارية):
+              </label>
+              <textarea
+                className="input text-xs min-h-[60px]"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="اكتب ملاحظة إن أردت..."
+              />
             </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">وسام / لقب تشجيعي:</label>
-            <input
-              className="input text-xs"
-              value={badge}
-              onChange={(e) => setBadge(e.target.value)}
-              placeholder="مثال: ⭐ نجم الرياضيات"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
-              ملاحظة تشجيعية (اختيارية):
-            </label>
-            <textarea
-              className="input text-xs min-h-[60px]"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="اكتب ملاحظة إن أردت..."
-            />
           </div>
         </div>
 
-        <div className="flex gap-2 pt-1">
-          <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs bg-amber-500 hover:bg-amber-600">
+        {/* Fixed Footer */}
+        <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 shrink-0 flex gap-2">
+          <button
+            type="submit"
+            disabled={busy}
+            className="btn-primary flex-1 py-2.5 text-xs bg-amber-500 hover:bg-amber-600 flex items-center justify-center gap-1.5"
+          >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التعديل"}
           </button>
           <button
@@ -6574,7 +6788,8 @@ function EditHonorModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -6590,6 +6805,16 @@ function DeleteHonorModal({
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const submitDelete = async () => {
     setBusy(true);
@@ -6608,9 +6833,16 @@ function DeleteHonorModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 text-center fade-up">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full space-y-4 shadow-2xl border border-slate-100 text-center fade-up" dir="rtl">
         <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto text-xl">
           ⭐
         </div>
@@ -6648,10 +6880,10 @@ function DeleteHonorModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
-
 /* ---------------- 10. نافذة تعديل بيانات عقوبة أو خصم ---------------- */
 function EditPenaltyModal({
   penalty,
@@ -6670,6 +6902,16 @@ function EditPenaltyModal({
   const [notes, setNotes] = useState(penalty.notes || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const submitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -6699,171 +6941,189 @@ function EditPenaltyModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
       <form
         onSubmit={submitEdit}
-        className="bg-white rounded-3xl p-5 max-w-md w-full space-y-4 shadow-xl border border-red-100 fade-up"
+        className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-red-100 flex flex-col max-h-[88vh] sm:max-h-[85vh] overflow-hidden text-right"
+        dir="rtl"
       >
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between p-4 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-white shrink-0">
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-xl bg-red-50 text-red-700">
               <OctagonAlert className="w-5 h-5" />
             </span>
             <div>
               <h3 className="font-extrabold text-sm text-slate-900">تعديل بيانات الخصم / العقوبة</h3>
-              <p className="text-[11px] text-slate-400">تحديث خصم التلميذ وسببه</p>
+              <p className="text-[10px] text-slate-400">تحديث خصم التلميذ وسببه</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
+            disabled={busy}
             className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {err && (
-          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold border border-red-200">
-            {err}
-          </div>
-        )}
+        {/* Scrollable Body */}
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-3.5">
+          {err && (
+            <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold border border-red-200">
+              {err}
+            </div>
+          )}
 
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <label className="text-xs font-bold text-slate-700 block mb-1">اسم التلميذ:</label>
+                <input
+                  className="input text-xs font-bold"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="col-span-1">
+                <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
+                <select
+                  className="input text-xs font-black text-red-900 bg-red-50/40 border-red-200"
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value)}
+                  required
+                >
+                  {HONOR_CLASSES.map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 block mb-1">مقدار الخصم / العقوبة:</label>
               <input
-                className="input text-xs font-bold"
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
+                className="input text-xs font-bold text-red-700 bg-red-50/40 border-red-200"
+                value={deduction}
+                onChange={(e) => setDeduction(e.target.value)}
+                placeholder="مثال: ناقص 3 في التقويم المستمر (-3)"
                 required
               />
-            </div>
-
-            <div className="col-span-1">
-              <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
-              <select
-                className="input text-xs font-black text-red-900 bg-red-50/40 border-red-200"
-                value={className}
-                onChange={(e) => setClassName(e.target.value)}
-                required
-              >
-                {HONOR_CLASSES.map((cls) => (
-                  <option key={cls} value={cls}>
-                    {cls}
-                  </option>
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {[
+                  "ناقص 3 في التقويم المستمر (-3)",
+                  "ناقص 2 في التقويم المستمر (-2)",
+                  "ناقص 1 في التقويم المستمر (-1)",
+                  "ناقص 5 في التقويم المستمر (-5)",
+                  "خصم نقطة السلوك والمواظبة (-2)",
+                ].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDeduction(d)}
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200"
+                  >
+                    {d}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 block mb-1">مقدار الخصم / العقوبة:</label>
-            <input
-              className="input text-xs font-bold text-red-700 bg-red-50/40 border-red-200"
-              value={deduction}
-              onChange={(e) => setDeduction(e.target.value)}
-              placeholder="مثال: ناقص 3 في التقويم المستمر (-3)"
-              required
-            />
-            <div className="flex flex-wrap gap-1 pt-0.5">
-              {[
-                "ناقص 3 في التقويم المستمر (-3)",
-                "ناقص 2 في التقويم المستمر (-2)",
-                "ناقص 1 في التقويم المستمر (-1)",
-                "ناقص 5 في التقويم المستمر (-5)",
-                "خصم نقطة السلوك والمواظبة (-2)",
-              ].map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDeduction(d)}
-                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200"
-                >
-                  {d}
-                </button>
-              ))}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 block mb-1">سبب العقوبة:</label>
+              <input
+                className="input text-xs"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="مثال: هروب من الحصة يوم كذا..."
+                required
+              />
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {[
+                  "هروب من الحصة",
+                  "تشويش متكرر وإخلال بنظام القسم",
+                  "عدم إحضار كراس الدروس 192 صفحة",
+                  "عدم حل الواجب المنزلي في البيت",
+                  "دروس ناقصة في الكراس وإهمال الكتابة",
+                ].map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setReason(r)}
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-50 text-slate-700 border border-slate-200"
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 block mb-1">سبب العقوبة:</label>
-            <input
-              className="input text-xs"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="مثال: هروب من الحصة يوم كذا..."
-              required
-            />
-            <div className="flex flex-wrap gap-1 pt-0.5">
-              {[
-                "هروب من الحصة",
-                "تشويش متكرر وإخلال بنظام القسم",
-                "عدم إحضار كراس الدروس 192 صفحة",
-                "عدم حل الواجب المنزلي في البيت",
-                "دروس ناقصة في الكراس وإهمال الكتابة",
-              ].map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setReason(r)}
-                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-50 text-slate-700 border border-slate-200"
-                >
-                  {r}
-                </button>
-              ))}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 block mb-1">التاريخ والتوقيت:</label>
+              <input
+                className="input text-xs"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                placeholder="مثال: الأربعاء 07 أكتوبر 2026 (حصة 10:00 - 11:00)"
+              />
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {[
+                  "حصة 08:00 - 09:00",
+                  "حصة 09:00 - 10:00",
+                  "حصة 10:00 - 11:00",
+                  "حصة 11:00 - 12:00",
+                  "حصة 13:00 - 14:00",
+                  "حصة 14:00 - 15:00",
+                ].map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      const baseDate = date ? date.split("(")[0].trim() : "الأربعاء 07 أكتوبر 2026";
+                      setDate(`${baseDate} (${t})`);
+                    }}
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-50 text-slate-700 border border-slate-200"
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 block mb-1">التاريخ والتوقيت:</label>
-            <input
-              className="input text-xs"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              placeholder="مثال: الأربعاء 07 أكتوبر 2026 (حصة 10:00 - 11:00)"
-            />
-            <div className="flex flex-wrap gap-1 pt-0.5">
-              {[
-                "حصة 08:00 - 09:00",
-                "حصة 09:00 - 10:00",
-                "حصة 10:00 - 11:00",
-                "حصة 11:00 - 12:00",
-                "حصة 13:00 - 14:00",
-                "حصة 14:00 - 15:00",
-              ].map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => {
-                    const baseDate = date ? date.split("(")[0].trim() : "الأربعاء 07 أكتوبر 2026";
-                    setDate(`${baseDate} (${t})`);
-                  }}
-                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-50 text-slate-700 border border-slate-200"
-                >
-                  {t}
-                </button>
-              ))}
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                ملاحظة للأستاذ أو ولي الأمر (اختيارية):
+              </label>
+              <textarea
+                className="input text-xs min-h-[60px]"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="اكتب ملاحظة إن أردت..."
+              />
             </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
-              ملاحظة للأستاذ أو ولي الأمر (اختيارية):
-            </label>
-            <textarea
-              className="input text-xs min-h-[60px]"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="اكتب ملاحظة إن أردت..."
-            />
           </div>
         </div>
 
-        <div className="flex gap-2 pt-1">
-          <button disabled={busy} className="btn-primary flex-1 py-2.5 text-xs bg-red-600 hover:bg-red-700">
+        {/* Fixed Footer */}
+        <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 shrink-0 flex gap-2">
+          <button
+            type="submit"
+            disabled={busy}
+            className="btn-primary flex-1 py-2.5 text-xs bg-red-600 hover:bg-red-700 flex items-center justify-center gap-1.5"
+          >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ التعديل"}
           </button>
           <button
@@ -6876,7 +7136,8 @@ function EditPenaltyModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -6892,6 +7153,16 @@ function DeletePenaltyModal({
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const submitDelete = async () => {
     setBusy(true);
@@ -6910,9 +7181,16 @@ function DeletePenaltyModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-red-100 text-center fade-up">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full space-y-4 shadow-2xl border border-red-100 text-center fade-up" dir="rtl">
         <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto text-xl">
           🛑
         </div>
@@ -6952,7 +7230,8 @@ function DeletePenaltyModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
