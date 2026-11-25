@@ -169,8 +169,9 @@ export function getOrCreateClientIdentity(): ClientDeviceInfo {
 }
 
 export type TrackEventOptions = {
-  type: "visit" | "lesson_view";
+  type: "visit" | "lesson_view" | "feature_view";
   path?: string;
+  featureKey?: "calculator" | "rewards" | "grades" | "honor" | "parents" | "messages" | string;
   lessonId?: string;
   lessonTitle?: string;
   level?: 1 | 2;
@@ -189,6 +190,7 @@ export async function trackAnalyticsEvent(options: TrackEventOptions): Promise<v
     const payload = {
       type: options.type,
       path: currentPath,
+      featureKey: options.featureKey,
       visitorId: identity.visitorId,
       shortDeviceId: identity.shortDeviceId,
       sessionId: identity.sessionId,

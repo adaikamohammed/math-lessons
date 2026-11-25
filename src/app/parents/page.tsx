@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { HONOR_CLASSES, type ParentSummons } from "@/lib/types";
 import { Loading } from "@/components/ui";
+import FeatureViewBadge from "@/components/FeatureViewBadge";
 
 export default function ParentsPage() {
   const [summons, setSummons] = useState<ParentSummons[] | null>(null);
@@ -72,13 +73,23 @@ export default function ParentsPage() {
           <ArrowRight className="w-5 h-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-base font-black text-slate-900 truncate">
-              أولياء أود استقبالهم
-            </h1>
-            <span className="text-[11px] bg-sky-100 text-sky-800 font-black px-2 py-0.5 rounded-full border border-sky-200">
-              لصالح أبنائكم 🤝
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-base font-black text-slate-900 truncate">
+                أولياء أود استقبالهم
+              </h1>
+              <span className="text-[11px] bg-sky-100 text-sky-800 font-black px-2 py-0.5 rounded-full border border-sky-200">
+                لصالح أبنائكم 🤝
+              </span>
+            </div>
+            <FeatureViewBadge
+              views={195}
+              uniqueDevices={52}
+              featureKey="parents"
+              trackOnMount={true}
+              size="xs"
+              variant="sky"
+            />
           </div>
           <p className="text-[11px] text-slate-500 font-bold truncate">
             الأستاذ محمد عدايكة — متوسطة المجاهد باهي علي

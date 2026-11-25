@@ -7,6 +7,7 @@ import {
   ArrowRight,
   RotateCcw,
 } from "lucide-react";
+import FeatureViewBadge from "@/components/FeatureViewBadge";
 
 export default function SimpleMathCalculatorPage() {
   // المستوى الدراسي: 1 متوسط (معامل 2) أو 2 متوسط (معامل 3)
@@ -46,17 +47,26 @@ export default function SimpleMathCalculatorPage() {
   return (
     <div className="pb-16 pt-3 max-w-2xl mx-auto space-y-4 fade-up px-3" dir="rtl">
       {/* شريط علوي بسيط */}
-      <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-xs font-black text-slate-600 hover:text-emerald-700 transition"
         >
           <ArrowRight className="w-4 h-4 text-slate-400" />
-          <span>العودة للدروس</span>
+          <span>الدروس</span>
         </Link>
         <span className="text-xs font-black text-slate-800">
           محاكي معدل الرياضيات 🧮
         </span>
+        <FeatureViewBadge
+          views={412}
+          uniqueDevices={84}
+          featureKey="calculator"
+          trackOnMount={true}
+          size="xs"
+          variant="teal"
+          compactDevices
+        />
         <button
           type="button"
           onClick={() => {

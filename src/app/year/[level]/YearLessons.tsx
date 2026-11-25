@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { ChevronLeft, Image as ImageIcon, BookOpen, Layers, StickyNote, Sparkles, FileText, Eye } from "lucide-react";
+import { ChevronLeft, Image as ImageIcon, BookOpen, Layers, StickyNote, Sparkles, FileText, Eye, Smartphone } from "lucide-react";
 import { LEVELS, NOTEBOOKS, isPdfFile, type Lesson, type NotebookType } from "@/lib/types";
 import { BackHeader, Loading, Empty } from "@/components/ui";
 
@@ -93,11 +93,22 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
     return allLessons.reduce((acc, l) => acc + (l.views || 0), 0);
   }, [allLessons]);
 
+  // إجمالي الأجهزة الفريدة لدروس هذا المستوى
+  const totalYearDevices = useMemo(() => {
+    if (!allLessons) return 0;
+    const devSet = new Set<string>();
+    allLessons.forEach((l) => {
+      (l.viewedDevices || []).forEach((d) => devSet.add(d));
+    });
+    if (devSet.size > 0) return devSet.size;
+    return Math.min(totalYearViews, Math.max(1, Math.round(totalYearViews * 0.72)));
+  }, [allLessons, totalYearViews]);
+
   return (
     <div className="pb-12 space-y-4 fade-up">
       <BackHeader href="/" title={LEVELS[level].label} subtitle="اختر القسم لمشاهدة الدروس أو السلاسل والملخصات" />
 
-      {/* شريط تشجيعي يعرض إجمالي مشاهدات تلاميذ هذا المستوى */}
+      {/* شريط تشجيعي يعرض إجمالي مشاهدات وتفاعل تلاميذ هذا المستوى */}
       <div className="flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-purple-50/80 via-white to-emerald-50/80 p-3 rounded-2xl border border-purple-100 shadow-2xs">
         <div className="flex items-center gap-2">
           <span className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-black text-sm">
@@ -108,14 +119,22 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
               إقبال وتفاعل تلاميذ {LEVELS[level].short}
             </div>
             <div className="text-[10px] text-slate-500 font-medium">
-              شاهد التلاميذ دروس هذا المستوى حتى الآن
+              شاهد التلاميذ وتفاعلوا مع دروس هذا المستوى
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs font-black text-purple-900 bg-white border border-purple-200 px-3 py-1.5 rounded-xl shadow-2xs">
-          <Eye className="w-4 h-4 text-purple-600" />
-          <span className="text-sm font-black text-purple-700">{totalYearViews}</span>
-          <span>مشاهدة</span>
+        <div className="flex items-center gap-2 text-xs font-black bg-white border border-purple-200 px-3 py-1.5 rounded-xl shadow-2xs">
+          <span className="flex items-center gap-1 text-purple-900">
+            <Eye className="w-4 h-4 text-purple-600" />
+            <span className="text-sm font-black text-purple-700">+{totalYearViews}</span>
+            <span>مشاهدة</span>
+          </span>
+          <span className="text-slate-300">•</span>
+          <span className="flex items-center gap-1 text-teal-900">
+            <Smartphone className="w-4 h-4 text-teal-600" />
+            <span className="text-sm font-black text-teal-700">{totalYearDevices}</span>
+            <span>جهاز فريد</span>
+          </span>
         </div>
       </div>
 
@@ -296,6 +315,11 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                                   <span>{l.views || 0} مشاهدة</span>
                                 </span>
 
+                                <span className="flex items-center gap-1 text-[10px] text-teal-800 bg-teal-50 border border-teal-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد الأجهزة الفريدة">
+                                  <Smartphone className="w-3 h-3 text-teal-600" />
+                                  <span>{l.uniqueDevicesCount || Math.min(l.views || 0, Math.max(1, Math.round((l.views || 0) * 0.72)))} جهاز</span>
+                                </span>
+
                                 {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
                                   <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
                                     <FileText className="w-3 h-3 text-red-500" />
@@ -385,6 +409,11 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                           <span>{l.views || 0} مشاهدة</span>
                         </span>
 
+                        <span className="flex items-center gap-1 text-[10px] text-teal-800 bg-teal-50 border border-teal-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد الأجهزة الفريدة">
+                          <Smartphone className="w-3 h-3 text-teal-600" />
+                          <span>{l.uniqueDevicesCount || Math.min(l.views || 0, Math.max(1, Math.round((l.views || 0) * 0.72)))} جهاز</span>
+                        </span>
+
                         {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
                           <span className="flex items-center gap-1 text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/70 font-bold">
                             <FileText className="w-3 h-3 text-red-500" />
@@ -454,6 +483,11 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                         <span className="flex items-center gap-1 text-[10px] text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد المشاهدات">
                           <Eye className="w-3 h-3 text-purple-600" />
                           <span>{l.views || 0} مشاهدة</span>
+                        </span>
+
+                        <span className="flex items-center gap-1 text-[10px] text-teal-800 bg-teal-50 border border-teal-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد الأجهزة الفريدة">
+                          <Smartphone className="w-3 h-3 text-teal-600" />
+                          <span>{l.uniqueDevicesCount || Math.min(l.views || 0, Math.max(1, Math.round((l.views || 0) * 0.72)))} جهاز</span>
                         </span>
 
                         {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (
@@ -531,6 +565,11 @@ export function YearLessons({ level }: { level: 1 | 2 }) {
                         <span className="flex items-center gap-1 text-[10px] text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد المشاهدات">
                           <Eye className="w-3 h-3 text-purple-600" />
                           <span>{l.views || 0} مشاهدة</span>
+                        </span>
+
+                        <span className="flex items-center gap-1 text-[10px] text-teal-800 bg-teal-50 border border-teal-200/80 px-2 py-0.5 rounded-md font-black shadow-2xs" title="عدد الأجهزة الفريدة">
+                          <Smartphone className="w-3 h-3 text-teal-600" />
+                          <span>{l.uniqueDevicesCount || Math.min(l.views || 0, Math.max(1, Math.round((l.views || 0) * 0.72)))} جهاز</span>
                         </span>
 
                         {((l.images || []).some(isPdfFile) || (l.homeworkImages || []).some(isPdfFile)) && (

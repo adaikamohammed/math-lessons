@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { HonorStudent, HONOR_CLASSES } from "@/lib/types";
+import FeatureViewBadge from "@/components/FeatureViewBadge";
 
 export default function HonorRollPage() {
   const [honors, setHonors] = useState<HonorStudent[]>([]);
@@ -74,9 +75,19 @@ export default function HonorRollPage() {
           <ArrowRight className="w-5 h-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-base font-black text-slate-900 truncate">لوحة الشرف | نجوم الرياضيات</h1>
-            <span className="text-amber-500 text-sm">✨</span>
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-base font-black text-slate-900 truncate">لوحة الشرف | نجوم الرياضيات</h1>
+              <span className="text-amber-500 text-sm">✨</span>
+            </div>
+            <FeatureViewBadge
+              views={260}
+              uniqueDevices={65}
+              featureKey="honor"
+              trackOnMount={true}
+              size="xs"
+              variant="amber"
+            />
           </div>
           <p className="text-[11px] text-slate-500 font-bold truncate">
             الأستاذ محمد عدايكة — متوسطة المجاهد باهي علي

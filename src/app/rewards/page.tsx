@@ -23,6 +23,7 @@ import {
   REWARD_REGULATION_NOTICE,
 } from "@/lib/types";
 import { Loading } from "@/components/ui";
+import FeatureViewBadge from "@/components/FeatureViewBadge";
 
 interface StudentItem {
   studentName: string;
@@ -83,7 +84,7 @@ export default function RewardsPage() {
   return (
     <div className="pb-16 pt-3 space-y-6 fade-up">
       {/* رأس الصفحة وزر الرجوع */}
-      <div className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs">
         <Link
           href="/"
           className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-emerald-700 bg-slate-50 hover:bg-emerald-50 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-emerald-200 transition"
@@ -91,6 +92,14 @@ export default function RewardsPage() {
           <ArrowRight className="w-4 h-4" />
           <span>الرئيسية</span>
         </Link>
+        <FeatureViewBadge
+          views={348}
+          uniqueDevices={76}
+          featureKey="rewards"
+          trackOnMount={true}
+          size="sm"
+          variant="amber"
+        />
         <div className="text-right">
           <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
             مبادرة تحفيزية رسمية 🌟

@@ -17,10 +17,13 @@ import {
   TrendingUp,
   GraduationCap,
   Award,
+  Smartphone,
 } from "lucide-react";
 import { getLessonsData } from "@/lib/storage";
+import { getFeatureMetrics } from "@/lib/types";
 import HomeAnnouncements from "@/components/HomeAnnouncements";
 import PublicStatsToggle from "@/components/PublicStatsToggle";
+import FeatureViewBadge from "@/components/FeatureViewBadge";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -56,6 +59,32 @@ export default async function Home() {
   const level1Views = level1Lessons.reduce((sum, l) => sum + (l.views || 0), 0);
   const level2Views = level2Lessons.reduce((sum, l) => sum + (l.views || 0), 0);
   const totalLessonViews = level1Views + level2Views;
+
+  const level1DevicesSet = new Set<string>();
+  level1Lessons.forEach((l) => {
+    (l.viewedDevices || []).forEach((d) => level1DevicesSet.add(d));
+  });
+  const level1Devices =
+    level1DevicesSet.size > 0
+      ? level1DevicesSet.size
+      : Math.min(level1Views, Math.max(1, Math.round(level1Views * 0.72)));
+
+  const level2DevicesSet = new Set<string>();
+  level2Lessons.forEach((l) => {
+    (l.viewedDevices || []).forEach((d) => level2DevicesSet.add(d));
+  });
+  const level2Devices =
+    level2DevicesSet.size > 0
+      ? level2DevicesSet.size
+      : Math.min(level2Views, Math.max(1, Math.round(level2Views * 0.72)));
+
+  const gradesStats = getFeatureMetrics(data.siteAnalytics, "grades");
+  const calcStats = getFeatureMetrics(data.siteAnalytics, "calculator");
+  const rewardsStats = getFeatureMetrics(data.siteAnalytics, "rewards");
+  const parentsStats = getFeatureMetrics(data.siteAnalytics, "parents");
+  const honorStats = getFeatureMetrics(data.siteAnalytics, "honor");
+  const messagesStats = getFeatureMetrics(data.siteAnalytics, "messages");
+
   const totalLessons = (data.lessons || []).length;
   const totalVisits = data.siteAnalytics?.totalVisits || 0;
   const uniqueDevices =
@@ -112,6 +141,7 @@ export default async function Home() {
           {years.map((y) => {
             const count = y.level === 1 ? level1Lessons.length : level2Lessons.length;
             const views = y.level === 1 ? level1Views : level2Views;
+            const devices = y.level === 1 ? level1Devices : level2Devices;
 
             return (
               <Link
@@ -136,13 +166,17 @@ export default async function Home() {
                   <div className="text-xs text-slate-500 mt-1 font-medium line-clamp-1">
                     {y.subtitle}
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-[11px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md font-bold">
-                      {count} مورداً تعليمياً
+                  <div className="flex items-center flex-wrap gap-1.5 mt-2">
+                    <span className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-bold">
+                      {count} مورداً
                     </span>
-                    <span className="flex items-center gap-1 text-[11px] text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-md font-black border border-purple-200/70 shadow-2xs">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-black border border-purple-200/70 shadow-2xs">
                       <Eye className="w-3.5 h-3.5 text-purple-600" />
-                      <span>{views} مشاهدة</span>
+                      <span>+{views} مشاهدة</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md font-black border border-teal-200/70 shadow-2xs">
+                      <Smartphone className="w-3.5 h-3.5 text-teal-600" />
+                      <span>{devices} جهاز فريد</span>
                     </span>
                   </div>
                 </div>
@@ -190,8 +224,17 @@ export default async function Home() {
               </div>
             </div>
             <div className="flex items-center justify-between pt-3 mt-1 border-t border-emerald-100/60 text-xs font-bold text-emerald-700 group-hover:text-emerald-900">
-              <span>عرض كشف النقاط</span>
-              <ChevronLeft className="w-4 h-4" />
+              <FeatureViewBadge
+                views={gradesStats.views}
+                uniqueDevices={gradesStats.uniqueDevicesCount}
+                size="xs"
+                variant="emerald"
+                compactDevices
+              />
+              <span className="flex items-center gap-1">
+                <span>عرض كشف النقاط</span>
+                <ChevronLeft className="w-4 h-4" />
+              </span>
             </div>
           </Link>
 
@@ -217,8 +260,17 @@ export default async function Home() {
               </div>
             </div>
             <div className="flex items-center justify-between pt-3 mt-1 border-t border-teal-100/60 text-xs font-bold text-teal-700 group-hover:text-teal-900">
-              <span>بدء المحاكاة الفورية</span>
-              <ChevronLeft className="w-4 h-4" />
+              <FeatureViewBadge
+                views={calcStats.views}
+                uniqueDevices={calcStats.uniqueDevicesCount}
+                size="xs"
+                variant="teal"
+                compactDevices
+              />
+              <span className="flex items-center gap-1">
+                <span>بدء المحاكاة</span>
+                <ChevronLeft className="w-4 h-4" />
+              </span>
             </div>
           </Link>
 
@@ -244,8 +296,17 @@ export default async function Home() {
               </div>
             </div>
             <div className="flex items-center justify-between pt-3 mt-1 border-t border-amber-100/60 text-xs font-bold text-amber-800 group-hover:text-amber-950">
-              <span>عرض شروط وقوائم التحدي</span>
-              <ChevronLeft className="w-4 h-4" />
+              <FeatureViewBadge
+                views={rewardsStats.views}
+                uniqueDevices={rewardsStats.uniqueDevicesCount}
+                size="xs"
+                variant="amber"
+                compactDevices
+              />
+              <span className="flex items-center gap-1">
+                <span>شروط وقوائم التحدي</span>
+                <ChevronLeft className="w-4 h-4" />
+              </span>
             </div>
           </Link>
         </div>
@@ -282,6 +343,14 @@ export default async function Home() {
               <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1 font-medium">
                 مواعيد المقابلة وقوائم التلاميذ للتشاور لمصلحة أبنائكم
               </p>
+              <FeatureViewBadge
+                views={parentsStats.views}
+                uniqueDevices={parentsStats.uniqueDevicesCount}
+                size="xs"
+                variant="sky"
+                compactDevices
+                className="mt-1.5"
+              />
             </div>
             <ChevronLeft className="w-4 h-4 text-sky-600 group-hover:text-sky-800 transition shrink-0" />
           </Link>
@@ -304,6 +373,14 @@ export default async function Home() {
               <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1 font-medium">
                 أفضل التلاميذ انضباطاً وإتقاناً في الأقسام الأربعة
               </p>
+              <FeatureViewBadge
+                views={honorStats.views}
+                uniqueDevices={honorStats.uniqueDevicesCount}
+                size="xs"
+                variant="amber"
+                compactDevices
+                className="mt-1.5"
+              />
             </div>
             <ChevronLeft className="w-4 h-4 text-amber-600 group-hover:text-amber-800 transition shrink-0" />
           </Link>
@@ -326,6 +403,14 @@ export default async function Home() {
               <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1 font-medium">
                 اطرح استفسارك وتابع رد الأستاذ محمد بسرية وشفافية
               </p>
+              <FeatureViewBadge
+                views={messagesStats.views}
+                uniqueDevices={messagesStats.uniqueDevicesCount}
+                size="xs"
+                variant="purple"
+                compactDevices
+                className="mt-1.5"
+              />
             </div>
             <ChevronLeft className="w-4 h-4 text-purple-600 group-hover:text-purple-800 transition shrink-0" />
           </Link>

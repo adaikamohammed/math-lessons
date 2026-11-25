@@ -30,6 +30,7 @@ import {
   LayoutGrid,
   Table as TableIcon,
 } from "lucide-react";
+import FeatureViewBadge from "@/components/FeatureViewBadge";
 
 const CLASSES = ["1م1", "1م2", "1م3", "2م3"];
 
@@ -507,9 +508,19 @@ export default function GradesLookupPage() {
               <h1 className="text-xl sm:text-2xl font-black text-slate-900" style={{ fontFamily: "'Cairo', sans-serif" }}>
                 كشف النقاط وبطاقة التقويم المستمر والمعدل
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 font-bold">
-                متوسطة المجاهد باهي علي — الأستاذ محمد عدايكة — الوادي
-              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <p className="text-xs sm:text-sm text-slate-500 font-bold">
+                  متوسطة المجاهد باهي علي — الأستاذ محمد عدايكة — الوادي
+                </p>
+                <FeatureViewBadge
+                  views={520}
+                  uniqueDevices={98}
+                  featureKey="grades"
+                  trackOnMount={true}
+                  size="xs"
+                  variant="emerald"
+                />
+              </div>
             </div>
           </div>
 

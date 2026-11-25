@@ -24,6 +24,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { MessageCategory, AnonymousMessage } from "@/lib/types";
+import FeatureViewBadge from "@/components/FeatureViewBadge";
 
 const CATEGORIES: {
   id: MessageCategory;
@@ -255,12 +256,24 @@ export default function MessagesPage() {
           <ArrowRight className="w-5 h-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 mb-0.5">
-            <Lock className="w-3 h-3 text-emerald-600" /> خصوصية وشفافية 100%
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <div>
+              <div className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 mb-0.5">
+                <Lock className="w-3 h-3 text-emerald-600" /> خصوصية وشفافية 100%
+              </div>
+              <h1 className="text-base font-extrabold text-slate-900 truncate">
+                صندوق الصراحة والتواصل
+              </h1>
+            </div>
+            <FeatureViewBadge
+              views={180}
+              uniqueDevices={45}
+              featureKey="messages"
+              trackOnMount={true}
+              size="xs"
+              variant="purple"
+            />
           </div>
-          <h1 className="text-base font-extrabold text-slate-900 truncate">
-            صندوق الصراحة والتواصل
-          </h1>
           <p className="text-[11px] text-slate-500">
             تواصل مباشر وسري مع الأستاذ محمد عدايكة — أستاذ الرياضيات
           </p>

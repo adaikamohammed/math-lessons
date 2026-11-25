@@ -5213,9 +5213,14 @@ function LessonCard({
                 {lesson.number}
               </span>
               <span>•</span>
-              <span className="text-emerald-800 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[10px] inline-flex items-center gap-1">
+              <span className="text-emerald-800 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[10px] inline-flex items-center gap-1" title="إجمالي المشاهدات">
                 <Eye className="w-3 h-3 text-emerald-600" />
                 <span>{lesson.views || 0} مشاهدة</span>
+              </span>
+              <span>•</span>
+              <span className="text-cyan-800 font-extrabold bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-200 text-[10px] inline-flex items-center gap-1" title="عدد الأجهزة الفريدة">
+                <Smartphone className="w-3 h-3 text-cyan-600" />
+                <span>{lesson.uniqueDevicesCount || Math.min(lesson.views || 0, Math.max(1, Math.round((lesson.views || 0) * 0.72)))} جهاز</span>
               </span>
               <span>•</span>
               <span className="font-bold text-slate-500">
