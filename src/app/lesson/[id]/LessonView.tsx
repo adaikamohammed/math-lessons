@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   Clock,
   Eye,
-  Smartphone,
 } from "lucide-react";
 import Link from "next/link";
 import { LEVELS, NOTEBOOKS, isPdfFile, type Lesson, type LessonImage } from "@/lib/types";
@@ -140,14 +139,6 @@ export function LessonView({ id }: { id: string }) {
                 >
                   <Eye className="w-3.5 h-3.5 text-purple-600" />
                   <span>{lesson.views || 0} مشاهدة</span>
-                </span>
-
-                <span
-                  className="bg-teal-50 text-teal-900 border border-teal-200/90 px-2 py-0.5 rounded-md inline-flex items-center gap-1 font-black shadow-2xs"
-                  title="عدد الأجهزة الفريدة التي فتحت هذا الدرس"
-                >
-                  <Smartphone className="w-3.5 h-3.5 text-teal-600" />
-                  <span>{lesson.uniqueDevicesCount || Math.min(lesson.views || 0, Math.max(1, Math.round((lesson.views || 0) * 0.72)))} جهاز فريد</span>
                 </span>
               </div>
 

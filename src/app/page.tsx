@@ -17,7 +17,6 @@ import {
   TrendingUp,
   GraduationCap,
   Award,
-  Smartphone,
 } from "lucide-react";
 import { getLessonsData } from "@/lib/storage";
 import { getFeatureMetrics } from "@/lib/types";
@@ -59,24 +58,6 @@ export default async function Home() {
   const level1Views = level1Lessons.reduce((sum, l) => sum + (l.views || 0), 0);
   const level2Views = level2Lessons.reduce((sum, l) => sum + (l.views || 0), 0);
   const totalLessonViews = level1Views + level2Views;
-
-  const level1DevicesSet = new Set<string>();
-  level1Lessons.forEach((l) => {
-    (l.viewedDevices || []).forEach((d) => level1DevicesSet.add(d));
-  });
-  const level1Devices =
-    level1DevicesSet.size > 0
-      ? level1DevicesSet.size
-      : Math.min(level1Views, Math.max(1, Math.round(level1Views * 0.72)));
-
-  const level2DevicesSet = new Set<string>();
-  level2Lessons.forEach((l) => {
-    (l.viewedDevices || []).forEach((d) => level2DevicesSet.add(d));
-  });
-  const level2Devices =
-    level2DevicesSet.size > 0
-      ? level2DevicesSet.size
-      : Math.min(level2Views, Math.max(1, Math.round(level2Views * 0.72)));
 
   const gradesStats = getFeatureMetrics(data.siteAnalytics, "grades");
   const calcStats = getFeatureMetrics(data.siteAnalytics, "calculator");
@@ -141,7 +122,6 @@ export default async function Home() {
           {years.map((y) => {
             const count = y.level === 1 ? level1Lessons.length : level2Lessons.length;
             const views = y.level === 1 ? level1Views : level2Views;
-            const devices = y.level === 1 ? level1Devices : level2Devices;
 
             return (
               <Link
@@ -166,17 +146,13 @@ export default async function Home() {
                   <div className="text-xs text-slate-500 mt-1 font-medium line-clamp-1">
                     {y.subtitle}
                   </div>
-                  <div className="flex items-center flex-wrap gap-1.5 mt-2">
-                    <span className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-bold">
-                      {count} مورداً
+                  <div className="flex items-center flex-wrap gap-2 mt-2">
+                    <span className="text-[11px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md font-bold">
+                      {count} مورداً تعليمياً
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-black border border-purple-200/70 shadow-2xs">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-md font-black border border-purple-200/70 shadow-2xs">
                       <Eye className="w-3.5 h-3.5 text-purple-600" />
                       <span>+{views} مشاهدة</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md font-black border border-teal-200/70 shadow-2xs">
-                      <Smartphone className="w-3.5 h-3.5 text-teal-600" />
-                      <span>{devices} جهاز فريد</span>
                     </span>
                   </div>
                 </div>

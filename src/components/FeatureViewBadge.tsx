@@ -6,7 +6,8 @@ import { trackAnalyticsEvent } from "@/lib/analyticsClient";
 
 export interface FeatureViewBadgeProps {
   views: number;
-  uniqueDevices: number;
+  uniqueDevices?: number;
+  showDevices?: boolean;
   featureKey?: string;
   trackOnMount?: boolean;
   size?: "xs" | "sm" | "md" | "lg";
@@ -14,12 +15,13 @@ export interface FeatureViewBadgeProps {
   className?: string;
   viewsLabel?: string;
   devicesLabel?: string;
-  compactDevices?: boolean; // يعرض "جهاز" بدلاً من "جهاز فريد"
+  compactDevices?: boolean;
 }
 
 export default function FeatureViewBadge({
   views,
   uniqueDevices,
+  showDevices = false,
   featureKey,
   trackOnMount = false,
   size = "sm",
@@ -82,12 +84,15 @@ export default function FeatureViewBadge({
         <span>+{views} {viewsLabel}</span>
       </span>
 
-      <span className="opacity-35 shrink-0">•</span>
-
-      <span className="inline-flex items-center gap-1" title="عدد الأجهزة والتلاميذ الفريدين">
-        <Smartphone className={`${iconSizes} opacity-85 shrink-0`} />
-        <span>{uniqueDevices} {resolvedDevicesLabel}</span>
-      </span>
+      {showDevices && uniqueDevices ? (
+        <>
+          <span className="opacity-35 shrink-0">•</span>
+          <span className="inline-flex items-center gap-1" title="عدد الأجهزة والتلاميذ الفريدين">
+            <Smartphone className={`${iconSizes} opacity-85 shrink-0`} />
+            <span>{uniqueDevices} {resolvedDevicesLabel}</span>
+          </span>
+        </>
+      ) : null}
     </div>
   );
 }
