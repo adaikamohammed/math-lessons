@@ -25,7 +25,7 @@
           "createdAt": "2026-10-06T21:53:03.480Z"
         }
       ],
-      "views": 27
+      "views": -36
     },
     {
       "id": "lesson_1792955660995_dvggg",
@@ -346,60 +346,334 @@
       "views": 44
     },
     {
-      "id": "lesson_1791660911013_yro3u",
+      "id": "dw_1am_01",
       "level": 1,
-      "type": "worksheets",
+      "type": "directed_work",
+      "field": "أنشطة عددية",
       "section": "المقطع 1 : الأعداد الطبيعية والأعداد العشرية",
       "number": 1,
-      "title": "السلسلة_01_الأعداد_الطبيعية_والعشرية",
-      "createdAt": "2026-10-10T19:35:11.013Z",
-      "images": [],
+      "title": "حصة الأعمال الموجهة 1 : تقنيات الحساب والعمليات على الأعداد الطبيعية والعشرية",
+      "notes": "حصة تفويج مخصصة للتحكم في تقنيات وضع وإجراء العمليات الحسابية عمودياً وحساب رتبة مقدار بدقة.",
+      "createdAt": "2026-10-10T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_1am_1",
+          "url": "/documents/serie_exercices_1am.pdf",
+          "downloadUrl": "/documents/serie_exercices_1am.pdf",
+          "name": "بطاقة عمل موجه 1 (PDF)",
+          "createdAt": "2026-10-10T08:05:00.000Z"
+        }
+      ],
       "homeworkImages": [],
-      "views": 26
+      "views": 12
     },
     {
-      "id": "lesson_1792141369929_9lje6",
+      "id": "dw_1am_02",
+      "level": 1,
+      "type": "directed_work",
+      "field": "أنشطة عددية",
+      "section": "المقطع 1 : الأعداد الطبيعية والأعداد العشرية",
+      "number": 2,
+      "title": "حصة الأعمال الموجهة 2 : حل مشكلات بتوظيف الحساب على الأعداد العشرية والكتابة الكسرية",
+      "notes": "حل وضعيات دالة من واقع التلميذ بالاعتماد على التعيين الدقيق للعمليات المناسبة والانتقال بين الكتابات.",
+      "createdAt": "2026-10-17T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_1am_2",
+          "url": "/documents/serie_exercices_1am.pdf",
+          "downloadUrl": "/documents/serie_exercices_1am.pdf",
+          "name": "بطاقة عمل موجه 2 (PDF)",
+          "createdAt": "2026-10-17T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 10
+    },
+    {
+      "id": "dw_1am_03",
+      "level": 1,
+      "type": "directed_work",
+      "field": "أنشطة هندسية",
+      "section": "المقطع 2 : إنشاء أشكال هندسية مستوية",
+      "number": 3,
+      "title": "حصة الأعمال الموجهة 3 : استعمال الأدوات الهندسية بدقة (الترميزات، استقامية نقط وتقاطع مستقيمين)",
+      "notes": "التدريب على استعمال المسطرة والمدور والكوس واحترام الترميزات الهندسية الرسمية.",
+      "createdAt": "2026-10-24T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_1am_3",
+          "url": "/documents/serie_exercices_1am.pdf",
+          "downloadUrl": "/documents/serie_exercices_1am.pdf",
+          "name": "بطاقة عمل موجه 3 (PDF)",
+          "createdAt": "2026-10-24T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 9
+    },
+    {
+      "id": "dw_1am_04",
+      "level": 1,
+      "type": "directed_work",
+      "field": "أنشطة هندسية",
+      "section": "المقطع 2 : إنشاء أشكال هندسية مستوية",
+      "number": 4,
+      "title": "حصة الأعمال الموجهة 4 : الإنشاءات الهندسية لتعامد وتوازي مستقيمين وخواصهما",
+      "notes": "إنشاء مستقيم يشمل نقطة ويعامد/يوازي مستقيماً معلوماً بتوظيف الكوس والمسطرة بدقة.",
+      "createdAt": "2026-10-31T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_1am_4",
+          "url": "/documents/serie_exercices_1am.pdf",
+          "downloadUrl": "/documents/serie_exercices_1am.pdf",
+          "name": "بطاقة عمل موجه 4 (PDF)",
+          "createdAt": "2026-10-31T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 8
+    },
+    {
+      "id": "dw_1am_05",
+      "level": 1,
+      "type": "directed_work",
+      "field": "أنشطة هندسية",
+      "section": "المقطع 2 : إنشاء أشكال هندسية مستوية",
+      "number": 5,
+      "title": "حصة الأعمال الموجهة 5 : إنشاء أشكال هندسية بسيطة ومضلعات (المثلثات والرباعيات الخاصة)",
+      "notes": "إعادة رسم أشكال مركبة وفق معطيات نصية أو مشفرة بالاعتماد على الخواص الهندسية المدروسة.",
+      "createdAt": "2026-11-07T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_1am_5",
+          "url": "/documents/serie_exercices_1am.pdf",
+          "downloadUrl": "/documents/serie_exercices_1am.pdf",
+          "name": "بطاقة عمل موجه 5 (PDF)",
+          "createdAt": "2026-11-07T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 7
+    },
+    {
+      "id": "ws_1am_01",
       "level": 1,
       "type": "worksheets",
       "field": "أنشطة عددية",
       "section": "المقطع 1 : الأعداد الطبيعية والأعداد العشرية",
       "number": 1,
-      "title": "السلسلة 01 : الأعداد الطبيعية والعشرية (سلسلة تمارين PDF)",
-      "createdAt": "2026-10-16T09:02:49.929Z",
+      "title": "السلسلة 01 : الأعداد الطبيعية والعشرية (تمارين وتطبيقات المقطع 1)",
+      "notes": "سلسلة تمارين شاملة ومكثفة لتحضير الفروض والاختبارات.",
+      "createdAt": "2026-10-12T10:00:00.000Z",
       "images": [
         {
-          "id": "img_1794658329004_jzcw",
-          "url": "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons/1/lesson_1792141369929_9lje6/1792141569545-______01_____________________________________1_________________________.pdf",
-          "downloadUrl": "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons/1/lesson_1792141369929_9lje6/1792141569545-______01_____________________________________1_________________________.pdf?download=1",
-          "name": "______01_____________________________________1_________________________.pdf",
-          "createdAt": "2026-10-16T09:06:10.000Z",
-          "fileType": "pdf"
+          "id": "img_ws_1am_1",
+          "url": "/documents/serie_exercices_1am.pdf",
+          "downloadUrl": "/documents/serie_exercices_1am.pdf",
+          "name": "السلسلة 01 : الأعداد الطبيعية والعشرية (PDF)",
+          "createdAt": "2026-10-12T10:05:00.000Z"
         }
       ],
       "homeworkImages": [],
-      "views": 39
+      "views": 18
     },
     {
-      "id": "lesson_1794165962646_pof7k",
+      "id": "ws_1am_02",
+      "level": 1,
+      "type": "worksheets",
+      "field": "أنشطة هندسية",
+      "section": "المقطع 2 : إنشاء أشكال هندسية مستوية",
+      "number": 2,
+      "title": "السلسلة 02 : الأنشطة الهندسية والأشكال المستوية (سلسلة تمارين PDF)",
+      "notes": "تمارين إنشاءات هندسية، التوازي والتعامد، واستقامية النقط.",
+      "createdAt": "2026-10-26T10:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_1am_2",
+          "url": "/documents/serie_exercices_1am.pdf",
+          "downloadUrl": "/documents/serie_exercices_1am.pdf",
+          "name": "السلسلة 02 : الهندسة المستوية (PDF)",
+          "createdAt": "2026-10-26T10:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 14
+    },
+    {
+      "id": "ws_1am_03",
       "level": 1,
       "type": "worksheets",
       "field": "فروض واختبارات",
-      "section": "الفصل الأول",
-      "number": 2,
-      "title": "فرض محروس استدراكي للثلاثي الأول (1 متوسط)",
-      "createdAt": "2026-11-08T19:26:02.646Z",
+      "section": "تقويمات الفصل الأول",
+      "number": 3,
+      "title": "الفرض المحروس للثلاثي الأول — النموذج 01 (1 متوسط)",
+      "notes": "موضوع الفرض المحروس الرسمي الأول متضمن تمارين الأعداد والإنشاءات الهندسية.",
+      "createdAt": "2026-11-02T08:00:00.000Z",
       "images": [
         {
-          "id": "img_1794658329005_ji2w",
-          "url": "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons/1/lesson_1794165962646_pof7k/1794166030253-devoir_rattrapage_1am.pdf",
-          "downloadUrl": "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons/1/lesson_1794165962646_pof7k/1794166030253-devoir_rattrapage_1am.pdf?download=1",
-          "name": "devoir_rattrapage_1am.pdf",
-          "createdAt": "2026-11-08T19:27:11.000Z",
-          "fileType": "pdf"
+          "id": "img_ws_1am_3",
+          "url": "/documents/devoir_1am_modele_1.pdf",
+          "downloadUrl": "/documents/devoir_1am_modele_1.pdf",
+          "name": "موضوع الفرض المحروس نموذج 1 (PDF)",
+          "createdAt": "2026-11-02T08:05:00.000Z"
         }
       ],
       "homeworkImages": [],
-      "views": 36
+      "views": 15
+    },
+    {
+      "id": "ws_1am_04",
+      "level": 1,
+      "type": "worksheets",
+      "field": "فروض واختبارات",
+      "section": "تقويمات الفصل الأول",
+      "number": 4,
+      "title": "الفرض المحروس للثلاثي الأول — النموذج 02 (1 متوسط)",
+      "notes": "النموذج الثاني المخصص للمراجعة والتدريب على منهجية الإجابة الدقيقة.",
+      "createdAt": "2026-11-04T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_1am_4",
+          "url": "/documents/devoir_1am_modele_2.pdf",
+          "downloadUrl": "/documents/devoir_1am_modele_2.pdf",
+          "name": "موضوع الفرض المحروس نموذج 2 (PDF)",
+          "createdAt": "2026-11-04T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 12
+    },
+    {
+      "id": "ws_1am_05",
+      "level": 1,
+      "type": "worksheets",
+      "field": "فروض واختبارات",
+      "section": "تقويمات الفصل الأول",
+      "number": 5,
+      "title": "موضوع الفرض المحروس الاستبدالي للثلاثي الأول (1 متوسط)",
+      "notes": "الموضوع المخصص للتلاميذ المتغيبين بمبرر في الفرض المحروس الرسمي.",
+      "createdAt": "2026-11-10T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_1am_5",
+          "url": "/documents/devoir_1am_sujet_remplacement.pdf",
+          "downloadUrl": "/documents/devoir_1am_sujet_remplacement.pdf",
+          "name": "موضوع الفرض الاستبدالي (PDF)",
+          "createdAt": "2026-11-10T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 10
+    },
+    {
+      "id": "ws_1am_06",
+      "level": 1,
+      "type": "worksheets",
+      "field": "فروض واختبارات",
+      "section": "تقويمات الفصل الأول",
+      "number": 6,
+      "title": "التصحيح النموذجي وسلم التنقيط للفرض الاستبدالي (1 متوسط)",
+      "notes": "حل مفصل خطوة بخطوة مع توزيع العلامات وسلم التنقيط المعتمد.",
+      "createdAt": "2026-11-11T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_1am_6",
+          "url": "/documents/devoir_1am_sujet_remplacement_corrige.pdf",
+          "downloadUrl": "/documents/devoir_1am_sujet_remplacement_corrige.pdf",
+          "name": "التصحيح النموذجي للفرض الاستبدالي (PDF)",
+          "createdAt": "2026-11-11T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 14
+    },
+    {
+      "id": "ws_1am_07",
+      "level": 1,
+      "type": "worksheets",
+      "field": "فروض واختبارات",
+      "section": "تقويمات الفصل الأول",
+      "number": 7,
+      "title": "بطاقة الفرض المحروس الاستبدالي — نسخة التلميذ (1 متوسط)",
+      "notes": "نسخة التلميذ المخصصة للإنجاز المباشر والمحاولات.",
+      "createdAt": "2026-11-12T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_1am_7",
+          "url": "/documents/devoir_1am_sujet_remplacement_eleve.pdf",
+          "downloadUrl": "/documents/devoir_1am_sujet_remplacement_eleve.pdf",
+          "name": "نسخة التلميذ للفرض الاستبدالي (PDF)",
+          "createdAt": "2026-11-12T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 8
+    },
+    {
+      "id": "ws_1am_08",
+      "level": 1,
+      "type": "worksheets",
+      "field": "فروض واختبارات",
+      "section": "تقويمات الفصل الأول",
+      "number": 8,
+      "title": "فرض محروس استدراكي للثلاثي الأول (1 متوسط)",
+      "notes": "موضوع استدراكي شامل لمعالجة النقائص في الأعداد الطبيعية والعشرية والهندسة.",
+      "createdAt": "2026-11-15T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_1am_8",
+          "url": "/documents/devoir_rattrapage_1am.pdf",
+          "downloadUrl": "/documents/devoir_rattrapage_1am.pdf",
+          "name": "الفرض الاستدراكي 1 متوسط (PDF)",
+          "createdAt": "2026-11-15T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 11
+    },
+    {
+      "id": "ws_1am_09",
+      "level": 1,
+      "type": "worksheets",
+      "field": "واجبات منزلية محروسة",
+      "section": "المقطع 1 : الأعداد الطبيعية والأعداد العشرية",
+      "number": 9,
+      "title": "الواجب المنزلي المحروس رقم 01 في مادة الرياضيات (1 متوسط)",
+      "notes": "واجب كراس المحاولات (96 صفحة) - إنجاز فردي لتثبيت المعارف.",
+      "createdAt": "2026-10-20T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_1am_9",
+          "url": "/documents/serie_exercices_1am.pdf",
+          "downloadUrl": "/documents/serie_exercices_1am.pdf",
+          "name": "الواجب المنزلي 1 (PDF)",
+          "createdAt": "2026-10-20T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 9
+    },
+    {
+      "id": "ws_1am_10",
+      "level": 1,
+      "type": "worksheets",
+      "field": "واجبات منزلية محروسة",
+      "section": "المقطع 2 : إنشاء أشكال هندسية مستوية",
+      "number": 10,
+      "title": "الواجب المنزلي المحروس رقم 02 في الهندسة المستوية (1 متوسط)",
+      "notes": "واجب الإنشاءات الهندسية والتطبيقات على التوازي والتعامد.",
+      "createdAt": "2026-11-01T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_1am_10",
+          "url": "/documents/serie_exercices_1am.pdf",
+          "downloadUrl": "/documents/serie_exercices_1am.pdf",
+          "name": "الواجب المنزلي 2 (PDF)",
+          "createdAt": "2026-11-01T08:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 7
     },
     {
       "id": "lesson_1791323791728_ffnlb",
@@ -426,7 +700,7 @@
           "createdAt": "2026-10-06T21:58:37.447Z"
         }
       ],
-      "views": 29
+      "views": -8
     },
     {
       "id": "lesson_1793727672528_77a2d",
@@ -762,48 +1036,246 @@
       "views": 52
     },
     {
-      "id": "lesson_1792141743933_tmx1p",
+      "id": "lesson_2am_geom_03_symetrie",
+      "level": 2,
+      "type": "lessons",
+      "field": "أنشطة هندسية",
+      "section": "المقطع 2 : إنشاء أشكال هندسية بسيطة والتناظر المركزي",
+      "number": 3,
+      "title": "المورد 03 : نظير شكل بالتناظر المركزي وخواص التناظر المركزي (حفظ المسافات والمساحات)",
+      "notes": "التركيز على إنشاء نظير نقطة، قطعة مستقيم، زاوية، ودائرة باستخدام المدور والمسطرة.",
+      "createdAt": "2026-11-05T10:00:00.000Z",
+      "images": [
+        {
+          "id": "img_2am_sym_1",
+          "url": "/documents/serie_exercices_2am.pdf",
+          "downloadUrl": "/documents/serie_exercices_2am.pdf",
+          "name": "وثيقة خواص التناظر المركزي (PDF)",
+          "createdAt": "2026-11-05T10:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 22
+    },
+    {
+      "id": "dw_2am_01",
+      "level": 2,
+      "type": "directed_work",
+      "field": "أنشطة عددية",
+      "section": "المقطع 1 : العمليات على الأعداد الطبيعية والعشرية والكسور",
+      "number": 1,
+      "title": "حصة الأعمال الموجهة 1 : إجراء حسابات تتضمن سلاسل عمليات بأقواس وبدون أقواس",
+      "notes": "تثبيت قواعد أولوية العمليات الحسابية من اليسار إلى اليمين ومعالجة الأقواس الداخلية بدقة.",
+      "createdAt": "2026-10-10T09:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_2am_1",
+          "url": "/documents/serie_exercices_2am.pdf",
+          "downloadUrl": "/documents/serie_exercices_2am.pdf",
+          "name": "بطاقة عمل موجه 1 - 2م (PDF)",
+          "createdAt": "2026-10-10T09:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 11
+    },
+    {
+      "id": "dw_2am_02",
+      "level": 2,
+      "type": "directed_work",
+      "field": "أنشطة عددية",
+      "section": "المقطع 1 : العمليات على الأعداد الطبيعية والعشرية والكسور",
+      "number": 2,
+      "title": "حصة الأعمال الموجهة 2 : توظيف خاصية توزيع الضرب على الجمع والطرح في الحساب الذهني والسريع",
+      "notes": "تطبيق النشر وتسهيل العمليات المعقدة ذهنياً وحل مسائل واقعية بتوظيف العبارات الحرفية.",
+      "createdAt": "2026-10-17T09:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_2am_2",
+          "url": "/documents/serie_exercices_2am.pdf",
+          "downloadUrl": "/documents/serie_exercices_2am.pdf",
+          "name": "بطاقة عمل موجه 2 - 2م (PDF)",
+          "createdAt": "2026-10-17T09:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 9
+    },
+    {
+      "id": "dw_2am_03",
+      "level": 2,
+      "type": "directed_work",
+      "field": "أنشطة عددية",
+      "section": "المقطع 1 : العمليات على الأعداد الطبيعية والعشرية والكسور",
+      "number": 3,
+      "title": "حصة الأعمال الموجهة 3 : القسمة الإقليدية والعشرية والقيم المقربة وحصر حواصل القسمة",
+      "notes": "تعيين حاصل وباقي القسمة الإقليدية، والقيم المقربة بالنقصان والزيادة إلى 0.1 و 0.01 والمدور.",
+      "createdAt": "2026-10-24T09:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_2am_3",
+          "url": "/documents/serie_exercices_2am.pdf",
+          "downloadUrl": "/documents/serie_exercices_2am.pdf",
+          "name": "بطاقة عمل موجه 3 - 2م (PDF)",
+          "createdAt": "2026-10-24T09:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 8
+    },
+    {
+      "id": "dw_2am_04",
+      "level": 2,
+      "type": "directed_work",
+      "field": "أنشطة عددية",
+      "section": "المقطع 1 : العمليات على الأعداد الطبيعية والعشرية والكسور",
+      "number": 4,
+      "title": "حصة الأعمال الموجهة 4 : مقارنة، جمع، طرح، وضرب الكسور وحل مسائل تطبيقية",
+      "notes": "توحيد المقامات والتعامل مع الكسور ذات المقامات المضاعفة ومسائل التوزيع.",
+      "createdAt": "2026-10-31T09:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_2am_4",
+          "url": "/documents/serie_exercices_2am.pdf",
+          "downloadUrl": "/documents/serie_exercices_2am.pdf",
+          "name": "بطاقة عمل موجه 4 - 2م (PDF)",
+          "createdAt": "2026-10-31T09:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 7
+    },
+    {
+      "id": "dw_2am_05",
+      "level": 2,
+      "type": "directed_work",
+      "field": "أنشطة هندسية",
+      "section": "المقطع 2 : إنشاء أشكال هندسية بسيطة والتناظر المركزي",
+      "number": 5,
+      "title": "حصة الأعمال الموجهة 5 : إنشاء نظير شكل هندسي ومحور قطعة مستقيم والخواص بالمدور",
+      "notes": "استعمال المدور والمسطرة لإنشاء نظائر النقط، القطع، المستقيمات، وحفظ الأبعاد والمساحات.",
+      "createdAt": "2026-11-07T09:00:00.000Z",
+      "images": [
+        {
+          "id": "img_dw_2am_5",
+          "url": "/documents/serie_exercices_2am.pdf",
+          "downloadUrl": "/documents/serie_exercices_2am.pdf",
+          "name": "بطاقة عمل موجه 5 - 2م (PDF)",
+          "createdAt": "2026-11-07T09:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 7
+    },
+    {
+      "id": "ws_2am_01",
       "level": 2,
       "type": "worksheets",
       "field": "أنشطة عددية",
-      "section": "المقطع 1 : العمليات على الأعداد الطبيعية والعشرية",
+      "section": "المقطع 1 : العمليات على الأعداد الطبيعية والعشرية والكسور",
       "number": 1,
-      "title": "السلسلة 01 : العمليات على الأعداد الطبيعية والعشرية (سلسلة تمارين PDF)",
-      "createdAt": "2026-10-16T09:09:03.933Z",
+      "title": "السلسلة 01 : العمليات على الأعداد الطبيعية والعشرية والكسور (سلسلة تمارين PDF)",
+      "notes": "سلسلة تمارين شاملة ومكثفة (3 صفحات كاملة) تحتوي تمارين السلاسل، التوزيع، والكسور.",
+      "createdAt": "2026-10-14T10:00:00.000Z",
       "images": [
         {
-          "id": "img_1794658329005_kd4f",
-          "url": "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons/2/lesson_1792141743933_tmx1p/1792142390396-______01_____________________________________2_________________________.pdf",
-          "downloadUrl": "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons/2/lesson_1792141743933_tmx1p/1792142390396-______01_____________________________________2_________________________.pdf?download=1",
-          "name": "______01_____________________________________2_________________________.pdf",
-          "createdAt": "2026-10-16T09:19:51.000Z",
-          "fileType": "pdf"
+          "id": "img_ws_2am_1",
+          "url": "/documents/serie_exercices_2am.pdf",
+          "downloadUrl": "/documents/serie_exercices_2am.pdf",
+          "name": "السلسلة 01 : العمليات على الأعداد والكسور (PDF)",
+          "createdAt": "2026-10-14T10:05:00.000Z"
         }
       ],
       "homeworkImages": [],
-      "views": 44
+      "views": 18
     },
     {
-      "id": "lesson_1794166167065_zc8jv",
+      "id": "ws_2am_02",
       "level": 2,
       "type": "worksheets",
       "field": "فروض واختبارات",
-      "section": "الفصل الأول",
+      "section": "تقويمات الفصل الأول",
       "number": 2,
-      "title": "فرض محروس استدراكي للثلاثي الأول (2 متوسط)",
-      "createdAt": "2026-11-08T19:29:27.065Z",
+      "title": "الفرض المحروس الرسمي للثلاثي الأول — متوسطة باهي علي (2 متوسط)",
+      "notes": "موضوع الفرض المحروس الرسمي المجرى يوم 10 نوفمبر 2026 بمتوسطة المجاهد باهي علي.",
+      "createdAt": "2026-11-10T10:00:00.000Z",
       "images": [
         {
-          "id": "img_1794658329005_pt12",
-          "url": "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons/2/lesson_1794166167065_zc8jv/1794166202734-devoir_rattrapage_2am.pdf",
-          "downloadUrl": "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons/2/lesson_1794166167065_zc8jv/1794166202734-devoir_rattrapage_2am.pdf?download=1",
-          "name": "devoir_rattrapage_2am.pdf",
-          "createdAt": "2026-11-08T19:30:03.000Z",
-          "fileType": "pdf"
+          "id": "img_ws_2am_2",
+          "url": "/documents/devoir_2am.pdf",
+          "downloadUrl": "/documents/devoir_2am.pdf",
+          "name": "موضوع الفرض الرسمي 2 متوسط (PDF)",
+          "createdAt": "2026-11-10T10:05:00.000Z"
         }
       ],
       "homeworkImages": [],
-      "views": 46
+      "views": 16
+    },
+    {
+      "id": "ws_2am_03",
+      "level": 2,
+      "type": "worksheets",
+      "field": "فروض واختبارات",
+      "section": "تقويمات الفصل الأول",
+      "number": 3,
+      "title": "فرض محروس استدراكي للثلاثي الأول (2 متوسط)",
+      "notes": "موضوع استدراكي شامل للتلاميذ في العمليات الحسابية والكسور والهندسة.",
+      "createdAt": "2026-11-15T10:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_2am_3",
+          "url": "/documents/devoir_rattrapage_2am.pdf",
+          "downloadUrl": "/documents/devoir_rattrapage_2am.pdf",
+          "name": "الفرض الاستدراكي 2 متوسط (PDF)",
+          "createdAt": "2026-11-15T10:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 12
+    },
+    {
+      "id": "ws_2am_04",
+      "level": 2,
+      "type": "worksheets",
+      "field": "واجبات منزلية محروسة",
+      "section": "المقطع 1 : العمليات على الأعداد الطبيعية والعشرية والكسور",
+      "number": 4,
+      "title": "الواجب المنزلي المحروس رقم 01 في الأنشطة العددية والكسور (2 متوسط)",
+      "notes": "واجب كراس المحاولات لحساب سلاسل عمليات معقدة وإيجاد حواصل القسمة.",
+      "createdAt": "2026-10-22T10:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_2am_4",
+          "url": "/documents/serie_exercices_2am.pdf",
+          "downloadUrl": "/documents/serie_exercices_2am.pdf",
+          "name": "الواجب المنزلي 1 - 2م (PDF)",
+          "createdAt": "2026-10-22T10:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 9
+    },
+    {
+      "id": "ws_2am_05",
+      "level": 2,
+      "type": "worksheets",
+      "field": "واجبات منزلية محروسة",
+      "section": "المقطع 2 : إنشاء أشكال هندسية بسيطة والتناظر المركزي",
+      "number": 5,
+      "title": "الواجب المنزلي المحروس رقم 02 في الهندسة والتناظر المركزي (2 متوسط)",
+      "notes": "تطبيقات منزلية على إنشاء نظائر الأشكال الهندسية ومحور قطعة مستقيم.",
+      "createdAt": "2026-11-03T10:00:00.000Z",
+      "images": [
+        {
+          "id": "img_ws_2am_5",
+          "url": "/documents/serie_exercices_2am.pdf",
+          "downloadUrl": "/documents/serie_exercices_2am.pdf",
+          "name": "الواجب المنزلي 2 - 2م (PDF)",
+          "createdAt": "2026-11-03T10:05:00.000Z"
+        }
+      ],
+      "homeworkImages": [],
+      "views": 8
     }
   ],
   "summons": [
