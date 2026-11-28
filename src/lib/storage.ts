@@ -1,4 +1,4 @@
-import { put, del, list, get } from "@vercel/blob";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import fs from "fs/promises";
 import path from "path";
 import { Lesson, LessonsData } from "./types";
@@ -8,12 +8,24 @@ const LOCAL_DATA_DIR = path.join(process.cwd(), "data");
 const LOCAL_DATA_FILE = path.join(LOCAL_DATA_DIR, "lessons.json");
 const LOCAL_UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
 
-export function getBlobToken(): string | undefined {
-  return process.env.BLOB_READ_WRITE_TOKEN;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hpgzmbibwewzebufczrr.supabase.co";
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const BUCKET_NAME = "math-assets";
+const FIXED_SUPABASE_DB_URL = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/lessons-db.json`;
+
+let supabaseClientInstance: SupabaseClient | null = null;
+
+export function getSupabaseClient(): SupabaseClient | null {
+  if (supabaseClientInstance) return supabaseClientInstance;
+  if (!SUPABASE_KEY) return null;
+  supabaseClientInstance = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: false },
+  });
+  return supabaseClientInstance;
 }
 
-export function isVercelBlobConfigured(): boolean {
-  return Boolean(getBlobToken());
+export function isSupabaseConfigured(): boolean {
+  return Boolean(SUPABASE_KEY);
 }
 
 // Ensure local folders exist
@@ -27,13 +39,6 @@ let writeQueue: Promise<any> = Promise.resolve();
 
 // كاش ذاكرة فوري لمنع قراءة بيانات قديمة من كاش CDN بعد الحفظ المباشر
 let memoryCache: { data: LessonsData; timestamp: number } | null = null;
-
-// استخراج الطابع الزمني الرقمي من مسار النسخة db/v-123456.json
-function getVersionTs(pathname: string, uploadedAt?: string | Date): number {
-  const match = pathname.match(/v-(\d+)\.json/);
-  if (match) return Number(match[1]);
-  return uploadedAt ? new Date(uploadedAt).getTime() : 0;
-}
 
 function normalizeClass(raw?: string): string {
   if (!raw) return "1م1";
@@ -113,8 +118,6 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
   return data;
 }
 
-const FIXED_BLOB_DB_URL = "https://zcvevxcbfufx3f96.public.blob.vercel-storage.com/lessons-db.json";
-
 // ----------------- قراءة بيانات الدروس -----------------
 export async function getLessonsData(): Promise<LessonsData> {
   // كاش ذاكرة فوري لتفادي تأخير كاش الـ CDN بعد الحفظ المباشر
@@ -122,54 +125,71 @@ export async function getLessonsData(): Promise<LessonsData> {
     return JSON.parse(JSON.stringify(memoryCache.data));
   }
 
-  const token = getBlobToken();
+  const supabase = getSupabaseClient();
 
-  if (token) {
+  // 1. القراءة من جدول Supabase Database (الأسرع والأدق عبر PostgreSQL)
+  if (supabase) {
     try {
-      // قراءة مباشرة وفورية للملف الثابت lessons-db.json دون استهلاك أي Advanced Requests (list)
-      const res = await fetch(`${FIXED_BLOB_DB_URL}?_t=${Date.now()}`, {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-        },
-      });
+      const { data: row, error } = await supabase
+        .from("math_platform_store")
+        .select("data")
+        .eq("id", "platform_state")
+        .single();
 
-      if (res.ok) {
-        const json = await res.json();
-        if (Array.isArray(json.lessons) && json.lessons.length > 0) {
-          const rawResult: LessonsData = {
-            lessons: json.lessons,
-            summons: Array.isArray(json.summons) ? json.summons : [],
-            honors: Array.isArray(json.honors) ? json.honors : [],
-            penalties: Array.isArray(json.penalties) ? json.penalties : [],
-            evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
-            inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
-            studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
-            gradebookRecords: Array.isArray(json.gradebookRecords) ? json.gradebookRecords : [],
-            parentGradebookLookup: Array.isArray(json.parentGradebookLookup) ? json.parentGradebookLookup : [],
-            announcements: Array.isArray(json.announcements) ? json.announcements : [],
-            anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
-            siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
-            rewardSubmissions: Array.isArray(json.rewardSubmissions) ? json.rewardSubmissions : [],
-          };
-          const result = synchronizeStudents(rawResult);
-          memoryCache = { data: JSON.parse(JSON.stringify(result)), timestamp: Date.now() };
-          // حفظ نسخة محلية احتياطية
-          ensureLocalDirs()
-            .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
-            .catch(() => {});
-          return result;
-        }
-      } else {
-        console.warn(`[Storage] Blob fetch returned status ${res.status}: ${res.statusText}. Using bundled fallback.`);
+      if (!error && row && row.data && Array.isArray(row.data.lessons) && row.data.lessons.length > 0) {
+        const result = synchronizeStudents(row.data);
+        memoryCache = { data: JSON.parse(JSON.stringify(result)), timestamp: Date.now() };
+        ensureLocalDirs()
+          .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
+          .catch(() => {});
+        return result;
       }
-    } catch (fetchErr) {
-      console.warn("[Storage] Direct blob fetch failed, falling back to local/bundled:", fetchErr);
+    } catch (dbErr) {
+      console.warn("[Storage] Supabase DB read error:", dbErr);
     }
   }
 
-  // Local fallback
+  // 2. القراءة البديلة من سلة Supabase Storage
+  try {
+    const res = await fetch(`${FIXED_SUPABASE_DB_URL}?_t=${Date.now()}`, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json.lessons) && json.lessons.length > 0) {
+        const rawResult: LessonsData = {
+          lessons: json.lessons,
+          summons: Array.isArray(json.summons) ? json.summons : [],
+          honors: Array.isArray(json.honors) ? json.honors : [],
+          penalties: Array.isArray(json.penalties) ? json.penalties : [],
+          evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
+          inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
+          studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
+          gradebookRecords: Array.isArray(json.gradebookRecords) ? json.gradebookRecords : [],
+          parentGradebookLookup: Array.isArray(json.parentGradebookLookup) ? json.parentGradebookLookup : [],
+          announcements: Array.isArray(json.announcements) ? json.announcements : [],
+          anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
+          siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
+          rewardSubmissions: Array.isArray(json.rewardSubmissions) ? json.rewardSubmissions : [],
+        };
+        const result = synchronizeStudents(rawResult);
+        memoryCache = { data: JSON.parse(JSON.stringify(result)), timestamp: Date.now() };
+        ensureLocalDirs()
+          .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
+          .catch(() => {});
+        return result;
+      }
+    }
+  } catch (fetchErr) {
+    console.warn("[Storage] Direct Supabase storage fetch failed, trying local fallback:", fetchErr);
+  }
+
+  // 3. Local filesystem fallback
   try {
     await ensureLocalDirs();
     const data = await fs.readFile(LOCAL_DATA_FILE, "utf-8");
@@ -183,7 +203,7 @@ export async function getLessonsData(): Promise<LessonsData> {
     // Local filesystem not available on serverless
   }
 
-  // Guaranteed bundled fallback (always has complete 28 lessons, 166 students, 1088 views, 116 devices, 832 visits!)
+  // 4. Guaranteed bundled fallback (always has complete 49 lessons, 166 students, 1088 views, 116 devices, 832 visits!)
   const fallback = synchronizeStudents(JSON.parse(JSON.stringify(bundledLessonsData)));
   memoryCache = { data: JSON.parse(JSON.stringify(fallback)), timestamp: Date.now() };
   return fallback;
@@ -193,6 +213,7 @@ export async function getLessonsData(): Promise<LessonsData> {
 async function executeSave(data: LessonsData): Promise<void> {
   synchronizeStudents(data);
   memoryCache = { data: JSON.parse(JSON.stringify(data)), timestamp: Date.now() };
+
   // دمج وقائي صارم لمنع فقدان الدروس أو التلاميذ عند حدوث أي خطأ في الكاش
   try {
     const existing = await getLessonsData();
@@ -231,34 +252,39 @@ async function executeSave(data: LessonsData): Promise<void> {
   }
 
   synchronizeStudents(data);
-  const token = getBlobToken();
+  const payload = JSON.stringify(data, null, 2);
 
-  if (token) {
-    const payload = JSON.stringify(data, null, 2);
-
-    // تحديث مباشر للملف lessons-db.json دون استهلاك طلبات list أو del متقدمة
+  // 1. الحفظ إلى Supabase Database & Storage
+  const supabase = getSupabaseClient();
+  if (supabase) {
     try {
-      await put("lessons-db.json", payload, {
-        access: "public",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        token,
-      });
-    } catch (saveErr) {
-      console.error("Vercel Blob put error on lessons-db.json:", saveErr);
+      await supabase
+        .from("math_platform_store")
+        .upsert({
+          id: "platform_state",
+          data,
+          updated_at: new Date().toISOString(),
+        });
+    } catch (dbSaveErr) {
+      console.error("Supabase DB upsert error:", dbSaveErr);
     }
 
-    // حفظ نسخة محلية أيضاً للأمان
-    ensureLocalDirs()
-      .then(() => fs.writeFile(LOCAL_DATA_FILE, payload, "utf-8"))
-      .catch(() => {});
-
-    return;
+    try {
+      await supabase.storage
+        .from(BUCKET_NAME)
+        .upload("lessons-db.json", Buffer.from(payload, "utf-8"), {
+          contentType: "application/json",
+          upsert: true,
+        });
+    } catch (saveErr) {
+      console.error("Supabase Storage save error on lessons-db.json:", saveErr);
+    }
   }
 
-  // Local fallback
-  await ensureLocalDirs();
-  await fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+  // 2. حفظ نسخة محلية احتياطية
+  ensureLocalDirs()
+    .then(() => fs.writeFile(LOCAL_DATA_FILE, payload, "utf-8"))
+    .catch(() => {});
 }
 
 export function saveLessonsData(data: LessonsData): Promise<void> {
@@ -278,18 +304,29 @@ export async function uploadImageFile(
 ): Promise<{ url: string; downloadUrl: string }> {
   const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
   const uniqueName = `${Date.now()}-${safeName}`;
-  const token = getBlobToken();
+  const supabase = getSupabaseClient();
 
-  if (token) {
-    const blobPath = `lessons/${level}/${lessonId}/${uniqueName}`;
-    const blob = await put(blobPath, file, {
-      access: "public",
-      token,
-    });
-    return {
-      url: blob.url,
-      downloadUrl: blob.downloadUrl || blob.url,
-    };
+  if (supabase) {
+    const storagePath = `lessons/${level}/${lessonId}/${uniqueName}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const mimeType = (file as any).type || "image/jpeg";
+
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(storagePath, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (!error) {
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${storagePath}`;
+      return {
+        url: publicUrl,
+        downloadUrl: publicUrl,
+      };
+    } else {
+      console.error("Supabase upload error:", error);
+    }
   }
 
   // Local fallback
@@ -315,15 +352,26 @@ export async function uploadRewardProofFile(
 ): Promise<{ url: string }> {
   const safeName = (fileName || "proof.jpg").replace(/[^a-zA-Z0-9.-]/g, "_");
   const uniqueName = `proof-${Date.now()}-${safeName}`;
-  const token = getBlobToken();
+  const supabase = getSupabaseClient();
 
-  if (token) {
-    const blobPath = `rewards/proofs/${uniqueName}`;
-    const blob = await put(blobPath, file, {
-      access: "public",
-      token,
-    });
-    return { url: blob.url };
+  if (supabase) {
+    const storagePath = `rewards/proofs/${uniqueName}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const mimeType = (file as any).type || "image/jpeg";
+
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(storagePath, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (!error) {
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${storagePath}`;
+      return { url: publicUrl };
+    } else {
+      console.error("Supabase proof upload error:", error);
+    }
   }
 
   // Local fallback
@@ -338,13 +386,16 @@ export async function uploadRewardProofFile(
 
 // ----------------- حذف صورة -----------------
 export async function deleteImageFile(url: string): Promise<void> {
-  const token = getBlobToken();
+  const supabase = getSupabaseClient();
 
-  if (token && url.startsWith("http")) {
+  if (supabase && url.includes(`/storage/v1/object/public/${BUCKET_NAME}/`)) {
     try {
-      await del(url, { token });
+      const relPath = url.split(`/storage/v1/object/public/${BUCKET_NAME}/`)[1];
+      if (relPath) {
+        await supabase.storage.from(BUCKET_NAME).remove([relPath]);
+      }
     } catch (e) {
-      console.error("Error deleting blob:", e);
+      console.error("Error deleting from Supabase storage:", e);
     }
     return;
   }
