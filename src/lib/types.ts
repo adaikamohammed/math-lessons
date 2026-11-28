@@ -188,12 +188,13 @@ export type Announcement = {
   viewedDevices?: string[]; // مصفوفة معرفات الأجهزة لمنع تكرار الحساب لنفس الجهاز
 };
 
-export type MessageCategory = "question" | "suggestion" | "criticism" | "other";
+export type MessageCategory = "question" | "suggestion" | "criticism" | "other" | string;
 
 export type MessageReply = {
   content: string; // نص رد الأستاذ
   repliedAt: string; // تاريخ ووقت الرد
   isPublic?: boolean; // هل يُعرض في الإجابات العامة لتعم الفائدة
+  author?: string;
 };
 
 export type AnonymousMessage = {

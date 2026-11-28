@@ -2,6 +2,7 @@ import { put, del, list, get } from "@vercel/blob";
 import fs from "fs/promises";
 import path from "path";
 import { Lesson, LessonsData } from "./types";
+import { bundledLessonsData } from "./bundledData";
 
 const LOCAL_DATA_DIR = path.join(process.cwd(), "data");
 const LOCAL_DATA_FILE = path.join(LOCAL_DATA_DIR, "lessons.json");
@@ -136,31 +137,35 @@ export async function getLessonsData(): Promise<LessonsData> {
 
       if (res.ok) {
         const json = await res.json();
-        const rawResult: LessonsData = {
-          lessons: Array.isArray(json.lessons) ? json.lessons : [],
-          summons: Array.isArray(json.summons) ? json.summons : [],
-          honors: Array.isArray(json.honors) ? json.honors : [],
-          penalties: Array.isArray(json.penalties) ? json.penalties : [],
-          evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
-          inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
-          studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
-          gradebookRecords: Array.isArray(json.gradebookRecords) ? json.gradebookRecords : [],
-          parentGradebookLookup: Array.isArray(json.parentGradebookLookup) ? json.parentGradebookLookup : [],
-          announcements: Array.isArray(json.announcements) ? json.announcements : [],
-          anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
-          siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
-          rewardSubmissions: Array.isArray(json.rewardSubmissions) ? json.rewardSubmissions : [],
-        };
-        const result = synchronizeStudents(rawResult);
-        memoryCache = { data: JSON.parse(JSON.stringify(result)), timestamp: Date.now() };
-        // حفظ نسخة محلية احتياطية
-        ensureLocalDirs()
-          .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
-          .catch(() => {});
-        return result;
+        if (Array.isArray(json.lessons) && json.lessons.length > 0) {
+          const rawResult: LessonsData = {
+            lessons: json.lessons,
+            summons: Array.isArray(json.summons) ? json.summons : [],
+            honors: Array.isArray(json.honors) ? json.honors : [],
+            penalties: Array.isArray(json.penalties) ? json.penalties : [],
+            evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
+            inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
+            studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
+            gradebookRecords: Array.isArray(json.gradebookRecords) ? json.gradebookRecords : [],
+            parentGradebookLookup: Array.isArray(json.parentGradebookLookup) ? json.parentGradebookLookup : [],
+            announcements: Array.isArray(json.announcements) ? json.announcements : [],
+            anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
+            siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
+            rewardSubmissions: Array.isArray(json.rewardSubmissions) ? json.rewardSubmissions : [],
+          };
+          const result = synchronizeStudents(rawResult);
+          memoryCache = { data: JSON.parse(JSON.stringify(result)), timestamp: Date.now() };
+          // حفظ نسخة محلية احتياطية
+          ensureLocalDirs()
+            .then(() => fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(result, null, 2), "utf-8"))
+            .catch(() => {});
+          return result;
+        }
+      } else {
+        console.warn(`[Storage] Blob fetch returned status ${res.status}: ${res.statusText}. Using bundled fallback.`);
       }
     } catch (fetchErr) {
-      console.warn("Direct blob fetch failed, falling back to local file:", fetchErr);
+      console.warn("[Storage] Direct blob fetch failed, falling back to local/bundled:", fetchErr);
     }
   }
 
@@ -169,38 +174,19 @@ export async function getLessonsData(): Promise<LessonsData> {
     await ensureLocalDirs();
     const data = await fs.readFile(LOCAL_DATA_FILE, "utf-8");
     const json = JSON.parse(data);
-    return {
-      lessons: Array.isArray(json.lessons) ? json.lessons : [],
-      summons: Array.isArray(json.summons) ? json.summons : [],
-      honors: Array.isArray(json.honors) ? json.honors : [],
-      penalties: Array.isArray(json.penalties) ? json.penalties : [],
-      evaluations: Array.isArray(json.evaluations) ? json.evaluations : [],
-      inspectionSessions: Array.isArray(json.inspectionSessions) ? json.inspectionSessions : [],
-      studentRoster: Array.isArray(json.studentRoster) ? json.studentRoster : [],
-      gradebookRecords: Array.isArray(json.gradebookRecords) ? json.gradebookRecords : [],
-      parentGradebookLookup: Array.isArray(json.parentGradebookLookup) ? json.parentGradebookLookup : [],
-      announcements: Array.isArray(json.announcements) ? json.announcements : [],
-      anonymousMessages: Array.isArray(json.anonymousMessages) ? json.anonymousMessages : [],
-      siteAnalytics: json.siteAnalytics || { totalVisits: 0 },
-      rewardSubmissions: Array.isArray(json.rewardSubmissions) ? json.rewardSubmissions : [],
-    };
+    if (Array.isArray(json.lessons) && json.lessons.length > 0) {
+      const result = synchronizeStudents(json);
+      memoryCache = { data: JSON.parse(JSON.stringify(result)), timestamp: Date.now() };
+      return result;
+    }
   } catch {
-    return {
-      lessons: [],
-      summons: [],
-      honors: [],
-      penalties: [],
-      evaluations: [],
-      inspectionSessions: [],
-      studentRoster: [],
-      gradebookRecords: [],
-      parentGradebookLookup: [],
-      announcements: [],
-      anonymousMessages: [],
-      siteAnalytics: { totalVisits: 0 },
-      rewardSubmissions: [],
-    };
+    // Local filesystem not available on serverless
   }
+
+  // Guaranteed bundled fallback (always has complete 28 lessons, 166 students, 1088 views, 116 devices, 832 visits!)
+  const fallback = synchronizeStudents(JSON.parse(JSON.stringify(bundledLessonsData)));
+  memoryCache = { data: JSON.parse(JSON.stringify(fallback)), timestamp: Date.now() };
+  return fallback;
 }
 
 // ----------------- حفظ بيانات الدروس -----------------
